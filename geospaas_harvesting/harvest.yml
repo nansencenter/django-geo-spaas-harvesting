@@ -1,0 +1,9 @@
+---
+harvesters:
+  podaac:
+    class: 'PODAACHarvester'
+    urls:
+      - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
+      - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
+      - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
+...
