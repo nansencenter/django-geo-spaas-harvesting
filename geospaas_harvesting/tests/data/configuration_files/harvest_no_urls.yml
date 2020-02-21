@@ -1,0 +1,6 @@
+---
+harvesters:
+  test:
+    class: 'TestHarvester'
+    irrelevant: 'prop'
+...
