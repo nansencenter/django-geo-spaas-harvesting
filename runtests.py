@@ -19,5 +19,5 @@ if __name__ == "__main__":
 
     TestRunner = get_runner(settings)
     test_runner = TestRunner()
-    failures = test_runner.run_tests(["geospaas_harvesting.tests" + test_module])
+    failures = test_runner.run_tests(["tests" + test_module])
     sys.exit(bool(failures))
