@@ -92,12 +92,12 @@ class ConfigurationTestCase(unittest.TestCase):
         conf_file_path = CONFIGURATION_FILES['ok']
 
         # Test short argument
-        with mock.patch.object(sys, 'argv', ['harvest.py', '-c', conf_file_path]):
+        with mock.patch.object(sys, 'argv', [harvest.__file__, '-c', conf_file_path]):
             configuration = harvest.Configuration()
         self.assertEqual(configuration._path, conf_file_path)
 
         # Test long argument
-        with mock.patch.object(sys, 'argv', ['harvest.py', '--config', conf_file_path]):
+        with mock.patch.object(sys, 'argv', [harvest.__file__, '--config', conf_file_path]):
             configuration = harvest.Configuration()
         self.assertEqual(configuration._path, conf_file_path)
 

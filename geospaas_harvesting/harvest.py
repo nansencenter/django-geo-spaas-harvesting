@@ -66,16 +66,17 @@ class Configuration():
     def _get_cli_arguments(self):
         """Parse CLI arguments"""
         # Parse the arguments only when this module was directly executed
-        if sys.argv[0] == os.path.basename(__file__):
+        if sys.argv[0] == __file__:
             arg_parser = argparse.ArgumentParser(
                 description='Harvests data for the GeoSPaaS catalog')
             arg_parser.add_argument('-c', '--config',
-                                    default=self.DEFAULT_CONFIGURATION_PATH,
                                     dest='config_path',
+                                    default=self.DEFAULT_CONFIGURATION_PATH,
                                     help='Path to the configuration file')
             arguments = arg_parser.parse_args()
         else:
             arguments = argparse.Namespace()
+            setattr(arguments, 'config_path', self.DEFAULT_CONFIGURATION_PATH)
 
         return arguments
 
