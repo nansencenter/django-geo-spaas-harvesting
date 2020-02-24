@@ -11,11 +11,11 @@ INSTALLED_APPS = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD')
+        'HOST': os.getenv('GEOSPAAS_DB_HOST', 'localhost'),
+        'PORT': os.getenv('GEOSPAAS_DB_PORT', '5432'),
+        'NAME': os.getenv('GEOSPAAS_DB_NAME', 'geodjango'),
+        'USER': os.getenv('GEOSPAAS_DB_USER', 'geodjango'),
+        'PASSWORD': os.getenv('GEOSPAAS_DB_PASSWORD')
     }
 }
 
