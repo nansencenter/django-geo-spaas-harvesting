@@ -272,7 +272,7 @@ class NansatIngester(Ingester):
                 if created_dataset:
                     LOGGER.info("Successfully created dataset from url: '%s'", url)
                 else:
-                    LOGGER.info("Dataset at '%s' already exists.", url)
+                    LOGGER.info("Dataset at '%s' already exists in the database.", url)
 
                 if not created_dataset_uri:
                     LOGGER.error("The Dataset's URI already exists. This should never happen.")
