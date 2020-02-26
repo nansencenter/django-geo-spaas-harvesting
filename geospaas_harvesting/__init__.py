@@ -3,19 +3,21 @@ This module provides means to gather metadata about various Datasets into the Ge
 """
 #TODO: review docstrings in the whole package
 
-import logging
-import logging.handlers
+import logging.config
+import os
+import os.path
+import sys
+import yaml
 
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.INFO)
+DEFAULT_LOGGING_CONF_FILE = os.path.join(os.path.dirname(__file__), 'logging.yml')
+LOGGING_CONF_FILE = os.getenv('GEOSPAAS_HARVESTING_LOG_CONF_PATH', DEFAULT_LOGGING_CONF_FILE)
 
-FORMATTER = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# HANDLER = logging.StreamHandler()
-HANDLER = logging.handlers.RotatingFileHandler(
-    '/var/log/geospaas/harvesting.log',
-    maxBytes=100000000,
-    backupCount=10)
+try:
+    with open(LOGGING_CONF_FILE, 'rb') as stream:
+        logging_configuration = yaml.safe_load(stream)  # pylint: disable=invalid-name
+except FileNotFoundError:
+    print(f"'{LOGGING_CONF_FILE}' does not exist, logging can't be configured.", file=sys.stderr)
+    logging_configuration = None  # pylint: disable=invalid-name
 
-HANDLER.setFormatter(FORMATTER)
-
-LOGGER.addHandler(HANDLER)
+if logging_configuration:
+    logging.config.dictConfig(logging_configuration)
