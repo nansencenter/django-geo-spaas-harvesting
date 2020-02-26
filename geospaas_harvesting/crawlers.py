@@ -63,7 +63,7 @@ class OpenDAPCrawler(Crawler):
         links = self._get_links(self._get_html_page(folder_url))
         for link in links:
             # Select links which do not contain any of the self.EXCLUDE strings
-            if all(map(lambda s: s not in link, self.EXCLUDE)):
+            if all(map(lambda s, l=link: s not in l, self.EXCLUDE)):
                 if link.endswith(self.FOLDERS_SUFFIXES):
                     LOGGER.debug("Adding '%s' to the list of pages to process.", link)
                     self._to_process.add(f"{current_location}/{link}")
