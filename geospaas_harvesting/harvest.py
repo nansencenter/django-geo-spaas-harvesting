@@ -15,6 +15,7 @@ import geospaas_harvesting.harvesters as harvesters # pylint: disable=wrong-impo
 
 LOGGER_NAME = 'geospaas_harvesting.daemon'
 LOGGER = logging.getLogger(LOGGER_NAME)
+LOGGER.addHandler(logging.NullHandler())
 
 
 class Configuration():

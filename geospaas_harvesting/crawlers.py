@@ -6,6 +6,7 @@ import requests
 
 
 LOGGER = logging.getLogger(__name__)
+LOGGER.addHandler(logging.NullHandler())
 
 
 class Crawler():
