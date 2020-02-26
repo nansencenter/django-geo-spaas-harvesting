@@ -3,7 +3,6 @@ language: shell
 services:
   - docker
   - postgresql
-if: 'type = push'
 
 # Environment variables defined as part of the Travis CI repository configuration are:
 # - DOCKER_ORG: the docker hub organization (or user) to which the image will be pushed
@@ -19,6 +18,7 @@ env:
 jobs:
   include:
     - stage: 'Unit tests'
+      if: 'type = push'
       env:
         - GEOSPAAS_DB_HOST='db'
         - GEOSPAAS_DB_USER='test'
@@ -31,7 +31,7 @@ jobs:
           --network testing
           --name "$GEOSPAAS_DB_HOST"
           -e "POSTGRES_USER=$GEOSPAAS_DB_USER" -e "POSTGRES_PASSWORD=$GEOSPAAS_DB_PASSWORD"
-          postgis/postgis:12-2.5
+          'postgis/postgis:12-2.5'
       script:
         - >
           docker run --rm
@@ -47,4 +47,28 @@ jobs:
           && pip install 'https://github.com/nansencenter/metanorm/releases/download/${METANORM_VERSION}/metanorm-${METANORM_VERSION}-py3-none-any.whl'
           && coverage run --source=./geospaas_harvesting ./runtests.py
           && coveralls"
+      after_script:
+        - docker stop "$GEOSPAAS_DB_HOST"
+
+    - stage: 'Build docker image'
+      if: type = pull_request OR tag IS present
+      env:
+        - IMAGE_NAME="${DOCKER_ORG}/geospaas_harvesting"
+        - DOCKER_TMP_TAG='tmp'
+      install:
+        - docker pull "${IMAGE_NAME}" || true
+      script:
+        - >
+          docker build .
+          --cache-from "${IMAGE_NAME}"
+          --build-arg "METANORM_VERSION=$METANORM_VERSION"
+          -t "${IMAGE_NAME}:${DOCKER_TMP_TAG}"
+        - docker run --rm --entrypoint '' "${IMAGE_NAME}:${DOCKER_TMP_TAG}" python -c 'import geospaas_harvesting'
+      before_deploy:
+        - docker login -u "${DOCKER_USER}" -p "${DOCKER_PASS}"
+      deploy:
+        provider: script
+        on:
+          tags: true
+        script: /bin/bash scripts/docker_push.sh "${TRAVIS_TAG}" latest
 ...
