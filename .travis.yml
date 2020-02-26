@@ -33,7 +33,6 @@ jobs:
           -e "POSTGRES_USER=$GEOSPAAS_DB_USER" -e "POSTGRES_PASSWORD=$GEOSPAAS_DB_PASSWORD"
           postgis/postgis:12-2.5
       script:
-        # The psycopg2 installation can be removed once it's added in the geospaas image
         - >
           docker run --rm
           --network testing
