@@ -28,7 +28,8 @@ class Configuration():
     def __init__(self, config_path=None):
         self._cli_args = self._get_cli_arguments()
         self._path = config_path or self._cli_args.config_path
-        self._data = self._load_configuration()
+        self._data = None
+        self._load_configuration()
         self._validate()
 
     @property
@@ -83,14 +84,11 @@ class Configuration():
 
     def _load_configuration(self):
         """Loads the harvesting configuration from a file"""
-        config_data = None
         try:
-            with open(self._path, 'r') as config_stream:
-                config_data = yaml.safe_load(config_stream)
+            with open(self._path, 'rb') as config_stream:
+                self._data = yaml.safe_load(config_stream)
         except FileNotFoundError as error:
             LOGGER.exception('Configuration file not found', exc_info=error)
-
-        return config_data
 
 
 def main():
