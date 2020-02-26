@@ -33,10 +33,7 @@ class Configuration():
         self._validate()
 
     def __getitem__(self, key):
-        if isinstance(key, str):
-            return self._data[key]
-        else:
-            raise TypeError('Key must be a string')
+        return self._data[key]
 
     def __len__(self):
         return len(self._data)
