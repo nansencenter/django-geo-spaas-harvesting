@@ -32,11 +32,6 @@ class Configuration():
         self._load_configuration()
         self._validate()
 
-    @property
-    def data(self):
-        """Getter for the configuration data"""
-        return self._data
-
     def __getitem__(self, key):
         if isinstance(key, str):
             return self._data[key]
