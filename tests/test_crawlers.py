@@ -120,7 +120,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         self.assertSetEqual(crawler._to_process, set([self.TEST_DATA['folder']['url']]))
 
     def test_iterating(self):
-        """Test the state of the crawler the call to the __iter__ method"""
+        """Test the call to the __iter__ method"""
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
         crawler_iterator = iter(crawler)
 

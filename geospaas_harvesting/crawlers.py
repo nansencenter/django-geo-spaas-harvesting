@@ -30,9 +30,9 @@ class OpenDAPCrawler(Crawler):
 
     def __init__(self, root_url):
         super().__init__(root_url)
-        # The _urls attribute contains URLs to the ressources which will be returned by the crawler
+        # The _urls attribute contains URLs to the resources which will be returned by the crawler
         self._urls = set()
-        # The _to_process attribute contains URLs to pages which need to be searched for ressources
+        # The _to_process attribute contains URLs to pages which need to be searched for resources
         self._to_process = set()
 
     def __iter__(self):
@@ -43,7 +43,7 @@ class OpenDAPCrawler(Crawler):
     def __next__(self):
         """Make the crawler an iterator"""
         try:
-            # Return all ressource URLs from the previously processed folder
+            # Return all resource URLs from the previously processed folder
             result = self._urls.pop()
         except KeyError:
             # If no more URLs from the previously processed folder are available,
@@ -57,7 +57,7 @@ class OpenDAPCrawler(Crawler):
 
     def _explore_page(self, folder_url):
         """Gets all relevant links from a page and feeds the _urls and _to_process attributes"""
-        LOGGER.info("Looking for ressources in '%s'...", folder_url)
+        LOGGER.info("Looking for resources in '%s'...", folder_url)
 
         current_location = re.sub(r'/\w+\.\w+$', '', folder_url)
         links = self._get_links(self._get_html_page(folder_url))
@@ -68,7 +68,7 @@ class OpenDAPCrawler(Crawler):
                     LOGGER.debug("Adding '%s' to the list of pages to process.", link)
                     self._to_process.add(f"{current_location}/{link}")
                 elif link.endswith(self.FILES_SUFFIXES):
-                    LOGGER.debug("Adding '%s' to the list of ressources.", link)
+                    LOGGER.debug("Adding '%s' to the list of resources.", link)
                     self._urls.add(f"{current_location}/{link}")
 
     @staticmethod
