@@ -103,6 +103,12 @@ def main():
     except ValueError:
         LOGGER.error("Could not iterate over harvesters list, please check the configuration file",
                      exc_info=True)
+    except KeyboardInterrupt:
+        LOGGER.error("The process was killed", exc_info=True)
+        exit(1)
+    except Exception: # pylint: disable=broad-except
+        LOGGER.error("An unexpected error occurred", exc_info=True)
+        raise
 
 
 if __name__ == '__main__':
