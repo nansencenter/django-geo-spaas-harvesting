@@ -31,9 +31,9 @@ class OpenDAPCrawler(Crawler):
     def __init__(self, root_url):
         super().__init__(root_url)
         # The _urls attribute contains URLs to the resources which will be returned by the crawler
-        self._urls = set()
+        self._urls = []
         # The _to_process attribute contains URLs to pages which need to be searched for resources
-        self._to_process = set()
+        self._to_process = []
 
     def __iter__(self):
         """Make the crawler iterable"""
@@ -45,13 +45,13 @@ class OpenDAPCrawler(Crawler):
         try:
             # Return all resource URLs from the previously processed folder
             result = self._urls.pop()
-        except KeyError:
+        except IndexError:
             # If no more URLs from the previously processed folder are available,
             # process the next one
             try:
                 self._explore_page(self._to_process.pop())
                 result = self.__next__()
-            except KeyError:
+            except IndexError:
                 raise StopIteration
         return result
 
@@ -66,10 +66,10 @@ class OpenDAPCrawler(Crawler):
             if all(map(lambda s, l=link: s not in l, self.EXCLUDE)):
                 if link.endswith(self.FOLDERS_SUFFIXES):
                     LOGGER.debug("Adding '%s' to the list of pages to process.", link)
-                    self._to_process.add(f"{current_location}/{link}")
+                    self._to_process.append(f"{current_location}/{link}")
                 elif link.endswith(self.FILES_SUFFIXES):
                     LOGGER.debug("Adding '%s' to the list of resources.", link)
-                    self._urls.add(f"{current_location}/{link}")
+                    self._urls.append(f"{current_location}/{link}")
 
     @staticmethod
     def _get_html_page(url):

@@ -76,8 +76,8 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
         self.assertIsInstance(crawler, crawlers.Crawler)
         self.assertEqual(crawler.root_url, self.TEST_DATA['root']['url'])
-        self.assertEqual(crawler._urls, set())
-        self.assertEqual(crawler._to_process, set())
+        self.assertListEqual(crawler._urls, [])
+        self.assertListEqual(crawler._to_process, [])
 
     def test_get_correct_html_contents(self):
         """Test that the _get_html_page() method returns the correct HTML string"""
@@ -116,8 +116,8 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         """
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
         crawler._explore_page(self.TEST_DATA['root']['url'])
-        self.assertSetEqual(crawler._urls, set([self.TEST_DATA['root_dataset']['url']]))
-        self.assertSetEqual(crawler._to_process, set([self.TEST_DATA['folder']['url']]))
+        self.assertListEqual(crawler._urls, [self.TEST_DATA['root_dataset']['url']])
+        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['url']])
 
     def test_iterating(self):
         """Test the call to the __iter__ method"""
@@ -125,8 +125,8 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         crawler_iterator = iter(crawler)
 
         # Test the initial state of the crawler
-        self.assertSetEqual(crawler._urls, set([self.TEST_DATA['root_dataset']['url']]))
-        self.assertSetEqual(crawler._to_process, set([self.TEST_DATA['folder']['url']]))
+        self.assertListEqual(crawler._urls, [self.TEST_DATA['root_dataset']['url']])
+        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['url']])
 
         # Test the values returned by the iterator
         self.assertEqual(next(crawler_iterator), self.TEST_DATA['root_dataset']['url'])
