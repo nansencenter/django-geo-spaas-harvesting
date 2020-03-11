@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import os.path
+import pickle
 import sys
 import yaml
 
@@ -17,6 +18,9 @@ import geospaas_harvesting.harvesters as harvesters # pylint: disable=wrong-impo
 LOGGER_NAME = 'geospaas_harvesting.daemon'
 LOGGER = logging.getLogger(LOGGER_NAME)
 LOGGER.addHandler(logging.NullHandler())
+
+PERSISTENCE_DIR = os.getenv('GEOSPAAS_PERSISTENCE_DIR', os.path.join('/', 'var', 'run', 'geospaas'))
+PERSISTENCE_FILE = os.path.join(PERSISTENCE_DIR, 'harvesters_state')
 
 
 class Configuration():
@@ -84,32 +88,53 @@ class Configuration():
             LOGGER.exception('Configuration file not found', exc_info=error)
 
 
+def dump(obj, path):
+    """Convenience function to serialize objects"""
+    with open(path, 'wb') as persistence_file_handler:
+        pickle.dump(obj, persistence_file_handler)
+
+def load(path):
+    """Convenience function to deserialize objects"""
+    with open(path, 'rb') as persistence_file_handler:
+        return pickle.load(persistence_file_handler)
+
 def main():
     """Loads harvesting configuration and runs each harvester in turn"""
-    #TODO: add a way to resume when stopped
-    # Load the configuration
-    try:
-        config = Configuration()
-    except AssertionError:
-        LOGGER.error('Invalid configuration', exc_info=True)
-        exit(1)
 
-    # Build a list of harvester instances
-    harvesters_list = harvesters.HarvesterList(config['harvesters'])
+    # Deserialize the last known state if possible, otherwise initialize harvesters from
+    # configuration
+    if os.path.exists(PERSISTENCE_FILE):
+        (current_harvester, harvesters_iterator) = load(PERSISTENCE_FILE)
+        os.remove(PERSISTENCE_FILE)
+    else:
+        try:
+            config = Configuration()
+        except AssertionError:
+            LOGGER.error('Invalid configuration', exc_info=True)
+            sys.exit(1)
+        harvesters_iterator = iter(harvesters.HarvesterList(config['harvesters']))
+        current_harvester = next(harvesters_iterator)
 
     # Infinite loop
-    try:
-        for harvester in harvesters_list:
-            harvester.harvest()
-    except ValueError:
-        LOGGER.error("Could not iterate over harvesters list, please check the configuration file",
-                     exc_info=True)
-    except KeyboardInterrupt:
-        LOGGER.error("The process was killed", exc_info=True)
-        exit(1)
-    except Exception: # pylint: disable=broad-except
-        LOGGER.error("An unexpected error occurred", exc_info=True)
-        raise
+    while True:
+        try:
+            current_harvester.harvest()
+        except ValueError:
+            LOGGER.error(
+                "Could not iterate over harvesters list, please check the configuration file",
+                exc_info=True)
+        except KeyboardInterrupt:
+            LOGGER.error("The process was killed", exc_info=True)
+            LOGGER.info("Dumping current state...")
+            dump((current_harvester, harvesters_iterator), PERSISTENCE_FILE)
+            sys.exit(1)
+        except Exception:  # pylint: disable=broad-except
+            LOGGER.error("An unexpected error occurred", exc_info=True)
+            LOGGER.info("Dumping current state...")
+            dump((current_harvester, harvesters_iterator), PERSISTENCE_FILE)
+            raise
+        else:
+            current_harvester = next(harvesters_iterator)
 
 
 if __name__ == '__main__':
