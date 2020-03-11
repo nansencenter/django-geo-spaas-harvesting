@@ -18,13 +18,39 @@ class HarvesterConfigurationError(Exception):
 class Harvester():
     """Base Harvester class"""
 
+    CRAWLER_CLASS = crawlers.Crawler
+    INGESTER_CLASS = ingesters.Ingester
+
     def __init__(self, **config):
         """Load the configuration for the harvester from the file and the constructor arguments"""
+
+        if self.__class__.__name__ == 'Harvester':
+            raise NotImplementedError('Harvester is a base class, it should not be instanciated')
+
         self.config = config
 
+        try:
+            root_urls = self.config['urls']
+        except (KeyError, TypeError):
+            raise HarvesterConfigurationError(
+                "The 'urls' configuration for the PODAACHarvester was found neither in the " +
+                "configuration file, nor in the constructor arguments.")
+
+        self._crawlers_iterator = iter([self.CRAWLER_CLASS(url) for url in root_urls])
+        self._current_crawler = next(self._crawlers_iterator)
+        self._ingester = self.INGESTER_CLASS()
+
     def harvest(self):
-        """Use the class' crawlers and ingesters to get data from a provider"""
-        raise NotImplementedError('The fetch_data() method was not implemented')
+        """
+        Crawl through the URLs and ingest files
+        Looping by using the iterator explicitly enables to resume after a deserialization
+        """
+        while True:
+            try:
+                self._ingester.ingest(self._current_crawler)
+                self._current_crawler = next(self._crawlers_iterator)
+            except StopIteration:
+                break
 
 
 class EndlessHarvesterIterator():
@@ -98,30 +124,5 @@ class HarvesterList():
 
 class PODAACHarvester(Harvester):
     """Harvester class for PODAAC data (NASA)"""
-
-    def __init__(self, **config):
-        # Use the parent constructor to load the configuration
-        super().__init__(**config)
-
-        try:
-            root_urls = self.config['urls']
-        except (KeyError, TypeError):
-            raise HarvesterConfigurationError(
-                "The 'urls' configuration for the PODAACHarvester was found neither in the " +
-                "configuration file, nor in the constructor arguments.")
-
-        self._crawlers_iterator = iter([crawlers.OpenDAPCrawler(url) for url in root_urls])
-        self._current_crawler = next(self._crawlers_iterator)
-        self._ingester = ingesters.DDXIngester()
-
-    def harvest(self):
-        """
-        Crawl through the PO.DAAC OpenDAP server and ingest files using their metadata
-        Looping by using the iterator explicitly enables to resume after a deserialization
-        """
-        while True:
-            try:
-                self._ingester.ingest(self._current_crawler)
-                self._current_crawler = next(self._crawlers_iterator)
-            except StopIteration:
-                break
+    CRAWLER_CLASS = crawlers.OpenDAPCrawler
+    INGESTER_CLASS = ingesters.DDXIngester

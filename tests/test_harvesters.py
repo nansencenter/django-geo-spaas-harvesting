@@ -5,15 +5,56 @@ import logging
 import unittest
 import unittest.mock as mock
 
+import geospaas_harvesting.crawlers as crawlers
+import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.harvesters as harvesters
 
 TOP_PACKAGE = 'geospaas_harvesting'
+
+class MockCrawler():
+    """Mock crawler class which iterates over a defined set of URLs"""
+
+    TEST_DATA = {
+        'https://random1.url': ['ressource_1', 'ressource_2'],
+        'https://random2.url': ['ressource_a', 'ressource_b', 'ressource_c']
+    }
+
+    def __init__(self, root_url):
+        """Build a list of URLs which will be returned by the iterator"""
+        self.data = []
+        try:
+            for uri in self.TEST_DATA[root_url]:
+                self.data.append(f'{root_url}/{uri}')
+        except KeyError:
+            pass
+
+        self.current_index = 0
+
+    def __iter__(self):
+        return iter(self.data)
+
+class MockIngester():
+    """Mock ingester class """
+    INGESTED_URLS = []
+
+    def ingest(self, urls):
+        """Appends the URLs in the 'urls' iterable to the list of ingested URLs"""
+        for url in urls:
+            self.INGESTED_URLS.append(url)
+
+class MockHarvester(harvesters.Harvester):
+    """Mock harvester class using the previously defined mock crawler and ingester"""
+    CRAWLER_CLASS = MockCrawler
+    INGESTER_CLASS = MockIngester
 
 class HarvesterListTestCase(unittest.TestCase):
     """Test the HarvesterList behavior"""
 
     class TestHarvester(harvesters.Harvester):
         """Dummy Harvester used for tests"""
+        def __init__(self, **config):
+            self.config = config
+
         def harvest(self):
             pass
 
@@ -97,60 +138,25 @@ class HarvesterListTestCase(unittest.TestCase):
         self.assertEqual(next(iterator).config['id'], 1)
 
 
-class PODAACHarvesterTestCase(unittest.TestCase):
-    """Test the PO.DAAC harvester"""
+class HarvesterTestCase(unittest.TestCase):
+    """Test the base harvester"""
 
-    class MockCrawler():
-        """Mock crawler class which iterates over a defined set of URLs"""
-
-        TEST_DATA = {
-            'https://random1.url': ['ressource_1', 'ressource_2'],
-            'https://random2.url': ['ressource_a', 'ressource_b', 'ressource_c']
-        }
-
-        def __init__(self, root_url):
-            """Build a list of URLs which will be returned by the iterator"""
-            self.data = []
-            try:
-                for uri in self.TEST_DATA[root_url]:
-                    self.data.append(f'{root_url}/{uri}')
-            except KeyError:
-                pass
-
-            self.current_index = 0
-
-        def __iter__(self):
-            return self
-
-        def __next__(self):
-            """Return the next element in the list of URLs"""
-            try:
-                result = self.current_index
-                self.current_index += 1
-                return self.data[result]
-            except IndexError:
-                raise StopIteration
-
-    class MockIngester():
-        """Mock class """
-        INGESTED_URLS = []
-
-        def ingest(self, urls):
-            """Appends the URLs in the 'urls' iterable to the list of ingested URLs"""
-            for url in urls:
-                self.INGESTED_URLS.append(url)
+    def test_exception_on_instantiate_base_harvester(self):
+        """An exception is raised if an attempt is made to instantiate the base Harvester class"""
+        with self.assertRaises(NotImplementedError):
+            _ = harvesters.Harvester()
 
     def test_correct_conf_loading(self):
         """Test that a correct configuration file is used the proper way"""
         urls = ['https://random1.url', 'https://random2.url']
 
-        harvester = harvesters.PODAACHarvester(urls=urls)
+        harvester = MockHarvester(urls=urls)
         self.assertDictEqual(harvester.config, {'urls': urls})
 
     def test_empty_conf_loading(self):
         """An exception must be raised if the configuration file is empty"""
         with self.assertRaises(harvesters.HarvesterConfigurationError):
-            _ = harvesters.PODAACHarvester()
+            _ = MockHarvester()
 
     def test_conf_without_url_loading(self):
         """
@@ -158,24 +164,23 @@ class PODAACHarvesterTestCase(unittest.TestCase):
         harvester's section
         """
         with self.assertRaises(harvesters.HarvesterConfigurationError):
-            _ = harvesters.PODAACHarvester(nonsense='arg')
+            _ = MockHarvester(nonsense='arg')
 
     def test_all_urls_ingested(self):
         """Tests that all root URLs are explored"""
+        harvester = MockHarvester(urls=['https://random1.url', 'https://random2.url'])
+        harvester.harvest()
 
-        with mock.patch(
-                f'{TOP_PACKAGE}.crawlers.OpenDAPCrawler',
-                self.MockCrawler), mock.patch(
-                    f'{TOP_PACKAGE}.ingesters.DDXIngester',
-                    self.MockIngester) as mock_ingester:
-            harvester = harvesters.PODAACHarvester(
-                urls=['https://random1.url', 'https://random2.url'])
-            harvester.harvest()
+        self.assertListEqual(
+            harvester._ingester.INGESTED_URLS,
+            ['https://random1.url/ressource_1',
+             'https://random1.url/ressource_2',
+             'https://random2.url/ressource_a',
+             'https://random2.url/ressource_b',
+             'https://random2.url/ressource_c'])
 
-            self.assertListEqual(
-                mock_ingester.INGESTED_URLS,
-                ['https://random1.url/ressource_1',
-                 'https://random1.url/ressource_2',
-                 'https://random2.url/ressource_a',
-                 'https://random2.url/ressource_b',
-                 'https://random2.url/ressource_c'])
+    def test_podaac_harvester(self):
+        """The PODAAC harvester has the correct crawler and ingester"""
+        harvester = harvesters.PODAACHarvester(urls=[''])
+        self.assertIsInstance(harvester._current_crawler, crawlers.OpenDAPCrawler)
+        self.assertIsInstance(harvester._ingester, ingesters.DDXIngester)
