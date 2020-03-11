@@ -110,10 +110,18 @@ class PODAACHarvester(Harvester):
                 "The 'urls' configuration for the PODAACHarvester was found neither in the " +
                 "configuration file, nor in the constructor arguments.")
 
-        self._crawlers = [crawlers.OpenDAPCrawler(url) for url in root_urls]
+        self._crawlers_iterator = iter([crawlers.OpenDAPCrawler(url) for url in root_urls])
+        self._current_crawler = next(self._crawlers_iterator)
         self._ingester = ingesters.DDXIngester()
 
     def harvest(self):
-        """Crawl through the PO.DAAC OpenDAP server and ingest files using their metadata"""
-        for crawler in self._crawlers:
-            self._ingester.ingest(crawler)
+        """
+        Crawl through the PO.DAAC OpenDAP server and ingest files using their metadata
+        Looping by using the iterator explicitly enables to resume after a deserialization
+        """
+        while True:
+            try:
+                self._ingester.ingest(self._current_crawler)
+                self._current_crawler = next(self._crawlers_iterator)
+            except StopIteration:
+                break
