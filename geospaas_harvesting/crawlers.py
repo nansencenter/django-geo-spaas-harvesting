@@ -1,9 +1,9 @@
 """A set of crawlers used to explore data provider interfaces and get resources URLs"""
+
 import logging
 from html.parser import HTMLParser
 import re
 import requests
-
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.NullHandler())
@@ -11,8 +11,6 @@ LOGGER.addHandler(logging.NullHandler())
 
 class Crawler():
     """Base Crawler class"""
-    def __init__(self, root_url):
-        self.root_url = root_url.rstrip('/')
 
     def __iter__(self):
         raise NotImplementedError('The __iter__() method was not implemented')
@@ -29,15 +27,15 @@ class OpenDAPCrawler(Crawler):
     EXCLUDE = ('?')
 
     def __init__(self, root_url):
-        super().__init__(root_url)
-        # The _urls attribute contains URLs to the resources which will be returned by the crawler
+        """
+        The _urls attribute contains URLs to the resources which will be returned by the crawler
+        The _to_process attribute contains URLs to pages which need to be searched for resources
+        """
         self._urls = []
-        # The _to_process attribute contains URLs to pages which need to be searched for resources
-        self._to_process = []
+        self._to_process = [root_url.rstrip('/')]
 
     def __iter__(self):
         """Make the crawler iterable"""
-        self._explore_page(self.root_url)
         return self
 
     def __next__(self):
