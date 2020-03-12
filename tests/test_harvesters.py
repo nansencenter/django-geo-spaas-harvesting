@@ -9,43 +9,10 @@ import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.harvesters as harvesters
 
+from .stubs import StubHarvester
+
 TOP_PACKAGE = 'geospaas_harvesting'
 
-class MockCrawler():
-    """Mock crawler class which iterates over a defined set of URLs"""
-
-    TEST_DATA = {
-        'https://random1.url': ['ressource_1', 'ressource_2'],
-        'https://random2.url': ['ressource_a', 'ressource_b', 'ressource_c']
-    }
-
-    def __init__(self, root_url):
-        """Build a list of URLs which will be returned by the iterator"""
-        self.data = []
-        try:
-            for uri in self.TEST_DATA[root_url]:
-                self.data.append(f'{root_url}/{uri}')
-        except KeyError:
-            pass
-
-        self.current_index = 0
-
-    def __iter__(self):
-        return iter(self.data)
-
-class MockIngester():
-    """Mock ingester class """
-    INGESTED_URLS = []
-
-    def ingest(self, urls):
-        """Appends the URLs in the 'urls' iterable to the list of ingested URLs"""
-        for url in urls:
-            self.INGESTED_URLS.append(url)
-
-class MockHarvester(harvesters.Harvester):
-    """Mock harvester class using the previously defined mock crawler and ingester"""
-    CRAWLER_CLASS = MockCrawler
-    INGESTER_CLASS = MockIngester
 
 class HarvesterListTestCase(unittest.TestCase):
     """Test the HarvesterList behavior"""
@@ -150,13 +117,13 @@ class HarvesterTestCase(unittest.TestCase):
         """Test that a correct configuration file is used the proper way"""
         urls = ['https://random1.url', 'https://random2.url']
 
-        harvester = MockHarvester(urls=urls)
+        harvester = StubHarvester(urls=urls)
         self.assertDictEqual(harvester.config, {'urls': urls})
 
     def test_empty_conf_loading(self):
         """An exception must be raised if the configuration file is empty"""
         with self.assertRaises(harvesters.HarvesterConfigurationError):
-            _ = MockHarvester()
+            _ = StubHarvester()
 
     def test_conf_without_url_loading(self):
         """
@@ -164,17 +131,17 @@ class HarvesterTestCase(unittest.TestCase):
         harvester's section
         """
         with self.assertRaises(harvesters.HarvesterConfigurationError):
-            _ = MockHarvester(nonsense='arg')
+            _ = StubHarvester(nonsense='arg')
 
     def test_all_urls_ingested(self):
         """Tests that all root URLs are explored"""
-        harvester = MockHarvester(urls=['https://random1.url', 'https://random2.url'])
-        harvester.harvest()
+        harvester = StubHarvester(urls=['https://random1.url', 'https://random2.url'])
 
         self.assertListEqual(
-            harvester._ingester.INGESTED_URLS,
+            harvester._ingester.ingested_urls,
             ['https://random1.url/ressource_1',
              'https://random1.url/ressource_2',
+             'https://random1.url/ressource_3',
              'https://random2.url/ressource_a',
              'https://random2.url/ressource_b',
              'https://random2.url/ressource_c'])
