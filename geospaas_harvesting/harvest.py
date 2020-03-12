@@ -135,7 +135,11 @@ def main():
             dump((current_harvester, harvesters_iterator), PERSISTENCE_FILE)
             raise
         else:
-            current_harvester = next(harvesters_iterator)
+            try:
+                current_harvester = next(harvesters_iterator)
+            except StopIteration:
+                LOGGER.warning('The loop over the harvesters ended, it is not supposed to happen')
+                break
 
 
 if __name__ == '__main__':
