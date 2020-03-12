@@ -86,9 +86,9 @@ class ConfigurationTestCase(unittest.TestCase):
         file, and an error message must be logged
         """
         conf_file_path = '/this_file_should_not_exist'
-        with self.assertRaises(AssertionError, msg='Configuration data is empty'), self.assertLogs(
-                logging.getLogger(harvest.LOGGER_NAME), level=logging.ERROR) as logs_cm:
-            _ = harvest.Configuration(conf_file_path)
+        with self.assertRaises(AssertionError, msg='Configuration data is empty'):
+            with self.assertLogs(harvest.LOGGER, level=logging.ERROR) as logs_cm:
+                _ = harvest.Configuration(conf_file_path)
         self.assertEqual(len(logs_cm.records), 1)
         self.assertEqual(logs_cm.records[0].exc_info[0], FileNotFoundError)
 
@@ -146,10 +146,9 @@ class MainTestCase(unittest.TestCase):
         Configuration validation errors are caught and logged, then the program exists with a
         non-zero code
         """
-        with self.assertLogs(
-                logging.getLogger(harvest.LOGGER_NAME),
-                level=logging.ERROR), self.assertRaises(SystemExit) as system_exit_cm:
-            harvest.main()
+        with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
+            with self.assertRaises(SystemExit) as system_exit_cm:
+                harvest.main()
         self.assertGreater(system_exit_cm.exception.code, 0)
 
 

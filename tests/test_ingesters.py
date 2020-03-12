@@ -23,7 +23,7 @@ class BaseIngesterTestCase(unittest.TestCase):
     def test_ingest_must_be_implemented(self):
         """An error must be raised if the ingest() method is not implemented"""
         base_ingester = ingesters.Ingester()
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(NotImplementedError), self.assertLogs(ingesters.LOGGER):
             base_ingester.ingest([])
 
 
@@ -104,7 +104,7 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.DDXIngester()
 
-        with self.assertLogs(logger=logging.getLogger(ingesters.__name__), level=logging.WARNING):
+        with self.assertLogs(ingesters.LOGGER, level=logging.WARNING):
             namespace = ingester._get_xml_namespace(root)
 
         self.assertEqual(namespace, '')
@@ -132,7 +132,8 @@ class DDXIngesterTestCase(django.test.TestCase):
         initial_datasets_count = Dataset.objects.count()
 
         ingester = ingesters.DDXIngester()
-        ingester.ingest([self.TEST_DATA['full_ddx']['url']])
+        with self.assertLogs(ingesters.LOGGER):
+            ingester.ingest([self.TEST_DATA['full_ddx']['url']])
 
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
         inserted_dataset = Dataset.objects.latest('id')
@@ -187,11 +188,11 @@ class DDXIngesterTestCase(django.test.TestCase):
         initial_datasets_count = Dataset.objects.count()
 
         ingester = ingesters.DDXIngester()
-        ingester.ingest([self.TEST_DATA['full_ddx']['url']])
+        with self.assertLogs(ingesters.LOGGER):
+            ingester.ingest([self.TEST_DATA['full_ddx']['url']])
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
-        with self.assertLogs(
-                logger=logging.getLogger(ingesters.__name__), level=logging.INFO) as logger_cm:
+        with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
             ingester.ingest([self.TEST_DATA['full_ddx']['url']])
 
         self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database.'))
@@ -202,11 +203,11 @@ class DDXIngesterTestCase(django.test.TestCase):
         initial_datasets_count = Dataset.objects.count()
 
         ingester = ingesters.DDXIngester()
-        ingester.ingest([self.TEST_DATA['full_ddx']['url']])
+        with self.assertLogs(ingesters.LOGGER):
+            ingester.ingest([self.TEST_DATA['full_ddx']['url']])
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
-        with self.assertLogs(
-                logger=logging.getLogger(ingesters.__name__), level=logging.INFO) as logger_cm:
+        with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
             ingester.ingest([self.TEST_DATA['full_ddx_2']['url']])
 
         self.assertTrue(logger_cm.records[0].msg.endswith('already exists in the database.'))
@@ -217,8 +218,7 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.DDXIngester()
 
-        with self.assertLogs(
-                logger=logging.getLogger(ingesters.__name__), level=logging.INFO) as logger_cm:
+        with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
             ingester.ingest([self.TEST_DATA['short_ddx']['url']])
         self.assertTrue(logger_cm.records[0].msg.startswith(
             'Ingestion failed due to the following error:'))
@@ -232,7 +232,8 @@ class NansatIngesterTestCase(django.test.TestCase):
         initial_datasets_count = Dataset.objects.count()
 
         ingester = ingesters.NansatIngester()
-        ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
+        with self.assertLogs(ingesters.LOGGER):
+            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
 
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
         inserted_dataset = Dataset.objects.latest('id')
@@ -302,12 +303,12 @@ class NansatIngesterTestCase(django.test.TestCase):
         initial_datasets_count = Dataset.objects.count()
 
         ingester = ingesters.NansatIngester()
-        ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
+        with self.assertLogs(ingesters.LOGGER):
+            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
 
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
-        with self.assertLogs(
-                logger=logging.getLogger(ingesters.__name__), level=logging.INFO) as logger_cm:
+        with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
             ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
 
         self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database.'))
@@ -322,8 +323,7 @@ class NansatIngesterTestCase(django.test.TestCase):
     #     ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
     #     self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
-    #     with self.assertLogs(
-    #             logger=logging.getLogger(ingesters.__name__), level=logging.INFO) as logger_cm:
+    #     with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
     #         ingester.ingest([
     #             os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset_2.nc')])
 

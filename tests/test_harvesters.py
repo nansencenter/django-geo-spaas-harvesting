@@ -40,7 +40,7 @@ class HarvesterListTestCase(unittest.TestCase):
         If the config argument is of the wrong type, an error message must be logged and the
         HarvesterList must remain empty
         """
-        with self.assertLogs(f"{TOP_PACKAGE}.harvesters", level=logging.ERROR):
+        with self.assertLogs(harvesters.LOGGER, level=logging.ERROR):
             harvester_list = harvesters.HarvesterList(1)
         self.assertEqual(harvester_list._harvesters, [])
 
@@ -136,6 +136,8 @@ class HarvesterTestCase(unittest.TestCase):
     def test_all_urls_ingested(self):
         """Tests that all root URLs are explored"""
         harvester = StubHarvester(urls=['https://random1.url', 'https://random2.url'])
+        with self.assertLogs(ingesters.LOGGER):
+            harvester.harvest()
 
         self.assertListEqual(
             harvester._ingester.ingested_urls,
