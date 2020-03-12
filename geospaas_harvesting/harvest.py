@@ -104,6 +104,7 @@ def main():
     # Deserialize the last known state if possible, otherwise initialize harvesters from
     # configuration
     if os.path.exists(PERSISTENCE_FILE):
+        LOGGER.info("Loading saved state")
         (current_harvester, harvesters_iterator) = load(PERSISTENCE_FILE)
         os.remove(PERSISTENCE_FILE)
     else:
@@ -125,12 +126,12 @@ def main():
                 exc_info=True)
         except KeyboardInterrupt:
             LOGGER.error("The process was killed", exc_info=True)
-            LOGGER.info("Dumping current state...")
+            LOGGER.info("Dumping current state")
             dump((current_harvester, harvesters_iterator), PERSISTENCE_FILE)
             sys.exit(1)
         except Exception:  # pylint: disable=broad-except
             LOGGER.error("An unexpected error occurred", exc_info=True)
-            LOGGER.info("Dumping current state...")
+            LOGGER.info("Dumping current state")
             dump((current_harvester, harvesters_iterator), PERSISTENCE_FILE)
             raise
         else:
