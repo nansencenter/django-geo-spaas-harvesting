@@ -15,9 +15,6 @@ class Crawler():
     def __iter__(self):
         raise NotImplementedError('The __iter__() method was not implemented')
 
-    def __next__(self):
-        raise NotImplementedError('The __next__() method was not implemented')
-
 
 class OpenDAPCrawler(Crawler):
     """Crawler for OpenDAP resources"""
