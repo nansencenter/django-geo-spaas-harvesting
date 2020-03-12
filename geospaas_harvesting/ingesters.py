@@ -46,6 +46,7 @@ class Ingester():
     ]
 
     def __init__(self):
+        #TODO: why is this here??
         self._metadata_handler = GeospatialMetadataHandler(self.DATASET_PARAMETER_NAMES)
 
     def _uri_exists(self, uri):
