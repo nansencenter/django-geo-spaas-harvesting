@@ -89,19 +89,28 @@ class Configuration():
             LOGGER.exception('Configuration file not found', exc_info=error)
 
 
-def raise_keyboard_interrupt(self):
+def raise_keyboard_interrupt(*args):
     """Raises a KeyboardInterrupt exception, to be used for signals handling"""
     raise KeyboardInterrupt
 
 def dump(obj, path):
     """Convenience function to serialize objects"""
-    with open(path, 'wb') as persistence_file_handler:
-        pickle.dump(obj, persistence_file_handler)
+    try:
+        with open(path, 'wb') as persistence_file_handler:
+            pickle.dump(obj, persistence_file_handler)
+    except (FileNotFoundError, IsADirectoryError):
+        LOGGER.error("Could not dump %s to %s", str(obj), path, exc_info=True)
+    except Exception: # pylint: disable=broad-except
+        LOGGER.error("An unexpected error occurred while dumping %s to %s",
+                     str(obj), path, exc_info=True)
 
 def load(path):
     """Convenience function to deserialize objects"""
-    with open(path, 'rb') as persistence_file_handler:
-        return pickle.load(persistence_file_handler)
+    try:
+        with open(path, 'rb') as persistence_file_handler:
+            return pickle.load(persistence_file_handler)
+    except (FileNotFoundError, IsADirectoryError, TypeError):
+        LOGGER.error("Could not load from %s", path, exc_info=True)
 
 def main():
     """Loads harvesting configuration and runs each harvester in turn"""
