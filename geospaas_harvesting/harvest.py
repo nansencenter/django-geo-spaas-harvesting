@@ -5,6 +5,7 @@ import logging
 import os
 import os.path
 import pickle
+import signal
 import sys
 import yaml
 
@@ -88,6 +89,10 @@ class Configuration():
             LOGGER.exception('Configuration file not found', exc_info=error)
 
 
+def raise_keyboard_interrupt(self):
+    """Raises a KeyboardInterrupt exception, to be used for signals handling"""
+    raise KeyboardInterrupt
+
 def dump(obj, path):
     """Convenience function to serialize objects"""
     with open(path, 'wb') as persistence_file_handler:
@@ -100,6 +105,8 @@ def load(path):
 
 def main():
     """Loads harvesting configuration and runs each harvester in turn"""
+
+    signal.signal(signal.SIGTERM, raise_keyboard_interrupt)
 
     # Deserialize the last known state if possible, otherwise initialize harvesters from
     # configuration
