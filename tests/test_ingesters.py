@@ -218,10 +218,10 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.DDXIngester()
 
-        with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+        with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
             ingester.ingest([self.TEST_DATA['short_ddx']['url']])
-        self.assertTrue(logger_cm.records[0].msg.startswith(
-            'Ingestion failed due to the following error:'))
+        self.assertTrue(logger_cm.records[0].message.startswith(
+            f"Ingestion of the dataset at '{self.TEST_DATA['short_ddx']['url']}' failed:"))
 
 
 class NansatIngesterTestCase(django.test.TestCase):

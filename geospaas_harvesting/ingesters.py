@@ -21,7 +21,6 @@ from geospaas.catalog.models import (Dataset, DatasetURI, GeographicLocation,
 from geospaas.utils.utils import nansat_filename
 from geospaas.vocabularies.models import (DataCenter, Instrument,
                                           ISOTopicCategory, Location, Platform)
-from metanorm.errors import MetadataNormalizationError
 from metanorm.handlers import GeospatialMetadataHandler
 from nansat import Nansat
 
@@ -166,8 +165,9 @@ class DDXIngester(Ingester):
 
                     if not created_dataset_uri:
                         LOGGER.error("The Dataset's URI already exists. This should never happen.")
-                except MetadataNormalizationError as error:
-                    LOGGER.error('Ingestion failed due to the following error: %s', str(error))
+
+                except Exception: # pylint: disable=broad-except
+                    LOGGER.error("Ingestion of the dataset at '%s' failed:", url, exc_info=True)
 
 
 class NansatIngester(Ingester):
@@ -188,93 +188,97 @@ class NansatIngester(Ingester):
             if self._uri_exists(url):
                 LOGGER.info("%s is already present in the database.", url)
             else:
-                LOGGER.debug('Ingesting %s ...', url)
+                try:
+                    LOGGER.debug('Ingesting %s ...', url)
 
-                # Open file with Nansat
-                n = Nansat(nansat_filename(url), **nansat_options)
+                    # Open file with Nansat
+                    n = Nansat(nansat_filename(url), **nansat_options)
 
-                # get metadata from Nansat and get objects from vocabularies
-                n_metadata = n.get_metadata()
+                    # get metadata from Nansat and get objects from vocabularies
+                    n_metadata = n.get_metadata()
 
-                # set compulsory metadata (source)
-                platform, _ = Platform.objects.get_or_create(json.loads(n_metadata['platform']))
-                instrument, _ = Instrument.objects.get_or_create(
-                    json.loads(n_metadata['instrument']))
-                specs = n_metadata.get('specs', '')
-                source, _ = Source.objects.get_or_create(
-                    platform=platform, instrument=instrument, specs=specs)
+                    # set compulsory metadata (source)
+                    platform, _ = Platform.objects.get_or_create(json.loads(n_metadata['platform']))
+                    instrument, _ = Instrument.objects.get_or_create(
+                        json.loads(n_metadata['instrument']))
+                    specs = n_metadata.get('specs', '')
+                    source, _ = Source.objects.get_or_create(
+                        platform=platform, instrument=instrument, specs=specs)
 
-                default_char_fields = {
-                    'entry_id': lambda: 'NERSC_' + str(uuid.uuid4()),
-                    'entry_title': lambda: 'NONE',
-                    'summary': lambda: 'NONE',
-                }
+                    default_char_fields = {
+                        'entry_id': lambda: 'NERSC_' + str(uuid.uuid4()),
+                        'entry_title': lambda: 'NONE',
+                        'summary': lambda: 'NONE',
+                    }
 
-                # set optional CharField metadata from Nansat or from default_char_fields
-                options = {}
-                for name in default_char_fields:
-                    if name not in n_metadata:
-                        LOGGER.warning('%s is not provided in Nansat metadata!', name)
-                        options[name] = default_char_fields[name]()
+                    # set optional CharField metadata from Nansat or from default_char_fields
+                    options = {}
+                    for name in default_char_fields:
+                        if name not in n_metadata:
+                            LOGGER.warning('%s is not provided in Nansat metadata!', name)
+                            options[name] = default_char_fields[name]()
+                        else:
+                            options[name] = n_metadata[name]
+
+                    default_foreign_keys = {
+                        'gcmd_location': {
+                            'model': Location,
+                            'value': pti.get_gcmd_location('SEA SURFACE')},
+                        'data_center': {
+                            'model': DataCenter,
+                            'value': pti.get_gcmd_provider('NERSC')},
+                        'ISO_topic_category': {
+                            'model': ISOTopicCategory,
+                            'value': pti.get_iso19115_topic_category('Oceans')},
+                    }
+
+                    # set optional ForeignKey metadata from Nansat or from default_foreign_keys
+                    for name in default_foreign_keys:
+                        value = default_foreign_keys[name]['value']
+                        model = default_foreign_keys[name]['model']
+                        if name not in n_metadata:
+                            LOGGER.warning('%s is not provided in Nansat metadata!', name)
+                        else:
+                            try:
+                                value = json.loads(n_metadata[name])
+                            except json.JSONDecodeError:
+                                LOGGER.warning(
+                                    '%s value of %s  metadata provided in Nansat is wrong!',
+                                    n_metadata[name], name)
+                        options[name], _ = model.objects.get_or_create(value)
+
+                    # Find coverage to set number of points in the geolocation
+                    if len(n.vrt.dataset.GetGCPs()) > 0:
+                        n.reproject_gcps()
+                    geolocation = GeographicLocation.objects.get_or_create(
+                        geometry=WKTReader().read(n.get_border_wkt(nPoints=n_points)))[0]
+
+                    # create dataset
+                    dataset, created_dataset = Dataset.objects.get_or_create(
+                        time_coverage_start=n.get_metadata('time_coverage_start'),
+                        time_coverage_end=n.get_metadata('time_coverage_end'),
+                        source=source,
+                        geographic_location=geolocation,
+                        **options)
+
+                    url_scheme = urlparse(url).scheme
+                    if 'http' in url_scheme:
+                        service_name = DAP_SERVICE_NAME
+                        service = OPENDAP_SERVICE
                     else:
-                        options[name] = n_metadata[name]
+                        service_name = FILE_SERVICE_NAME
+                        service = LOCAL_FILE_SERVICE
+                    # create dataset URI
+                    _, created_dataset_uri = DatasetURI.objects.get_or_create(
+                        name=service_name, service=service, uri=url, dataset=dataset)
 
-                default_foreign_keys = {
-                    'gcmd_location': {
-                        'model': Location,
-                        'value': pti.get_gcmd_location('SEA SURFACE')},
-                    'data_center': {
-                        'model': DataCenter,
-                        'value': pti.get_gcmd_provider('NERSC')},
-                    'ISO_topic_category': {
-                        'model': ISOTopicCategory,
-                        'value': pti.get_iso19115_topic_category('Oceans')},
-                }
-
-                # set optional ForeignKey metadata from Nansat or from default_foreign_keys
-                for name in default_foreign_keys:
-                    value = default_foreign_keys[name]['value']
-                    model = default_foreign_keys[name]['model']
-                    if name not in n_metadata:
-                        LOGGER.warning('%s is not provided in Nansat metadata!', name)
+                    if created_dataset:
+                        LOGGER.info("Successfully created dataset from url: '%s'", url)
                     else:
-                        try:
-                            value = json.loads(n_metadata[name])
-                        except json.JSONDecodeError:
-                            LOGGER.warning(
-                                '%s value of %s  metadata provided in Nansat is wrong!',
-                                n_metadata[name], name)
-                    options[name], _ = model.objects.get_or_create(value)
+                        LOGGER.info("Dataset at '%s' already exists in the database.", url)
 
-                # Find coverage to set number of points in the geolocation
-                if len(n.vrt.dataset.GetGCPs()) > 0:
-                    n.reproject_gcps()
-                geolocation = GeographicLocation.objects.get_or_create(
-                    geometry=WKTReader().read(n.get_border_wkt(nPoints=n_points)))[0]
+                    if not created_dataset_uri:
+                        LOGGER.error("The Dataset's URI already exists. This should never happen.")
 
-                # create dataset
-                dataset, created_dataset = Dataset.objects.get_or_create(
-                    time_coverage_start=n.get_metadata('time_coverage_start'),
-                    time_coverage_end=n.get_metadata('time_coverage_end'),
-                    source=source,
-                    geographic_location=geolocation,
-                    **options)
-
-                url_scheme = urlparse(url).scheme
-                if 'http' in url_scheme:
-                    service_name = DAP_SERVICE_NAME
-                    service = OPENDAP_SERVICE
-                else:
-                    service_name = FILE_SERVICE_NAME
-                    service = LOCAL_FILE_SERVICE
-                # create dataset URI
-                _, created_dataset_uri = DatasetURI.objects.get_or_create(
-                    name=service_name, service=service, uri=url, dataset=dataset)
-
-                if created_dataset:
-                    LOGGER.info("Successfully created dataset from url: '%s'", url)
-                else:
-                    LOGGER.info("Dataset at '%s' already exists in the database.", url)
-
-                if not created_dataset_uri:
-                    LOGGER.error("The Dataset's URI already exists. This should never happen.")
+                except Exception: # pylint: disable=broad-except
+                    LOGGER.error("Ingestion of the dataset at '%s' failed:", url, exc_info=True)
