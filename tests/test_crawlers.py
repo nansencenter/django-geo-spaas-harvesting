@@ -114,7 +114,8 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         right values
         """
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
-        crawler._explore_page(crawler._to_process.pop())
+        with self.assertLogs(crawler.LOGGER):
+            crawler._explore_page(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['root_dataset']['url']])
         self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['url']])
 
@@ -124,8 +125,9 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         crawler_iterator = iter(crawler)
 
         # Test the values returned by the iterator
-        self.assertEqual(next(crawler_iterator), self.TEST_DATA['root_dataset']['url'])
-        self.assertEqual(next(crawler_iterator), self.TEST_DATA['folder_dataset']['url'])
+        with self.assertLogs(crawler.LOGGER):
+            self.assertEqual(next(crawler_iterator), self.TEST_DATA['root_dataset']['url'])
+            self.assertEqual(next(crawler_iterator), self.TEST_DATA['folder_dataset']['url'])
 
         # Test that a StopIteration is returned at the end. The nested context managers are
         # necessary because the StopIteration exception is raised inside an 'except KeyError:' block
@@ -227,5 +229,6 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
             "https://scihub.copernicus.eu/dhus/odata/v1/Products('e2842bc8-8b3e-4161-a88c-84c2b43e60f9')/$value"  # pylint:disable=line-too-long
         ]
 
-        for i, url in enumerate(self.crawler):
-            self.assertEqual(url, expected_urls[i])
+        with self.assertLogs(self.crawler.LOGGER):
+            for i, url in enumerate(self.crawler):
+                self.assertEqual(url, expected_urls[i])
