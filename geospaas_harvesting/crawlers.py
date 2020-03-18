@@ -1,10 +1,13 @@
 """A set of crawlers used to explore data provider interfaces and get resources URLs"""
 
 import logging
-from html.parser import HTMLParser
 import re
+from html.parser import HTMLParser
+
+import feedparser
 import requests
 
+#TODO: one logger per crawler
 LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.NullHandler())
 
@@ -76,6 +79,7 @@ class OpenDAPCrawler(Crawler):
             response.raise_for_status()
             html_page = response.text
         except requests.exceptions.RequestException as exception:
+            #TODO: use exc_info=True
             LOGGER.error('Could not get page due to the following error: %s', str(exception))
         return html_page
 
@@ -95,6 +99,7 @@ class LinkExtractor(HTMLParser):
     HTML parser which extracts links from an HTML page
     """
 
+    # TODO: remove useless convert_charrefs which already defaults to True in the parent constructor
     def __init__(self, convert_charrefs=True):
         """Constructor with extra attribute definition"""
         super().__init__(convert_charrefs=convert_charrefs)
@@ -120,3 +125,72 @@ class LinkExtractor(HTMLParser):
             for attr in attrs:
                 if attr[0] == 'href':
                     self._links.append(attr[1])
+
+
+class CopernicusOpenSearchAPICrawler(Crawler):
+    """
+    Crawler which returns the search results of an Opensearch API, given the URL and search
+    terms
+    """
+
+    def __init__(self, url, search_terms='*', username=None, password=None,
+                 page_size=100, offset=0):
+        self.url = url
+        self.search_terms = search_terms
+        self._credentials = (username, password) if username and password else None
+        self.page_size = page_size
+        self.offset = offset
+        self._urls = []
+
+    def __iter__(self):
+        """Makes the crawler iterable"""
+        return self
+
+    def __next__(self):
+        """Makes the crawler an iterator"""
+        try:
+            # Return all resource URLs from the previously processed page
+            result = self._urls.pop()
+        except IndexError:
+            # If no more URLs from the previously processed page are available, process the next one
+            if not self._get_next_page_urls():
+                LOGGER.debug("No more entries found at '%s' matching '%s'",
+                             self.url, self.search_terms)
+                raise StopIteration
+            try:
+                result = self.__next__()
+            except IndexError:
+                raise StopIteration
+        return result
+
+    def _get_next_page_urls(self):
+        """Get links for the next page. Returns True if links were found, False otherwise"""
+        LOGGER.info("Looking for ressources at '%s', matching '%s' with an offset of %s",
+                    self.url, self.search_terms, self.offset)
+
+        request_parameters = {
+            'params': {
+                'q': self.search_terms,
+                'start': self.offset,
+                'rows': self.page_size
+            }
+        }
+        if self._credentials:
+            request_parameters['auth'] = self._credentials
+
+        try:
+            response = requests.get(self.url, **request_parameters)
+            response.raise_for_status()
+            current_page = response.text
+        except requests.exceptions.RequestException:
+            LOGGER.error('Could not get page', exc_info=True)
+        else:
+            self.offset += self.page_size
+
+        entries = feedparser.parse(current_page)['entries']
+
+        for entry in entries:
+            LOGGER.debug("Adding '%s' to the list of resources.", entry['link'])
+            self._urls.append(entry['link'])
+
+        return bool(entries)
