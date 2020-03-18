@@ -16,13 +16,13 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
     TEST_DATA = {
         'root': {
             'url': "https://test-opendap.com",
-            'file_path': "data/opendap_root.html"},
+            'file_path': "data/opendap/root.html"},
         'root_dataset': {
             'url': 'https://test-opendap.com/dataset.nc',
             'file_path': None},
         'folder': {
             'url': 'https://test-opendap.com/folder/contents.html',
-            'file_path': 'data/opendap_folder.html'},
+            'file_path': 'data/opendap/folder.html'},
         'folder_dataset': {
             'url': 'https://test-opendap.com/folder/dataset.nc',
             'file_path': None},
@@ -80,7 +80,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_get_correct_html_contents(self):
         """Test that the _get_html_page() method returns the correct HTML string"""
-        data_file = open(os.path.join(os.path.dirname(__file__), 'data/opendap_root.html'))
+        data_file = open(os.path.join(os.path.dirname(__file__), 'data/opendap/root.html'))
         html = data_file.read()
         data_file.close()
 

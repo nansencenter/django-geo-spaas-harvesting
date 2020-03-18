@@ -33,16 +33,16 @@ class DDXIngesterTestCase(django.test.TestCase):
     TEST_DATA = {
         'full_ddx': {
             'url': "https://test-opendap.com/full_dataset.nc.ddx",
-            'file_path': "data/opendap_full_ddx.xml"},
+            'file_path': "data/opendap/full_ddx.xml"},
         'full_ddx_2': {
             'url': "https://test-opendap2.com/full_dataset.nc.ddx",
-            'file_path': "data/opendap_full_ddx.xml"},
+            'file_path': "data/opendap/full_ddx.xml"},
         'short_ddx': {
             'url': "https://test-opendap.com/short_dataset.nc.ddx",
-            'file_path': "data/opendap_short_ddx.xml"},
+            'file_path': "data/opendap/short_ddx.xml"},
         'no_ns_ddx': {
             'url': "https://test-opendap.com/no_ns_dataset.nc.ddx",
-            'file_path': "data/opendap_ddx_no_ns.xml"},
+            'file_path': "data/opendap/ddx_no_ns.xml"},
     }
 
     def requests_get_side_effect(self, url, **kwargs): # pylint: disable=unused-argument
@@ -233,7 +233,7 @@ class NansatIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.NansatIngester()
         with self.assertLogs(ingesters.LOGGER):
-            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
+            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
 
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
         inserted_dataset = Dataset.objects.latest('id')
@@ -304,12 +304,12 @@ class NansatIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.NansatIngester()
         with self.assertLogs(ingesters.LOGGER):
-            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
+            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
 
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
         with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
-            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
+            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
 
         self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database.'))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
@@ -320,12 +320,12 @@ class NansatIngesterTestCase(django.test.TestCase):
     #     initial_datasets_count = Dataset.objects.count()
 
     #     ingester = ingesters.NansatIngester()
-    #     ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset.nc')])
+    #     ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
     #     self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
     #     with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
     #         ingester.ingest([
-    #             os.path.join(os.path.dirname(__file__), 'data/arc_metno_dataset_2.nc')])
+    #             os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset_2.nc')])
 
     #     self.assertTrue(logger_cm.records[0].msg.endswith('already exists in the database.'))
     #     self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
