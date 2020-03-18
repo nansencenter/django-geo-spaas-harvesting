@@ -45,6 +45,7 @@ jobs:
           "${BASE_IMAGE_NAME}"
           bash -c "source /opt/conda/bin/activate
           && pip install 'https://github.com/nansencenter/metanorm/releases/download/${METANORM_VERSION}/metanorm-${METANORM_VERSION}-py3-none-any.whl'
+          feedparser==5.2.1
           && coverage run --source=./geospaas_harvesting ./runtests.py
           && coveralls"
       after_script:
