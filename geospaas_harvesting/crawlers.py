@@ -7,13 +7,13 @@ from html.parser import HTMLParser
 import feedparser
 import requests
 
-#TODO: one logger per crawler
-LOGGER = logging.getLogger(__name__)
-LOGGER.addHandler(logging.NullHandler())
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
 class Crawler():
     """Base Crawler class"""
+
+    LOGGER = logging.getLogger(__name__ + '.Crawler')
 
     def __iter__(self):
         raise NotImplementedError('The __iter__() method was not implemented')
@@ -22,19 +22,20 @@ class Crawler():
     def _http_get(cls, url, request_parameters=None):
         """Returns the contents of a Web page as a string"""
         html_page = ''
-        LOGGER.debug("Getting page: '%s'", url)
+        cls.LOGGER.debug("Getting page: '%s'", url)
         try:
             response = requests.get(url, **request_parameters or {})
             response.raise_for_status()
             html_page = response.text
         except requests.exceptions.RequestException:
-            LOGGER.error('Could not get page', exc_info=True)
+            cls.LOGGER.error('Could not get page', exc_info=True)
         return html_page
 
 
 class OpenDAPCrawler(Crawler):
     """Crawler for OpenDAP resources"""
 
+    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
     FOLDERS_SUFFIXES = ('/contents.html')
     FILES_SUFFIXES = ('.nc', '.nc.gz')
     EXCLUDE = ('?')
@@ -68,7 +69,7 @@ class OpenDAPCrawler(Crawler):
 
     def _explore_page(self, folder_url):
         """Gets all relevant links from a page and feeds the _urls and _to_process attributes"""
-        LOGGER.info("Looking for resources in '%s'...", folder_url)
+        self.LOGGER.info("Looking for resources in '%s'...", folder_url)
 
         current_location = re.sub(r'/\w+\.\w+$', '', folder_url)
         links = self._get_links(self._http_get(folder_url))
@@ -76,32 +77,18 @@ class OpenDAPCrawler(Crawler):
             # Select links which do not contain any of the self.EXCLUDE strings
             if all(map(lambda s, l=link: s not in l, self.EXCLUDE)):
                 if link.endswith(self.FOLDERS_SUFFIXES):
-                    LOGGER.debug("Adding '%s' to the list of pages to process.", link)
+                    self.LOGGER.debug("Adding '%s' to the list of pages to process.", link)
                     self._to_process.append(f"{current_location}/{link}")
                 elif link.endswith(self.FILES_SUFFIXES):
-                    LOGGER.debug("Adding '%s' to the list of resources.", link)
+                    self.LOGGER.debug("Adding '%s' to the list of resources.", link)
                     self._urls.append(f"{current_location}/{link}")
-
-    @staticmethod
-    def _get_html_page(url):
-        """Returns the contents of a Web page as a string"""
-        html_page = ''
-        LOGGER.debug("Getting page: '%s'", url)
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            html_page = response.text
-        except requests.exceptions.RequestException as exception:
-            #TODO: use exc_info=True
-            LOGGER.error('Could not get page due to the following error: %s', str(exception))
-        return html_page
 
     @classmethod
     def _get_links(cls, html):
         """Returns the list of links contained in an HTML page, passed as a string"""
 
         parser = LinkExtractor()
-        LOGGER.debug("Parsing HTML data.")
+        cls.LOGGER.debug("Parsing HTML data.")
         parser.feed(html)
 
         return parser.links
@@ -146,6 +133,8 @@ class CopernicusOpenSearchAPICrawler(Crawler):
     terms
     """
 
+    LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
+
     def __init__(self, url, search_terms='*', username=None, password=None,
                  page_size=100, offset=0):
         self.url = url
@@ -167,7 +156,7 @@ class CopernicusOpenSearchAPICrawler(Crawler):
         except IndexError:
             # If no more URLs from the previously processed page are available, process the next one
             if not self._get_next_page_urls():
-                LOGGER.debug("No more entries found at '%s' matching '%s'",
+                self.LOGGER.debug("No more entries found at '%s' matching '%s'",
                              self.url, self.search_terms)
                 raise StopIteration
             try:
@@ -178,7 +167,7 @@ class CopernicusOpenSearchAPICrawler(Crawler):
 
     def _get_next_page_urls(self):
         """Get links for the next page. Returns True if links were found, False otherwise"""
-        LOGGER.info("Looking for ressources at '%s', matching '%s' with an offset of %s",
+        self.LOGGER.info("Looking for ressources at '%s', matching '%s' with an offset of %s",
                     self.url, self.search_terms, self.offset)
 
         request_parameters = {
@@ -197,7 +186,7 @@ class CopernicusOpenSearchAPICrawler(Crawler):
         entries = feedparser.parse(current_page)['entries']
 
         for entry in entries:
-            LOGGER.debug("Adding '%s' to the list of resources.", entry['link'])
+            self.LOGGER.debug("Adding '%s' to the list of resources.", entry['link'])
             self._urls.append(entry['link'])
 
         return bool(entries)
