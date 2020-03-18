@@ -155,9 +155,9 @@ class CopernicusOpenSearchAPICrawler(Crawler):
             result = self._urls.pop()
         except IndexError:
             # If no more URLs from the previously processed page are available, process the next one
-            if not self._get_next_page_urls():
+            if not self._get_resources_urls(self._get_next_page()):
                 self.LOGGER.debug("No more entries found at '%s' matching '%s'",
-                             self.url, self.search_terms)
+                                  self.url, self.search_terms)
                 raise StopIteration
             try:
                 result = self.__next__()
@@ -165,10 +165,10 @@ class CopernicusOpenSearchAPICrawler(Crawler):
                 raise StopIteration
         return result
 
-    def _get_next_page_urls(self):
-        """Get links for the next page. Returns True if links were found, False otherwise"""
+    def _get_next_page(self):
+        """Get the next page of search results"""
         self.LOGGER.info("Looking for ressources at '%s', matching '%s' with an offset of %s",
-                    self.url, self.search_terms, self.offset)
+                         self.url, self.search_terms, self.offset)
 
         request_parameters = {
             'params': {
@@ -183,7 +183,12 @@ class CopernicusOpenSearchAPICrawler(Crawler):
         current_page = self._http_get(self.url, request_parameters)
         self.offset += self.page_size
 
-        entries = feedparser.parse(current_page)['entries']
+        return current_page
+
+    def _get_resources_urls(self, xml):
+        """Get links from the current page. Returns True if links were found, False otherwise"""
+
+        entries = feedparser.parse(xml)['entries']
 
         for entry in entries:
             self.LOGGER.debug("Adding '%s' to the list of resources.", entry['link'])
