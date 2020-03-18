@@ -18,6 +18,19 @@ class Crawler():
     def __iter__(self):
         raise NotImplementedError('The __iter__() method was not implemented')
 
+    @classmethod
+    def _http_get(cls, url, request_parameters=None):
+        """Returns the contents of a Web page as a string"""
+        html_page = ''
+        LOGGER.debug("Getting page: '%s'", url)
+        try:
+            response = requests.get(url, **request_parameters or {})
+            response.raise_for_status()
+            html_page = response.text
+        except requests.exceptions.RequestException:
+            LOGGER.error('Could not get page', exc_info=True)
+        return html_page
+
 
 class OpenDAPCrawler(Crawler):
     """Crawler for OpenDAP resources"""
@@ -58,7 +71,7 @@ class OpenDAPCrawler(Crawler):
         LOGGER.info("Looking for resources in '%s'...", folder_url)
 
         current_location = re.sub(r'/\w+\.\w+$', '', folder_url)
-        links = self._get_links(self._get_html_page(folder_url))
+        links = self._get_links(self._http_get(folder_url))
         for link in links:
             # Select links which do not contain any of the self.EXCLUDE strings
             if all(map(lambda s, l=link: s not in l, self.EXCLUDE)):
@@ -178,14 +191,8 @@ class CopernicusOpenSearchAPICrawler(Crawler):
         if self._credentials:
             request_parameters['auth'] = self._credentials
 
-        try:
-            response = requests.get(self.url, **request_parameters)
-            response.raise_for_status()
-            current_page = response.text
-        except requests.exceptions.RequestException:
-            LOGGER.error('Could not get page', exc_info=True)
-        else:
-            self.offset += self.page_size
+        current_page = self._http_get(self.url, request_parameters)
+        self.offset += self.page_size
 
         entries = feedparser.parse(current_page)['entries']
 
