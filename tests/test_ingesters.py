@@ -17,14 +17,24 @@ from geospaas.catalog.models import Dataset
 import geospaas_harvesting.ingesters as ingesters
 
 
-class BaseIngesterTestCase(unittest.TestCase):
+class IngesterTestCase(unittest.TestCase):
     """Test the base ingester class"""
 
-    def test_ingest_must_be_implemented(self):
-        """An error must be raised if the ingest() method is not implemented"""
-        base_ingester = ingesters.Ingester()
+    def test_ingest_dataset_must_be_implemented(self):
+        """An error must be raised if the _ingest_dataset() method is not implemented"""
+        ingester = ingesters.Ingester()
         with self.assertRaises(NotImplementedError), self.assertLogs(ingesters.LOGGER):
-            base_ingester.ingest([])
+            ingester._ingest_dataset('')
+
+
+class MetadataIngesterTestCase(unittest.TestCase):
+    """Test the base metadata ingester class"""
+
+    def test_get_normalized_attributes_must_be_implemented(self):
+        """An error must be raised if the _get_normalized_attributes() method is not implemented"""
+        ingester = ingesters.MetadataIngester()
+        with self.assertRaises(NotImplementedError), self.assertLogs(ingesters.LOGGER):
+            ingester._get_normalized_attributes('')
 
 
 class DDXIngesterTestCase(django.test.TestCase):
@@ -195,7 +205,7 @@ class DDXIngesterTestCase(django.test.TestCase):
         with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
             ingester.ingest([self.TEST_DATA['full_ddx']['url']])
 
-        self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database.'))
+        self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database'))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
     def test_ingest_dataset_twice_different_urls(self):
@@ -221,7 +231,7 @@ class DDXIngesterTestCase(django.test.TestCase):
         with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
             ingester.ingest([self.TEST_DATA['short_ddx']['url']])
         self.assertTrue(logger_cm.records[0].message.startswith(
-            f"Ingestion of the dataset at '{self.TEST_DATA['short_ddx']['url']}' failed:"))
+            f"Ingestion of the dataset at '{self.TEST_DATA['short_ddx']['url']}' failed"))
 
 
 class NansatIngesterTestCase(django.test.TestCase):
@@ -311,7 +321,7 @@ class NansatIngesterTestCase(django.test.TestCase):
         with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
             ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
 
-        self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database.'))
+        self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database'))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
     #TODO: make this work
