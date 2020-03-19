@@ -188,8 +188,33 @@ class DDXIngester(MetadataIngester):
 
         # Get the parameters needed to create a geospaas catalog dataset from the
         # global attributes
-        return self._metadata_handler.get_parameters(
-            dataset_global_attributes)
+        return self._metadata_handler.get_parameters(dataset_global_attributes)
+
+
+class CopernicusODataIngester(MetadataIngester):
+    """Ingest datasets from the metadata returned by calls to the Copernicus OData API"""
+
+    def __init__(self, username=None, password=None):
+        super().__init__()
+        self._credentials = (username, password)
+
+    def _get_raw_metadata(self, url):
+        """Opens a stream """
+        metadata_url = url.rstrip('/$value') + '/?$format=json&$expand=Attributes'
+        try:
+            stream = requests.get(metadata_url, auth=self._credentials, stream=True).content
+        except requests.exceptions.RequestException:
+            LOGGER.error("Could not get metadata at '%s'", metadata_url, exc_info=True)
+
+        return json.load(io.BytesIO(stream))
+
+    def _get_normalized_attributes(self, url):
+        """Get attributes from the Copernicus OData API"""
+
+        raw_metadata = self._get_raw_metadata(url)
+        attributes = {a['Name']: a['Value'] for a in raw_metadata['d']['Attributes']['results']}
+
+        return self._metadata_handler.get_parameters(attributes)
 
 
 class NansatIngester(Ingester):
