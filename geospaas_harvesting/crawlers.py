@@ -166,7 +166,10 @@ class CopernicusOpenSearchAPICrawler(Crawler):
         return result
 
     def _get_next_page(self):
-        """Get the next page of search results"""
+        """
+        Get the next page of search results. Results are sorted ascending, which avoids missing some
+        if products are added while the harvesting is happening (it will generally be the case)
+        """
         self.LOGGER.info("Looking for ressources at '%s', matching '%s' with an offset of %s",
                          self.url, self.search_terms, self.offset)
 
@@ -174,7 +177,8 @@ class CopernicusOpenSearchAPICrawler(Crawler):
             'params': {
                 'q': self.search_terms,
                 'start': self.offset,
-                'rows': self.page_size
+                'rows': self.page_size,
+                'orderby': 'ingestiondate asc'
             }
         }
         if self._credentials:
