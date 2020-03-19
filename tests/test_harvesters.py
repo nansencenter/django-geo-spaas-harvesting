@@ -118,7 +118,9 @@ class HarvesterTestCase(unittest.TestCase):
         urls = ['https://random1.url', 'https://random2.url']
 
         harvester = StubHarvester(urls=urls)
-        self.assertDictEqual(harvester.config, {'urls': urls})
+        # This assertion relies on the fact that StubHarvester uses StubCrawler which stores the
+        # root URL as an attribute. It wouldn't work with any harvester and crawler
+        self.assertListEqual([c.root_url for c in harvester._crawlers], urls)
 
     def test_empty_conf_loading(self):
         """An exception must be raised if the configuration file is empty"""

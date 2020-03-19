@@ -14,6 +14,7 @@ class StubCrawler(crawlers.Crawler):
 
     def __init__(self, root_url):
         """Build a list of URLs which will be returned by the iterator"""
+        self.root_url = root_url
         self.data = []
         try:
             for uri in self.TEST_DATA[root_url]:

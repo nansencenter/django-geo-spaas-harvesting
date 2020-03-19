@@ -27,18 +27,18 @@ class Harvester():
         if self.__class__.__name__ == 'Harvester':
             raise NotImplementedError('Harvester is a base class, it should not be instanciated')
 
-        self.config = config
-
         try:
-            root_urls = self.config['urls']
+            root_urls = config.pop('urls')
         except (KeyError, TypeError):
             raise HarvesterConfigurationError(
                 "The 'urls' configuration for the PODAACHarvester was found neither in the " +
                 "configuration file, nor in the constructor arguments.")
 
-        self._crawlers_iterator = iter([self.CRAWLER_CLASS(url) for url in root_urls])
+        self._crawlers = [self.CRAWLER_CLASS(url, **config) for url in root_urls]
+        self._crawlers_iterator = iter(self._crawlers)
         self._current_crawler = next(self._crawlers_iterator)
-        self._ingester = self.INGESTER_CLASS()
+
+        self._ingester = self.INGESTER_CLASS(**config)
 
     def harvest(self):
         """
@@ -126,3 +126,8 @@ class PODAACHarvester(Harvester):
     """Harvester class for PODAAC data (NASA)"""
     CRAWLER_CLASS = crawlers.OpenDAPCrawler
     INGESTER_CLASS = ingesters.DDXIngester
+
+class CopernicusSentinelHarvester(Harvester):
+    """Harvester class for Copernicus Sentinel data"""
+    CRAWLER_CLASS = crawlers.CopernicusOpenSearchAPICrawler
+    INGESTER_CLASS = ingesters.CopernicusODataIngester
