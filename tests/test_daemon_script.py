@@ -72,14 +72,6 @@ class ConfigurationTestCase(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, message_regex):
             _ = harvest.Configuration(CONFIGURATION_FILES['no_class'])
 
-    def test_loading_conf_without_urls(self):
-        """
-        An exception must be raised if a harvester configuration does not contain 'urls'
-        """
-        message_regex = "^Harvester configuration must contain the following keys: .*$"
-        with self.assertRaisesRegex(AssertionError, message_regex):
-            _ = harvest.Configuration(CONFIGURATION_FILES['no_urls'])
-
     def test_inexistent_config_file(self):
         """
         An exception must be raised if an attempt is made to load the configuration from an empty

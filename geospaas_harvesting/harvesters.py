@@ -1,6 +1,7 @@
 """Harvesters which use crawlers and ingesters to get data from """
 
 import logging
+import os
 
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
@@ -16,29 +17,34 @@ class HarvesterConfigurationError(Exception):
     """
 
 class Harvester():
-    """Base Harvester class"""
+    """
+    Base Harvester class. Implements the basic behavior but is not meant to be used directly.
+    It should be subclassed, and child classes should have the following elements:
+        - CRAWLER_CLASS class attribute
+        - INGESTER_CLASS class attribute
+        - _create_crawlers() method
+        - _create_ingester() methods
+    """
 
-    CRAWLER_CLASS = crawlers.Crawler
-    INGESTER_CLASS = ingesters.Ingester
+    def _create_crawlers(self):
+        """Should return a list of crawlers. Needs to be implemented in child classes"""
+        raise NotImplementedError('')
+
+    def _create_ingester(self):
+        """Should return an ingester. Needs to be implemented in child classes"""
+        raise NotImplementedError('')
 
     def __init__(self, **config):
-        """Load the configuration for the harvester from the file and the constructor arguments"""
-
-        if self.__class__.__name__ == 'Harvester':
-            raise NotImplementedError('Harvester is a base class, it should not be instanciated')
+        self.config = config
 
         try:
-            root_urls = config.pop('urls')
+            self._crawlers = self._create_crawlers()
+            self._ingester = self._create_ingester()
         except (KeyError, TypeError):
-            raise HarvesterConfigurationError(
-                "The 'urls' configuration for the PODAACHarvester was found neither in the " +
-                "configuration file, nor in the constructor arguments.")
+            raise HarvesterConfigurationError("Missing configuration key")
 
-        self._crawlers = [self.CRAWLER_CLASS(url, **config) for url in root_urls]
         self._crawlers_iterator = iter(self._crawlers)
         self._current_crawler = next(self._crawlers_iterator)
-
-        self._ingester = self.INGESTER_CLASS(**config)
 
     def harvest(self):
         """
@@ -127,7 +133,27 @@ class PODAACHarvester(Harvester):
     CRAWLER_CLASS = crawlers.OpenDAPCrawler
     INGESTER_CLASS = ingesters.DDXIngester
 
+    def _create_crawlers(self):
+        return [self.CRAWLER_CLASS(url) for url in self.config['urls']]
+
+    def _create_ingester(self):
+        return self.INGESTER_CLASS()
+
+
 class CopernicusSentinelHarvester(Harvester):
     """Harvester class for Copernicus Sentinel data"""
     CRAWLER_CLASS = crawlers.CopernicusOpenSearchAPICrawler
     INGESTER_CLASS = ingesters.CopernicusODataIngester
+
+    def _create_crawlers(self):
+        return [
+            self.CRAWLER_CLASS(self.config['url'],
+                               search_terms=search,
+                               username=self.config['username'],
+                               password=os.getenv(self.config['password']))
+            for search in self.config['search_terms']
+        ]
+
+    def _create_ingester(self):
+        return self.INGESTER_CLASS(
+            username=self.config['username'], password=os.getenv(self.config['password']))

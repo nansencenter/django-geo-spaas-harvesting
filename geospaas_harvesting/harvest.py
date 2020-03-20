@@ -29,7 +29,7 @@ class Configuration():
 
     DEFAULT_CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'harvest.yml')
     TOP_LEVEL_KEYS = set(['harvesters'])
-    HARVESTER_KEYS = set(['class', 'urls'])
+    HARVESTER_CLASS_KEY = 'class'
 
     def __init__(self, config_path=None):
         self._cli_args = self._get_cli_arguments()
@@ -50,18 +50,12 @@ class Configuration():
         assert self.TOP_LEVEL_KEYS.issuperset(self._data.keys()), 'Invalid top-level keys'
         assert self._data['harvesters'], 'No harvesters are configured'
         for name, config in self._data['harvesters'].items():
-            assert self.HARVESTER_KEYS == set(config.keys()), (
+            assert self.HARVESTER_CLASS_KEY in config.keys(), (
                 "Harvester configuration must contain the following keys: " +
-                ', '.join(self.HARVESTER_KEYS))
+                ', '.join(self.HARVESTER_CLASS_KEY))
 
             assert isinstance(config['class'], str), (
                 f"In '{name}' section: 'class' must be a string")
-
-            assert isinstance(config['urls'], list), (f"In '{name}' section: 'urls' must be a list")
-
-            for url in config['urls']:
-                assert isinstance(url, str), (
-                    f"In '{name}.urls' section: each URL must be a string")
 
     def _get_cli_arguments(self):
         """Parse CLI arguments"""

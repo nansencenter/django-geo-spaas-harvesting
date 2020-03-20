@@ -83,11 +83,23 @@ class StubHarvester(harvesters.Harvester):
     CRAWLER_CLASS = StubCrawler
     INGESTER_CLASS = StubIngester
 
+    def _create_crawlers(self):
+        return [self.CRAWLER_CLASS(url) for url in self.config['urls']]
+
+    def _create_ingester(self):
+        return self.INGESTER_CLASS()
+
 
 class StubInterruptHarvester(harvesters.Harvester):
     """Stub harvester class using the previously defined mock crawler and ingester"""
     CRAWLER_CLASS = StubCrawler
     INGESTER_CLASS = StubInterruptIngester
+
+    def _create_crawlers(self):
+        return [self.CRAWLER_CLASS(url) for url in self.config['urls']]
+
+    def _create_ingester(self):
+        return self.INGESTER_CLASS()
 
 
 class StubExceptionHarvester(harvesters.Harvester):
@@ -95,9 +107,16 @@ class StubExceptionHarvester(harvesters.Harvester):
     CRAWLER_CLASS = StubCrawler
     INGESTER_CLASS = StubExceptionIngester
 
+    def _create_crawlers(self):
+        return [self.CRAWLER_CLASS(url) for url in self.config['urls']]
+
+    def _create_ingester(self):
+        return self.INGESTER_CLASS()
+
 
 class StubInterruptHarvesterList(harvesters.HarvesterList):
     """HarvesterList class for testing interruptions"""
+
     def __init__(self, *args):
         self._harvesters = [StubInterruptHarvester(urls=['https://random1.url']),
                             StubHarvester(urls=['https://random2.url'])]
