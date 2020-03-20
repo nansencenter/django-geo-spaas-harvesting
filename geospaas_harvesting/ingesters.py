@@ -98,10 +98,7 @@ class MetadataIngester(Ingester):
         dataset from its metadata
         """
         normalized_attributes = self._get_normalized_attributes(url)
-        return self._ingest_dataset_from_metadata(url, normalized_attributes)
 
-    @staticmethod
-    def _ingest_dataset_from_metadata(url, normalized_attributes):
         # Create the objects with which the dataset has relationships
         # (or get them if they already exist)
         data_center, _ = DataCenter.objects.get_or_create(
