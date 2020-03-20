@@ -3,9 +3,9 @@
 
 import logging
 import os
-import unittest
 import unittest.mock as mock
 import xml.etree.ElementTree as ET
+from collections import OrderedDict
 from datetime import datetime
 
 import django.test
@@ -113,14 +113,101 @@ class IngesterTestCase(django.test.TestCase):
             self.assertEqual(len(logger_cm.records), 1)
 
 
-class MetadataIngesterTestCase(unittest.TestCase):
+class MetadataIngesterTestCase(django.test.TestCase):
     """Test the base metadata ingester class"""
+
+    def setUp(self):
+        self.ingester = ingesters.MetadataIngester()
 
     def test_get_normalized_attributes_must_be_implemented(self):
         """An error must be raised if the _get_normalized_attributes() method is not implemented"""
-        ingester = ingesters.MetadataIngester()
         with self.assertRaises(NotImplementedError), self.assertLogs(ingesters.LOGGER):
-            ingester._get_normalized_attributes('')
+            self.ingester._get_normalized_attributes('')
+
+    def test_ingest_from_metadata(self):
+        """Test that a dataset is created with the correct values from metadata"""
+
+        dataset_parameters = {
+            'entry_title': 'title_value',
+            'summary': 'summary_value',
+            'time_coverage_start': datetime(
+                year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()),
+            'time_coverage_end': datetime(
+                year=2020, month=1, day=1, hour=0, minute=5, second=59, tzinfo=tzutc()),
+            'platform': OrderedDict([
+                ('Category', 'platform_category'),
+                ('Series_Entity', 'platform_series_entity'),
+                ('Short_Name', 'platform_short_name'),
+                ('Long_Name', 'platform_long_name')]),
+            'instrument': OrderedDict([('Category', 'instrument_category'),
+                                       ('Class', 'instrument_class'),
+                                       ('Type', 'instrument_type'),
+                                       ('Subtype', 'instrument_subtype'),
+                                       ('Short_Name', 'instrument_short_name'),
+                                       ('Long_Name', 'instrument_long_name')]),
+            'location_geometry': GEOSGeometry(('POLYGON((1 1, 1 2, 2 2, 2 1, 1 1))'), srid=4326),
+            'provider': OrderedDict([('Bucket_Level0', 'provider_bucket_level0'),
+                                     ('Bucket_Level1', 'provider_bucket_level1'),
+                                     ('Bucket_Level2', 'provider_bucket_level2'),
+                                     ('Bucket_Level3', 'provider_bucket_level3'),
+                                     ('Short_Name', 'provider_short_name'),
+                                     ('Long_Name', 'provider_long_name'),
+                                     ('Data_Center_URL', 'provider_data_center_url')]),
+            'iso_topic_category': OrderedDict([('iso_topic_category', 'category_value')]),
+            'gcmd_location': OrderedDict([('Location_Category', 'gcmd_location_category'),
+                                          ('Location_Type', 'gcmd_location_type'),
+                                          ('Location_Subregion1', 'gcmd_location_subregion1'),
+                                          ('Location_Subregion2', 'gcmd_location_subregion2'),
+                                          ('Location_Subregion3', 'gcmd_location_subregion3')])
+        }
+
+        # Create a dataset from these values
+        patcher = mock.patch.object(ingesters.MetadataIngester, '_get_normalized_attributes')
+        with patcher as mock_get_normalized_attributes:
+            mock_get_normalized_attributes.return_value = dataset_parameters
+            self.ingester._ingest_dataset('http://test.uri/dataset')
+
+        self.assertTrue(Dataset.objects.count() == 1)
+        inserted_dataset = Dataset.objects.latest('id')
+
+        # Check that the dataset was created correctly
+        self.assertEqual(inserted_dataset.entry_title, 'title_value')
+        self.assertEqual(inserted_dataset.summary, 'summary_value')
+        self.assertEqual(inserted_dataset.time_coverage_start,
+                         dataset_parameters['time_coverage_start'])
+        self.assertEqual(inserted_dataset.time_coverage_end,
+                         dataset_parameters['time_coverage_end'])
+
+        self.assertEqual(inserted_dataset.source.platform.category, 'platform_category')
+        self.assertEqual(inserted_dataset.source.platform.series_entity, 'platform_series_entity')
+        self.assertEqual(inserted_dataset.source.platform.short_name, 'platform_short_name')
+        self.assertEqual(inserted_dataset.source.platform.long_name, 'platform_long_name')
+
+        self.assertEqual(inserted_dataset.source.instrument.category, 'instrument_category')
+        self.assertEqual(inserted_dataset.source.instrument.instrument_class, 'instrument_class')
+        self.assertEqual(inserted_dataset.source.instrument.type, 'instrument_type')
+        self.assertEqual(inserted_dataset.source.instrument.subtype, 'instrument_subtype')
+        self.assertEqual(inserted_dataset.source.instrument.short_name, 'instrument_short_name')
+        self.assertEqual(inserted_dataset.source.instrument.long_name, 'instrument_long_name')
+
+        self.assertEqual(inserted_dataset.geographic_location.geometry,
+                         GEOSGeometry(('POLYGON((1 1, 1 2, 2 2, 2 1, 1 1))'), srid=4326))
+
+        self.assertEqual(inserted_dataset.data_center.bucket_level0, 'provider_bucket_level0')
+        self.assertEqual(inserted_dataset.data_center.bucket_level1, 'provider_bucket_level1')
+        self.assertEqual(inserted_dataset.data_center.bucket_level2, 'provider_bucket_level2')
+        self.assertEqual(inserted_dataset.data_center.bucket_level3, 'provider_bucket_level3')
+        self.assertEqual(inserted_dataset.data_center.short_name, 'provider_short_name')
+        self.assertEqual(inserted_dataset.data_center.long_name, 'provider_long_name')
+        self.assertEqual(inserted_dataset.data_center.data_center_url, 'provider_data_center_url')
+
+        self.assertEqual(inserted_dataset.ISO_topic_category.name, 'category_value')
+
+        self.assertEqual(inserted_dataset.gcmd_location.category, 'gcmd_location_category')
+        self.assertEqual(inserted_dataset.gcmd_location.type, 'gcmd_location_type')
+        self.assertEqual(inserted_dataset.gcmd_location.subregion1, 'gcmd_location_subregion1')
+        self.assertEqual(inserted_dataset.gcmd_location.subregion2, 'gcmd_location_subregion2')
+        self.assertEqual(inserted_dataset.gcmd_location.subregion3, 'gcmd_location_subregion3')
 
 
 class DDXIngesterTestCase(django.test.TestCase):
@@ -222,62 +309,6 @@ class DDXIngesterTestCase(django.test.TestCase):
                 'title': 'VIIRS L2P Sea Surface Skin Temperature'
             }
         )
-
-    def test_ingest_ddx(self):
-        """Ingest a DDX file"""
-        initial_datasets_count = Dataset.objects.count()
-
-        ingester = ingesters.DDXIngester()
-        with self.assertLogs(ingesters.LOGGER):
-            ingester.ingest([self.TEST_DATA['full_ddx']['url']])
-
-        self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
-        inserted_dataset = Dataset.objects.latest('id')
-
-        self.assertEqual(inserted_dataset.entry_title, 'VIIRS L2P Sea Surface Skin Temperature')
-        self.assertEqual(inserted_dataset.summary, '''Sea surface temperature (SST) retrievals produced at the NASA OBPG for the Visible Infrared Imaging
-                Radiometer Suite (VIIRS) sensor on the Suomi National Polar-Orbiting Partnership (Suomi NPP) platform.
-                These have been reformatted to GHRSST GDS version 2 Level 2P specifications by the JPL PO.DAAC. VIIRS
-                SST algorithms developed by the University of Miami, RSMAS''')
-        self.assertEqual(inserted_dataset.time_coverage_start, datetime(
-            year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()))
-        self.assertEqual(inserted_dataset.time_coverage_end, datetime(
-            year=2020, month=1, day=1, hour=0, minute=5, second=59, tzinfo=tzutc()))
-
-        self.assertEqual(inserted_dataset.source.instrument.short_name, 'VIIRS')
-        self.assertEqual(inserted_dataset.source.instrument.long_name,
-                         'Visible-Infrared Imager-Radiometer Suite')
-        self.assertEqual(inserted_dataset.source.instrument.category,
-                         'Earth Remote Sensing Instruments')
-        self.assertEqual(inserted_dataset.source.instrument.subtype,
-                         'Imaging Spectrometers/Radiometers')
-        self.assertEqual(inserted_dataset.source.instrument.instrument_class,
-                         'Passive Remote Sensing')
-
-        self.assertEqual(inserted_dataset.source.platform.short_name, 'SUOMI-NPP')
-        self.assertEqual(inserted_dataset.source.platform.long_name,
-                         'Suomi National Polar-orbiting Partnership')
-        self.assertEqual(inserted_dataset.source.platform.category, 'Earth Observation Satellites')
-        self.assertEqual(inserted_dataset.source.platform.series_entity,
-                         'Joint Polar Satellite System (JPSS)')
-
-        self.assertEqual(inserted_dataset.geographic_location.geometry, GEOSGeometry(
-            'POLYGON((' +
-            '-175.084000 -15.3505001,' +
-            '-142.755005 -15.3505001,' +
-            '-142.755005 9.47472000,' +
-            '-175.084000 9.47472000,' +
-            '-175.084000 -15.3505001))',
-            srid=4326
-        ))
-        self.assertEqual(inserted_dataset.data_center.short_name, 'The GHRSST Project Office')
-        self.assertEqual(inserted_dataset.data_center.long_name, 'The GHRSST Project Office')
-        self.assertEqual(inserted_dataset.data_center.data_center_url, 'http://www.ghrsst.org')
-
-        self.assertEqual(inserted_dataset.ISO_topic_category.name, 'Oceans')
-
-        self.assertEqual(inserted_dataset.gcmd_location.category, 'VERTICAL LOCATION')
-        self.assertEqual(inserted_dataset.gcmd_location.type, 'SEA SURFACE')
 
     def test_ingest_dataset_twice_different_urls(self):
         """The same dataset must not be ingested twice even if it is present at different URLs"""
