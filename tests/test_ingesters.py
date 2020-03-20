@@ -10,7 +10,7 @@ from datetime import datetime
 
 import django.test
 import requests
-from dateutil.tz import tzlocal
+from dateutil.tz import tzutc
 from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset
 
@@ -154,9 +154,9 @@ class DDXIngesterTestCase(django.test.TestCase):
                 These have been reformatted to GHRSST GDS version 2 Level 2P specifications by the JPL PO.DAAC. VIIRS
                 SST algorithms developed by the University of Miami, RSMAS''')
         self.assertEqual(inserted_dataset.time_coverage_start, datetime(
-            year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzlocal()))
+            year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()))
         self.assertEqual(inserted_dataset.time_coverage_end, datetime(
-            year=2020, month=1, day=1, hour=0, minute=5, second=59, tzinfo=tzlocal()))
+            year=2020, month=1, day=1, hour=0, minute=5, second=59, tzinfo=tzutc()))
 
         self.assertEqual(inserted_dataset.source.instrument.short_name, 'VIIRS')
         self.assertEqual(inserted_dataset.source.instrument.long_name,
@@ -251,9 +251,9 @@ class NansatIngesterTestCase(django.test.TestCase):
         self.assertEqual(inserted_dataset.entry_title, 'NONE')
         self.assertEqual(inserted_dataset.summary, 'NONE')
         self.assertEqual(inserted_dataset.time_coverage_start, datetime(
-            year=2017, month=5, day=18, hour=0, minute=0, second=0, tzinfo=tzlocal()))
+            year=2017, month=5, day=18, hour=0, minute=0, second=0, tzinfo=tzutc()))
         self.assertEqual(inserted_dataset.time_coverage_end, datetime(
-            year=2017, month=5, day=27, hour=0, minute=0, second=0, tzinfo=tzlocal()))
+            year=2017, month=5, day=27, hour=0, minute=0, second=0, tzinfo=tzutc()))
 
         self.assertEqual(inserted_dataset.source.instrument.short_name, 'Computer')
         self.assertEqual(inserted_dataset.source.instrument.long_name, 'Computer')
