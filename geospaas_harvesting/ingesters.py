@@ -31,7 +31,8 @@ LOGGER.addHandler(logging.NullHandler())
 class Ingester():
     """Base class for ingesters"""
 
-    def _uri_exists(self, uri):
+    @staticmethod
+    def _uri_exists(uri):
         """Checks if the given URI already exists in the database"""
         return bool(DatasetURI.objects.filter(uri=uri))
 
