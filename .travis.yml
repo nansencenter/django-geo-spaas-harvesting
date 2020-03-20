@@ -2,7 +2,6 @@
 language: shell
 services:
   - docker
-  - postgresql
 
 # Environment variables defined as part of the Travis CI repository configuration are:
 # - DOCKER_ORG: the docker hub organization (or user) to which the image will be pushed
