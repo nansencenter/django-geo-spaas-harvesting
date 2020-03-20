@@ -21,30 +21,96 @@ import geospaas_harvesting.ingesters as ingesters
 class IngesterTestCase(django.test.TestCase):
     """Test the base ingester class"""
 
-    def test_check_existing_uri(self):
-        """The _uri_exists() method must return True if a URI already exists, False otherwise"""
-        uri = 'http://test.uri/dataset'
-        self.assertFalse(ingesters.Ingester._uri_exists(uri))
+    def setUp(self):
+        self.ingester = ingesters.Ingester()
 
-        # Create dummy DatasetURI
+    def _create_dummy_dataset(self, title):
+        """Create dummy dataset for testing purposes"""
+
         data_center = DataCenter(short_name='test')
         data_center.save()
         iso_topic_category = ISOTopicCategory(name='TEST')
         iso_topic_category.save()
-        dataset = Dataset(entry_title='test',
+        dataset = Dataset(entry_title=title,
                           ISO_topic_category=iso_topic_category,
                           data_center=data_center)
         dataset.save()
+        return (dataset, True)
+
+    def _create_dummy_dataset_uri(self, uri, dataset):
+        """Create dummy dataset URI for testing purposes"""
         dataset_uri = DatasetURI(uri=uri, dataset=dataset)
         dataset_uri.save()
+        return (dataset_uri, True)
 
-        self.assertTrue(ingesters.Ingester._uri_exists(uri))
+    def test_check_existing_uri(self):
+        """The _uri_exists() method must return True if a URI already exists, False otherwise"""
+
+        uri = 'http://test.uri/dataset'
+        self.assertFalse(self.ingester._uri_exists(uri))
+
+        dataset, _ = self._create_dummy_dataset('test')
+        self._create_dummy_dataset_uri(uri, dataset)
+        self.assertTrue(self.ingester._uri_exists(uri))
 
     def test_ingest_dataset_must_be_implemented(self):
         """An error must be raised if the _ingest_dataset() method is not implemented"""
-        ingester = ingesters.Ingester()
         with self.assertRaises(NotImplementedError), self.assertLogs(ingesters.LOGGER):
-            ingester._ingest_dataset('')
+            self.ingester._ingest_dataset('')
+
+    def test_ingest_same_uri_twice(self):
+        """Ingestion of the same URI must not happen twice and the attempt must be logged"""
+
+        uri = 'http://test.uri/dataset'
+        dataset, _ = self._create_dummy_dataset('test')
+        self._create_dummy_dataset_uri(uri, dataset)
+
+        with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
+            with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+                self.ingester.ingest([uri])
+
+        self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database'))
+        self.assertEqual(Dataset.objects.count(), 1)
+        self.assertFalse(mock_ingest_dataset.called)
+
+    def test_log_on_ingestion_error(self):
+        """The cause of the error must be logged if an exception is raised while ingesting"""
+
+        with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
+            mock_ingest_dataset.side_effect = TypeError
+            with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+                self.ingester.ingest(['some_url'])
+            self.assertEqual(len(logger_cm.records), 1)
+
+    def test_log_on_ingestion_success(self):
+        """All ingestion successes must be logged"""
+
+        with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
+            mock_ingest_dataset.return_value = (True, True)
+            with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+                self.ingester.ingest(['some_url'])
+            self.assertEqual(len(logger_cm.records), 1)
+
+    def test_log_error_on_dataset_created_with_existing_uri(self):
+        """
+        An error must be logged if a dataset is created during ingestion, even if its URI already
+        exists in the database (this should not be possible)
+        """
+
+        with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
+            mock_ingest_dataset.return_value = (True, False)
+            with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
+                self.ingester.ingest(['some_url'])
+            self.assertEqual(len(logger_cm.records), 1)
+
+    def test_log_on_dataset_already_ingested_from_different_uri(self):
+        """A message must be logged if a dataset was already ingested from a different URI"""
+
+        with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
+            mock_ingest_dataset.return_value = (False, True)
+            with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+                self.ingester.ingest(['some_url'])
+            self.assertEqual(len(logger_cm.records), 1)
 
 
 class MetadataIngesterTestCase(unittest.TestCase):
@@ -213,21 +279,6 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(inserted_dataset.gcmd_location.category, 'VERTICAL LOCATION')
         self.assertEqual(inserted_dataset.gcmd_location.type, 'SEA SURFACE')
 
-    def test_ingest_same_url_twice(self):
-        """The same URL must not be ingested twice"""
-        initial_datasets_count = Dataset.objects.count()
-
-        ingester = ingesters.DDXIngester()
-        with self.assertLogs(ingesters.LOGGER):
-            ingester.ingest([self.TEST_DATA['full_ddx']['url']])
-        self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
-
-        with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
-            ingester.ingest([self.TEST_DATA['full_ddx']['url']])
-
-        self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database'))
-        self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
-
     def test_ingest_dataset_twice_different_urls(self):
         """The same dataset must not be ingested twice even if it is present at different URLs"""
         initial_datasets_count = Dataset.objects.count()
@@ -243,16 +294,6 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertTrue(logger_cm.records[0].msg.endswith('already exists in the database.'))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
-    def test_logging_on_normalization_error(self):
-        """An error must be logged if the normalization failed"""
-
-        ingester = ingesters.DDXIngester()
-
-        with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
-            ingester.ingest([self.TEST_DATA['short_ddx']['url']])
-        self.assertTrue(logger_cm.records[0].message.startswith(
-            f"Ingestion of the dataset at '{self.TEST_DATA['short_ddx']['url']}' failed"))
-
 
 class NansatIngesterTestCase(django.test.TestCase):
     """Test the NansatIngester"""
@@ -263,7 +304,8 @@ class NansatIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.NansatIngester()
         with self.assertLogs(ingesters.LOGGER):
-            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
+            ingester.ingest(
+                [os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
 
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
         inserted_dataset = Dataset.objects.latest('id')
@@ -328,21 +370,6 @@ class NansatIngesterTestCase(django.test.TestCase):
         self.assertEqual(inserted_dataset.gcmd_location.category, 'VERTICAL LOCATION')
         self.assertEqual(inserted_dataset.gcmd_location.type, 'SEA SURFACE')
 
-    def test_ingest_same_url_twice(self):
-        """The same URL must not be ingested twice"""
-        initial_datasets_count = Dataset.objects.count()
-
-        ingester = ingesters.NansatIngester()
-        with self.assertLogs(ingesters.LOGGER):
-            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
-
-        self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
-
-        with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
-            ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
-
-        self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database'))
-        self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
     #TODO: make this work
     # def test_ingest_dataset_twice_different_urls(self):
