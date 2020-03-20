@@ -12,13 +12,33 @@ import django.test
 import requests
 from dateutil.tz import tzutc
 from django.contrib.gis.geos.geometry import GEOSGeometry
-from geospaas.catalog.models import Dataset
+from geospaas.catalog.models import Dataset, DatasetURI
+from geospaas.vocabularies.models import DataCenter, ISOTopicCategory
 
 import geospaas_harvesting.ingesters as ingesters
 
 
-class IngesterTestCase(unittest.TestCase):
+class IngesterTestCase(django.test.TestCase):
     """Test the base ingester class"""
+
+    def test_check_existing_uri(self):
+        """The _uri_exists() method must return True if a URI already exists, False otherwise"""
+        uri = 'http://test.uri/dataset'
+        self.assertFalse(ingesters.Ingester._uri_exists(uri))
+
+        # Create dummy DatasetURI
+        data_center = DataCenter(short_name='test')
+        data_center.save()
+        iso_topic_category = ISOTopicCategory(name='TEST')
+        iso_topic_category.save()
+        dataset = Dataset(entry_title='test',
+                          ISO_topic_category=iso_topic_category,
+                          data_center=data_center)
+        dataset.save()
+        dataset_uri = DatasetURI(uri=uri, dataset=dataset)
+        dataset_uri.save()
+
+        self.assertTrue(ingesters.Ingester._uri_exists(uri))
 
     def test_ingest_dataset_must_be_implemented(self):
         """An error must be raised if the _ingest_dataset() method is not implemented"""
