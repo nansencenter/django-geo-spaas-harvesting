@@ -310,6 +310,67 @@ class DDXIngesterTestCase(django.test.TestCase):
             }
         )
 
+    def test_get_normalized_attributes(self):
+        """Test that the correct attributes are extracted from a DDX file"""
+        ingester = ingesters.DDXIngester()
+        normalized_parameters = ingester._get_normalized_attributes(
+            self.TEST_DATA['full_ddx']['url'])
+
+        self.assertEqual(normalized_parameters['entry_title'],
+                         'VIIRS L2P Sea Surface Skin Temperature')
+        self.assertEqual(normalized_parameters['summary'], (
+            'Sea surface temperature (SST) retrievals produced at the NASA OBPG for the Visible I' +
+            'nfrared Imaging\n                Radiometer Suite (VIIRS) sensor on the Suomi Nation' +
+            'al Polar-Orbiting Partnership (Suomi NPP) platform.\n                These have been' +
+            ' reformatted to GHRSST GDS version 2 Level 2P specifications by the JPL PO.DAAC. VII' +
+            'RS\n                SST algorithms developed by the University of Miami, RSMAS'))
+        self.assertEqual(normalized_parameters['time_coverage_start'], datetime(
+            year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()))
+        self.assertEqual(normalized_parameters['time_coverage_end'], datetime(
+            year=2020, month=1, day=1, hour=0, minute=5, second=59, tzinfo=tzutc()))
+
+        self.assertEqual(normalized_parameters['instrument']['Short_Name'], 'VIIRS')
+        self.assertEqual(normalized_parameters['instrument']['Long_Name'],
+                         'Visible-Infrared Imager-Radiometer Suite')
+        self.assertEqual(normalized_parameters['instrument']['Category'],
+                         'Earth Remote Sensing Instruments')
+        self.assertEqual(normalized_parameters['instrument']['Subtype'],
+                         'Imaging Spectrometers/Radiometers')
+        self.assertEqual(normalized_parameters['instrument']['Class'],
+                         'Passive Remote Sensing')
+
+        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'SUOMI-NPP')
+        self.assertEqual(normalized_parameters['platform']['Long_Name'],
+                         'Suomi National Polar-orbiting Partnership')
+        self.assertEqual(normalized_parameters['platform']['Category'],
+                         'Earth Observation Satellites')
+        self.assertEqual(normalized_parameters['platform']['Series_Entity'],
+                         'Joint Polar Satellite System (JPSS)')
+
+        self.assertEqual(normalized_parameters['location_geometry'], GEOSGeometry(
+            'POLYGON((' +
+            '-175.084000 -15.3505001,' +
+            '-142.755005 -15.3505001,' +
+            '-142.755005 9.47472000,' +
+            '-175.084000 9.47472000,' +
+            '-175.084000 -15.3505001))',
+            srid=4326
+        ))
+
+        self.assertEqual(normalized_parameters['provider']['Short_Name'],
+                         'The GHRSST Project Office')
+        self.assertEqual(normalized_parameters['provider']['Long_Name'],
+                         'The GHRSST Project Office')
+        self.assertEqual(normalized_parameters['provider']['Data_Center_URL'],
+                         'http://www.ghrsst.org')
+
+        self.assertEqual(normalized_parameters['iso_topic_category']
+                         ['iso_topic_category'], 'Oceans')
+
+        self.assertEqual(normalized_parameters['gcmd_location']
+                         ['Location_Category'], 'VERTICAL LOCATION')
+        self.assertEqual(normalized_parameters['gcmd_location']['Location_Type'], 'SEA SURFACE')
+
     def test_ingest_dataset_twice_different_urls(self):
         """The same dataset must not be ingested twice even if it is present at different URLs"""
         initial_datasets_count = Dataset.objects.count()
