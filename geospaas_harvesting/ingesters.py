@@ -195,10 +195,16 @@ class CopernicusODataIngester(MetadataIngester):
     def __init__(self, username=None, password=None):
         super().__init__()
         self._credentials = (username, password)
+        self._url_regex = re.compile(r'^(\S+)/\$value$')
+
+    def _build_metadata_url(self, url):
+        """Returns the URL to query to get the metadata"""
+        matches = self._url_regex.match(url)
+        return matches.group(1) + '?$format=json&$expand=Attributes'
 
     def _get_raw_metadata(self, url):
         """Opens a stream """
-        metadata_url = url.rstrip('/$value') + '/?$format=json&$expand=Attributes'
+        metadata_url = self._build_metadata_url(url)
         try:
             stream = requests.get(metadata_url, auth=self._credentials, stream=True).content
         except requests.exceptions.RequestException:

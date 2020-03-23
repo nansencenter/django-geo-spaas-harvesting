@@ -1,6 +1,7 @@
 """Test suite for ingesters"""
 #pylint: disable=protected-access
 
+import json
 import logging
 import os
 import unittest.mock as mock
@@ -385,6 +386,135 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         self.assertTrue(logger_cm.records[0].msg.endswith('already exists in the database.'))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
+
+
+class CopernicusODataIngesterTestCase(django.test.TestCase):
+    """Test the CopernicusODataIngester"""
+
+    TEST_DATA = {
+        'full': {
+            'url': "https://random.url/full?$format=json&$expand=Attributes",
+            'file_path': "data/copernicus_opensearch/full.json"}
+    }
+
+    def requests_get_side_effect(self, url, **kwargs):  # pylint: disable=unused-argument
+        """Side effect function used to mock calls to requests.get().text"""
+        data_file_relative_path = None
+        for test_data in self.TEST_DATA.values():
+            if url == test_data['url']:
+                data_file_relative_path = test_data['file_path']
+
+        response = requests.Response()
+
+        if data_file_relative_path:
+            # Open data file as binary stream so it can be used to mock a requests response
+            data_file = open(os.path.join(os.path.dirname(__file__), data_file_relative_path), 'rb')
+            # Store opened files so they can be closed when the test is finished
+            self.opened_files.append(data_file)
+
+            response.status_code = 200
+            response.raw = data_file
+        else:
+            response.status_code = 404
+
+        return response
+
+    def setUp(self):
+        self.ingester = ingesters.CopernicusODataIngester()
+        # Mock requests.get()
+        self.patcher_requests_get = mock.patch.object(ingesters.requests, 'get')
+        self.mock_requests_get = self.patcher_requests_get.start()
+        self.mock_requests_get.side_effect = self.requests_get_side_effect
+        self.opened_files = []
+
+    def tearDown(self):
+        self.patcher_requests_get.stop()
+        # Close any files opened during the test
+        for opened_file in self.opened_files:
+            opened_file.close()
+
+    def test_instantiation(self):
+        """Test that the attributes of the CopernicusODataIngester are correctly initialized"""
+        ingester = ingesters.CopernicusODataIngester(username='test', password='test')
+        self.assertEqual(ingester._credentials, ('test', 'test'))
+
+    def test_build_metadata_url(self):
+        """Test that the metadata URL is correctly built from the dataset URL"""
+        test_url = 'http://ramdom.url/dataset/$value'
+        expected_result = 'http://ramdom.url/dataset?$format=json&$expand=Attributes'
+
+        self.assertEqual(self.ingester._build_metadata_url(test_url), expected_result)
+
+    def test_get_raw_metadata(self):
+        """Test that the raw metadata is correctly fetched"""
+        raw_metadata = self.ingester._get_raw_metadata('https://random.url/full/$value')
+        test_file_path = os.path.join(
+            os.path.dirname(__file__), self.TEST_DATA['full']['file_path'])
+
+        with open(test_file_path, 'rb') as test_file_handler:
+            self.assertDictEqual(json.load(test_file_handler), raw_metadata)
+
+    def test_get_normalized_attributes(self):
+        """Test that the correct attributes are extracted from Sentinel-SAFE JSON metadata"""
+        normalized_parameters = self.ingester._get_normalized_attributes(
+            'https://random.url/full/$value')
+
+        self.assertEqual(normalized_parameters['entry_title'],
+                         'S1A_IW_GRDH_1SDV_20200318T062305_20200318T062330_031726_03A899_F558')
+        self.assertEqual(normalized_parameters['summary'], (
+            'Date: 2020-03-18T06:23:05.976Z, Instrument: SAR-C, Mode: IW, ' +
+            'Satellite: Sentinel-1, Size: 1.65 GB'))
+        self.assertEqual(normalized_parameters['time_coverage_start'], datetime(
+            year=2020, month=3, day=18, hour=6, minute=23, second=5, microsecond=976000,
+            tzinfo=tzutc()))
+        self.assertEqual(normalized_parameters['time_coverage_end'], datetime(
+            year=2020, month=3, day=18, hour=6, minute=23, second=30, microsecond=975000,
+            tzinfo=tzutc()))
+
+        self.assertEqual(normalized_parameters['instrument']['Short_Name'], 'SAR')
+        self.assertEqual(normalized_parameters['instrument']['Long_Name'],
+                         'Synthetic Aperture Radar')
+        self.assertEqual(normalized_parameters['instrument']['Category'],
+                         'Earth Remote Sensing Instruments')
+        self.assertEqual(normalized_parameters['instrument']['Subtype'], '')
+        self.assertEqual(normalized_parameters['instrument']['Class'], 'Active Remote Sensing')
+
+        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'SENTINEL-1A')
+        self.assertEqual(normalized_parameters['platform']['Long_Name'], 'SENTINEL-1A')
+        self.assertEqual(normalized_parameters['platform']['Category'],
+                         'Earth Observation Satellites')
+        self.assertEqual(normalized_parameters['platform']['Series_Entity'], 'SENTINEL-1')
+
+        self.assertEqual(normalized_parameters['location_geometry'], GEOSGeometry(
+            'MULTIPOLYGON(((' +
+            '-0.694377 50.983601,' +
+            '-0.197663 52.476219,' +
+            '-4.065843 52.891499,' +
+            '-4.436811 51.396446,' +
+            '-0.694377 50.983601)))',
+            srid='4326' #TODO: check whether this should be an integer in metanorm
+        ))
+
+        self.assertEqual(normalized_parameters['provider']
+                         ['Bucket_Level0'], 'MULTINATIONAL ORGANIZATIONS')
+        self.assertEqual(normalized_parameters['provider']['Bucket_Level1'], '')
+        self.assertEqual(normalized_parameters['provider']['Bucket_Level2'], '')
+        self.assertEqual(normalized_parameters['provider']['Bucket_Level3'], '')
+        self.assertEqual(normalized_parameters['provider']['Short_Name'], 'ESA/EO')
+        self.assertEqual(normalized_parameters['provider']['Long_Name'],
+                         'Observing the Earth, European Space Agency')
+        self.assertEqual(normalized_parameters['provider']['Data_Center_URL'],
+                         'http://www.esa.int/esaEO/')
+
+        self.assertEqual(normalized_parameters['iso_topic_category']
+                         ['iso_topic_category'], 'Oceans')
+
+        self.assertEqual(normalized_parameters['gcmd_location']
+                         ['Location_Category'], 'VERTICAL LOCATION')
+        self.assertEqual(normalized_parameters['gcmd_location']['Location_Type'], 'SEA SURFACE')
+        self.assertEqual(normalized_parameters['gcmd_location']['Location_Subregion1'], '')
+        self.assertEqual(normalized_parameters['gcmd_location']['Location_Subregion2'], '')
+        self.assertEqual(normalized_parameters['gcmd_location']['Location_Subregion3'], '')
 
 
 class NansatIngesterTestCase(django.test.TestCase):
