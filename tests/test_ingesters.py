@@ -416,6 +416,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
             response.raw = data_file
         else:
             response.status_code = 404
+            raise requests.exceptions.HTTPError()
 
         return response
 
@@ -453,6 +454,16 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
 
         with open(test_file_path, 'rb') as test_file_handler:
             self.assertDictEqual(json.load(test_file_handler), raw_metadata)
+
+    def test_log_on_inexistent_metadata_page(self):
+        """An error must be logged in case the metadata URL points to nothing"""
+        with self.assertLogs(ingesters.LOGGER, level=logging.ERROR):
+            self.ingester._get_raw_metadata('http://nothing/$value')
+
+    def test_log_on_invalid_dataset_url(self):
+        """An An error must be logged in case the dataset URL does not match the ingester's regex"""
+        with self.assertLogs(ingesters.LOGGER, level=logging.ERROR):
+            self.ingester._get_raw_metadata('')
 
     def test_get_normalized_attributes(self):
         """Test that the correct attributes are extracted from Sentinel-SAFE JSON metadata"""

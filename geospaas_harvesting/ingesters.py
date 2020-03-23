@@ -200,17 +200,21 @@ class CopernicusODataIngester(MetadataIngester):
     def _build_metadata_url(self, url):
         """Returns the URL to query to get the metadata"""
         matches = self._url_regex.match(url)
-        return matches.group(1) + '?$format=json&$expand=Attributes'
+        if matches:
+            return matches.group(1) + '?$format=json&$expand=Attributes'
+        else:
+            raise ValueError('The URL does not match the expected pattern')
 
     def _get_raw_metadata(self, url):
         """Opens a stream """
-        metadata_url = self._build_metadata_url(url)
         try:
+            metadata_url = self._build_metadata_url(url)
             stream = requests.get(metadata_url, auth=self._credentials, stream=True).content
-        except requests.exceptions.RequestException:
-            LOGGER.error("Could not get metadata at '%s'", metadata_url, exc_info=True)
-
-        return json.load(io.BytesIO(stream))
+        except (requests.exceptions.RequestException, ValueError):
+            LOGGER.error("Could not get metadata for the dataset located at '%s'", url,
+                         exc_info=True)
+        else:
+            return json.load(io.BytesIO(stream))
 
     def _get_normalized_attributes(self, url):
         """Get attributes from the Copernicus OData API"""
