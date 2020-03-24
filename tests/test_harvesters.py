@@ -22,6 +22,12 @@ class HarvesterListTestCase(unittest.TestCase):
         def __init__(self, **config):
             self.config = config
 
+        def _create_crawlers(self):
+            pass
+
+        def _create_ingester(self):
+            pass
+
         def harvest(self):
             pass
 
@@ -67,6 +73,15 @@ class HarvesterListTestCase(unittest.TestCase):
         self.assertEqual(len(harvester_list), 2)
         self.assertIsInstance(harvester_list[0], harvesters.Harvester)
         self.assertIsInstance(harvester_list[1], harvesters.Harvester)
+
+    def test_init_wrong_harvester_class(self):
+        """An error must be logged if one of the harvesters has a inexistent class"""
+        with self.assertLogs(harvesters.LOGGER, level=logging.ERROR):
+            _ = harvesters.HarvesterList({
+                'harvester1': {
+                    'class': 'InexistentHarvester'
+                }
+            })
 
     def test_list_behavior(self):
         """
