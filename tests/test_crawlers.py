@@ -10,6 +10,15 @@ import requests
 import geospaas_harvesting.crawlers as crawlers
 
 
+class BaseCrawlerTestCase(unittest.TestCase):
+    """Tests for the base Crawler"""
+
+    def test_exception_on_iter(self):
+        """An exception must be raised if the __iter__ method is not overloaded"""
+        base_crawler = crawlers.Crawler()
+        with self.assertRaises(NotImplementedError):
+            _ = iter(base_crawler)
+
 class OpenDAPCrawlerTestCase(unittest.TestCase):
     """Tests for the OpenDAP crawler"""
 
