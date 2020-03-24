@@ -123,7 +123,6 @@ class ConfigurationTestCase(unittest.TestCase):
 
 class MainTestCase(unittest.TestCase):
     """Test the main() function in the daemon script"""
-    #TODO: complete this
 
     class TestHarvester(harvesters.Harvester):
         """Dummy Harvester used for tests"""
