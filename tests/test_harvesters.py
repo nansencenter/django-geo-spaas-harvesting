@@ -41,6 +41,13 @@ class HarvesterListTestCase(unittest.TestCase):
         harvester_list = harvesters.HarvesterList({})
         self.assertEqual(harvester_list._harvesters, [])
 
+    def test_iterate_over_empty_list(self):
+        """StopIteration must be raised if the list is empty"""
+        harvester_list = harvesters.HarvesterList({})
+        iterator = iter(harvester_list)
+        with self.assertRaises(StopIteration):
+            _ = next(iterator)
+
     def test_init_conf_is_wrong_type(self):
         """
         If the config argument is of the wrong type, an error message must be logged and the
@@ -123,10 +130,25 @@ class HarvesterListTestCase(unittest.TestCase):
 class HarvesterTestCase(unittest.TestCase):
     """Test the base harvester"""
 
-    def test_exception_on_instantiate_base_harvester(self):
-        """An exception is raised if an attempt is made to instantiate the base Harvester class"""
-        with self.assertRaises(NotImplementedError):
-            _ = harvesters.Harvester()
+    def test_exception_on_base_harvester_create_crawlers(self):
+        """
+        An exception is raised if an attempt is made to call the _create_crawlers() method of the
+        base Harvester class
+        """
+        with mock.patch.object(harvesters.Harvester, '__init__', return_value=None):
+            base_harvester = harvesters.Harvester()
+            with self.assertRaises(NotImplementedError):
+                base_harvester._create_crawlers()
+
+    def test_exception_on_base_harvester_create_ingester(self):
+        """
+        An exception is raised if an attempt is made to call the _create_ingester() method of the
+        base Harvester class
+        """
+        with mock.patch.object(harvesters.Harvester, '__init__', return_value=None):
+            base_harvester = harvesters.Harvester()
+            with self.assertRaises(NotImplementedError):
+                base_harvester._create_ingester()
 
     def test_correct_conf_loading(self):
         """Test that a correct configuration file is used the proper way"""

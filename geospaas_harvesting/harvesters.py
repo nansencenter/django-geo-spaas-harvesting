@@ -63,18 +63,21 @@ class EndlessHarvesterIterator():
     """Iterator which enables to endlessly iterate over a list of harvesters"""
 
     def __init__(self, harvesters_list):
-        if harvesters_list:
-            self._current_index = 0
-            self._harvesters_list = harvesters_list
-        else:
-            raise ValueError('Harvesters list is empty')
+        """Initialize internal list and current index"""
+        self._current_index = 0
+        self._harvesters_list = harvesters_list
+
 
     def __next__(self):
         try:
             result = self._harvesters_list[self._current_index]
         except IndexError:
-            self._current_index = 0
-            return self.__next__()
+            if self._current_index == 0:
+                # Stop the recursion if the list is empty
+                raise StopIteration()
+            else:
+                self._current_index = 0
+                return self.__next__()
         self._current_index += 1
         return result
 
