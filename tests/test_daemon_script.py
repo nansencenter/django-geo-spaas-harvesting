@@ -192,8 +192,13 @@ class PersistenceTestCase(unittest.TestCase):
         """
         with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
             harvest.dump('some_object', '/this/path/does/not/exist')
+
         with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
             harvest.dump('some_object', os.path.dirname(__file__))
+
+        with mock.patch.object(harvest, 'open', side_effect=KeyError):
+            with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
+                harvest.dump('some_object', '/this/path/does/not/exist')
 
     def test_log_on_load_error(self):
         """
