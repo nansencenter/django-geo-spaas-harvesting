@@ -152,6 +152,18 @@ class MainTestCase(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt):
             harvest.raise_keyboard_interrupt()
 
+    def test_log_on_harvest_value_error(self):
+        """An error must be logged if a ValueError is raised in a Harvester.harvest() call"""
+        harvester_list_patcher = mock.patch.object(
+            harvesters, 'HarvesterList', StubInterruptHarvesterList)
+        configuration_patcher = mock.patch('geospaas_harvesting.harvest.Configuration')
+        harvest_patcher = mock.patch.object(harvesters.Harvester, 'harvest', side_effect=ValueError)
+
+        with harvester_list_patcher, configuration_patcher, harvest_patcher:
+            with self.assertRaises(ValueError):
+                with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
+                    harvest.main()
+
 
 class PersistenceTestCase(unittest.TestCase):
     """Test the persistence of the harvesters"""
