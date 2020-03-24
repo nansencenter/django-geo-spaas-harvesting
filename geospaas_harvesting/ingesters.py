@@ -194,7 +194,7 @@ class CopernicusODataIngester(MetadataIngester):
 
     def __init__(self, username=None, password=None):
         super().__init__()
-        self._credentials = (username, password)
+        self._credentials = (username, password) if username and password else None
         self._url_regex = re.compile(r'^(\S+)/\$value$')
 
     def _build_metadata_url(self, url):
