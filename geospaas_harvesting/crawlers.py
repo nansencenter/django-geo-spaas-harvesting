@@ -99,10 +99,9 @@ class LinkExtractor(HTMLParser):
     HTML parser which extracts links from an HTML page
     """
 
-    # TODO: remove useless convert_charrefs which already defaults to True in the parent constructor
-    def __init__(self, convert_charrefs=True):
+    def __init__(self):
         """Constructor with extra attribute definition"""
-        super().__init__(convert_charrefs=convert_charrefs)
+        super().__init__()
         self._links = []
 
     def error(self, message):
