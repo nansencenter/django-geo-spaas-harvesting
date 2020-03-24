@@ -99,6 +99,8 @@ class LinkExtractor(HTMLParser):
     HTML parser which extracts links from an HTML page
     """
 
+    LOGGER = logging.getLogger(__name__ + '.LinkExtractor')
+
     def __init__(self):
         """Constructor with extra attribute definition"""
         super().__init__()
@@ -106,7 +108,7 @@ class LinkExtractor(HTMLParser):
 
     def error(self, message):
         """Error behavior"""
-        print(message)
+        self.LOGGER.error(message)
 
     def feed(self, data):
         """Reset links lists when new data is fed to the parser"""
