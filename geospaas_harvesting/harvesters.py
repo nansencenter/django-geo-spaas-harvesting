@@ -150,11 +150,12 @@ class CopernicusSentinelHarvester(Harvester):
         return [
             self.CRAWLER_CLASS(self.config['url'],
                                search_terms=search,
-                               username=self.config['username'],
-                               password=os.getenv(self.config['password']))
+                               username=self.config.get('username', None),
+                               password=os.getenv(self.config.get('password', ''), None))
             for search in self.config['search_terms']
         ]
 
     def _create_ingester(self):
         return self.INGESTER_CLASS(
-            username=self.config['username'], password=os.getenv(self.config['password']))
+            username=self.config.get('username', None),
+            password=os.getenv(self.config.get('password', ''), None))
