@@ -119,10 +119,8 @@ class HarvesterList():
             raise TypeError('Attempt to insert a non-Harvester object')
 
     def __getitem__(self, index):
-        if isinstance(index, int):
-            return self._harvesters[index]
-        else:
-            raise TypeError('Index must be an integer')
+        return self._harvesters[index]
+
 
     def __len__(self):
         return len(self._harvesters)

@@ -90,30 +90,52 @@ class HarvesterListTestCase(unittest.TestCase):
                 }
             })
 
-    def test_list_behavior(self):
-        """
-        A HarvesterList object must have a subset of list functionalities.
-        It must be: iterable, subscriptable, have a length and a working append() method
-        """
+    def test_append(self):
+        """Test append() method"""
         harvester_list = harvesters.HarvesterList()
-
-        # Test append() method
         harvester_list.append(self.TestHarvester())
         harvester_list.append(self.TestHarvester())
         self.assertIsInstance(harvester_list._harvesters[0], self.TestHarvester)
         self.assertIsInstance(harvester_list._harvesters[1], self.TestHarvester)
 
-        # harvester_list is iterable
+    def test_append_wrong_type(self):
+        """An exception must be raised if a non Harvester object is appended"""
+        harvester_list = harvesters.HarvesterList()
+        with self.assertRaises(TypeError):
+            harvester_list.append(1)
+
+    def test_iterable(self):
+        """HarvesterList is iterable"""
+        harvester_list = harvesters.HarvesterList()
         iterator = iter(harvester_list)
         self.assertIsInstance(iterator, harvesters.EndlessHarvesterIterator)
 
-        # harvester_list is subscriptable
+    def test_subscriptable(self):
+        """HarvesterList is subscriptable"""
+        harvester_list = harvesters.HarvesterList()
+
         self.assertTrue(callable(getattr(harvester_list, '__getitem__')))
+
+        harvester_list.append(self.TestHarvester())
         self.assertIsNotNone(harvester_list[0])
 
-        # harvester_list has a length
+    def test_exception_on_wrong_index_type(self):
+        """An exception must be raised if anything but an integer is used a index"""
+        harvester_list = harvesters.HarvesterList()
+        harvester_list.append(self.TestHarvester())
+        with self.assertRaises(TypeError):
+            _ = harvester_list['v']
+
+    def test_len(self):
+        """harvester_list has a length"""
+        harvester_list = harvesters.HarvesterList()
+
         self.assertTrue(callable(getattr(harvester_list, '__len__')))
-        self.assertEqual(len(harvester_list), 2)
+
+        self.assertEqual(len(harvester_list), 0)
+
+        harvester_list.append(self.TestHarvester())
+        self.assertEqual(len(harvester_list), 1)
 
     def test_endless_iteration(self):
         """The iterator for a HarvesterList must start over at the end of a loop"""
