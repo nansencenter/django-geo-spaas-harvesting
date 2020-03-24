@@ -40,8 +40,8 @@ class Harvester():
         try:
             self._crawlers = self._create_crawlers()
             self._ingester = self._create_ingester()
-        except (KeyError, TypeError):
-            raise HarvesterConfigurationError("Missing configuration key")
+        except (KeyError, TypeError) as error:
+            raise HarvesterConfigurationError("Missing configuration key") from error
 
         self._crawlers_iterator = iter(self._crawlers)
         self._current_crawler = next(self._crawlers_iterator)
