@@ -174,6 +174,26 @@ class PersistenceTestCase(unittest.TestCase):
         except FileNotFoundError:
             pass
 
+    def test_log_on_dump_error(self):
+        """
+        An error must be logged if the persistence file is a directory or is in a non existing
+        directory
+        """
+        with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
+            harvest.dump('some_object', '/this/path/does/not/exist')
+        with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
+            harvest.dump('some_object', os.path.dirname(__file__))
+
+    def test_log_on_load_error(self):
+        """
+        An error must be logged if the persistence file is a directory or is in a non existing
+        directory
+        """
+        with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
+            _ = harvest.load('/this/path/does/not/exist')
+        with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
+            _ = harvest.load(os.path.dirname(__file__))
+
     def test_dump_on_keyboard_interrupt(self):
         """The harvesters state is dumped when a KeyboardInterrupt exception is raised"""
 
