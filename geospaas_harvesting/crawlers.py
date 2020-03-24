@@ -159,10 +159,7 @@ class CopernicusOpenSearchAPICrawler(Crawler):
                 self.LOGGER.debug("No more entries found at '%s' matching '%s'",
                                   self.url, self.search_terms)
                 raise StopIteration
-            try:
-                result = self.__next__()
-            except IndexError:
-                raise StopIteration
+            result = self.__next__()
         return result
 
     def _get_next_page(self):
