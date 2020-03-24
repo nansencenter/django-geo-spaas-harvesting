@@ -134,6 +134,7 @@ def main():
             LOGGER.error(
                 "Could not iterate over harvesters list, please check the configuration file",
                 exc_info=True)
+            raise
         except KeyboardInterrupt:
             LOGGER.error("The process was killed", exc_info=True)
             LOGGER.info("Dumping current state")
