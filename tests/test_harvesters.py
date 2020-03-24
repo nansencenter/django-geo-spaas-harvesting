@@ -209,8 +209,17 @@ class HarvesterTestCase(unittest.TestCase):
              'https://random2.url/ressource_b',
              'https://random2.url/ressource_c'])
 
+class ChildHarvestersTestCase(unittest.TestCase):
+    """Tests for the Harvesters which inherit from the base Harvester class"""
+
     def test_podaac_harvester(self):
         """The PODAAC harvester has the correct crawler and ingester"""
         harvester = harvesters.PODAACHarvester(urls=[''])
         self.assertIsInstance(harvester._current_crawler, crawlers.OpenDAPCrawler)
         self.assertIsInstance(harvester._ingester, ingesters.DDXIngester)
+
+    def test_copernicus_sentinel_harvester(self):
+        """The Copernicus Sentinel harvester has the correct crawler and ingester"""
+        harvester = harvesters.CopernicusSentinelHarvester(url='', search_terms=[''])
+        self.assertIsInstance(harvester._current_crawler, crawlers.CopernicusOpenSearchAPICrawler)
+        self.assertIsInstance(harvester._ingester, ingesters.CopernicusODataIngester)
