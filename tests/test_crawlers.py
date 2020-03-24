@@ -1,6 +1,7 @@
 """Test suite for crawlers"""
 #pylint: disable=protected-access
 
+import logging
 import os
 import unittest
 import unittest.mock as mock
@@ -116,6 +117,12 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
         self.assertEqual(len(links['root']), 4)
         self.assertEqual(len(links['empty']), 0)
+
+    def test_link_extractor_error(self):
+        """In case of error, LinkExtractor must use a logger"""
+        parser = crawlers.LinkExtractor()
+        with self.assertLogs(parser.LOGGER, level=logging.ERROR):
+            parser.error('some message')
 
     def test_explore_page(self):
         """
