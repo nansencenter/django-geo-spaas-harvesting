@@ -127,6 +127,10 @@ class MainTestCase(unittest.TestCase):
 
     class TestHarvester(harvesters.Harvester):
         """Dummy Harvester used for tests"""
+        def _create_crawlers(self):
+            pass
+        def _create_ingester(self):
+            pass
         def harvest(self):
             pass
 
@@ -142,6 +146,11 @@ class MainTestCase(unittest.TestCase):
             with self.assertRaises(SystemExit) as system_exit_cm:
                 harvest.main()
         self.assertGreater(system_exit_cm.exception.code, 0)
+
+    def test_raise_keyboard_error(self):
+        """The raise_keyboard_interrupt function must raise a KeyboardInterrupt exception"""
+        with self.assertRaises(KeyboardInterrupt):
+            harvest.raise_keyboard_interrupt()
 
 
 class PersistenceTestCase(unittest.TestCase):
