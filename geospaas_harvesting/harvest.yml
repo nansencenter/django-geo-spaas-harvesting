@@ -8,7 +8,7 @@ harvesters:
       - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
   copernicus_sentinel:
     class: 'CopernicusSentinelHarvester'
-    url: 'https://scihub.copernicus.eu/dhus/search'
+    url: 'https://scihub.copernicus.eu/apihub/search'
     search_terms:
       - 'platformname:Sentinel-1 AND NOT L0'
       - 'platformname:Sentinel-2 AND NOT L0'
