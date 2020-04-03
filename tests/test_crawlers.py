@@ -27,11 +27,20 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         'root': {
             'url': "https://test-opendap.com",
             'file_path': "data/opendap/root.html"},
+        'root_duplicates': {
+            'url': "https://test2-opendap.com",
+            'file_path': "data/opendap/root_duplicates.html"},
         'root_dataset': {
             'url': 'https://test-opendap.com/dataset.nc',
             'file_path': None},
+        'root_dataset_2': {
+            'url': 'https://test2-opendap.com/dataset.nc',
+            'file_path': None},
         'folder': {
             'url': 'https://test-opendap.com/folder/contents.html',
+            'file_path': 'data/opendap/folder.html'},
+        'folder_2': {
+            'url': 'https://test2-opendap.com/folder/contents.html',
             'file_path': 'data/opendap/folder.html'},
         'folder_dataset': {
             'url': 'https://test-opendap.com/folder/dataset.nc',
@@ -134,6 +143,14 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             crawler._explore_page(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['root_dataset']['url']])
         self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['url']])
+
+    def test_explore_page_with_duplicates(self):
+        """If the same URL is present twice in the page, it should only be processed once"""
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['url'])
+        with self.assertLogs(crawler.LOGGER):
+            crawler._explore_page(crawler._to_process.pop())
+        self.assertListEqual(crawler._urls, [self.TEST_DATA['root_dataset_2']['url']])
+        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder_2']['url']])
 
     def test_iterating(self):
         """Test the call to the __iter__ method"""
