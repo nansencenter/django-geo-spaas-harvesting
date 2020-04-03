@@ -19,11 +19,9 @@ class HarvesterConfigurationError(Exception):
 class Harvester():
     """
     Base Harvester class. Implements the basic behavior but is not meant to be used directly.
-    It should be subclassed, and child classes should have the following elements:
-        - CRAWLER_CLASS class attribute
-        - INGESTER_CLASS class attribute
-        - _create_crawlers() method
-        - _create_ingester() methods
+    It should be subclassed, and child classes should implement the following methods:
+        - _create_crawlers()
+        - _create_ingester()
     """
 
     def _create_crawlers(self):
@@ -133,31 +131,26 @@ class HarvesterList():
 
 class PODAACHarvester(Harvester):
     """Harvester class for PODAAC data (NASA)"""
-    CRAWLER_CLASS = crawlers.OpenDAPCrawler
-    INGESTER_CLASS = ingesters.DDXIngester
-
     def _create_crawlers(self):
-        return [self.CRAWLER_CLASS(url) for url in self.config['urls']]
+        return [crawlers.OpenDAPCrawler(url) for url in self.config['urls']]
 
     def _create_ingester(self):
-        return self.INGESTER_CLASS()
+        return ingesters.DDXIngester()
 
 
 class CopernicusSentinelHarvester(Harvester):
     """Harvester class for Copernicus Sentinel data"""
-    CRAWLER_CLASS = crawlers.CopernicusOpenSearchAPICrawler
-    INGESTER_CLASS = ingesters.CopernicusODataIngester
-
     def _create_crawlers(self):
         return [
-            self.CRAWLER_CLASS(self.config['url'],
-                               search_terms=search,
-                               username=self.config.get('username', None),
-                               password=os.getenv(self.config.get('password', ''), None))
+            crawlers.CopernicusOpenSearchAPICrawler(
+                self.config['url'],
+                search_terms=search,
+                username=self.config.get('username', None),
+                password=os.getenv(self.config.get('password', ''), None))
             for search in self.config['search_terms']
         ]
 
     def _create_ingester(self):
-        return self.INGESTER_CLASS(
+        return ingesters.CopernicusODataIngester(
             username=self.config.get('username', None),
             password=os.getenv(self.config.get('password', ''), None))

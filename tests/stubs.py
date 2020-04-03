@@ -83,38 +83,29 @@ class StubExceptionIngester(ingesters.Ingester):
 
 class StubHarvester(harvesters.Harvester):
     """Stub harvester class using the previously defined mock crawler and ingester"""
-    CRAWLER_CLASS = StubCrawler
-    INGESTER_CLASS = StubIngester
-
     def _create_crawlers(self):
-        return [self.CRAWLER_CLASS(url) for url in self.config['urls']]
+        return [StubCrawler(url) for url in self.config['urls']]
 
     def _create_ingester(self):
-        return self.INGESTER_CLASS()
+        return StubIngester()
 
 
 class StubInterruptHarvester(harvesters.Harvester):
     """Stub harvester class using the previously defined mock crawler and ingester"""
-    CRAWLER_CLASS = StubCrawler
-    INGESTER_CLASS = StubInterruptIngester
-
     def _create_crawlers(self):
-        return [self.CRAWLER_CLASS(url) for url in self.config['urls']]
+        return [StubCrawler(url) for url in self.config['urls']]
 
     def _create_ingester(self):
-        return self.INGESTER_CLASS()
+        return StubInterruptIngester()
 
 
 class StubExceptionHarvester(harvesters.Harvester):
     """Stub harvester class using the previously defined mock crawler and ingester"""
-    CRAWLER_CLASS = StubCrawler
-    INGESTER_CLASS = StubExceptionIngester
-
     def _create_crawlers(self):
-        return [self.CRAWLER_CLASS(url) for url in self.config['urls']]
+        return [StubCrawler(url) for url in self.config['urls']]
 
     def _create_ingester(self):
-        return self.INGESTER_CLASS()
+        return StubExceptionIngester()
 
 
 class StubInterruptHarvesterList(harvesters.HarvesterList):
