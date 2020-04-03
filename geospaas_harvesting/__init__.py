@@ -21,3 +21,4 @@ except FileNotFoundError:
 
 if logging_configuration:
     logging.config.dictConfig(logging_configuration)
+    logging.captureWarnings(True)
