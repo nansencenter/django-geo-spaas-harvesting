@@ -18,6 +18,13 @@ class Crawler():
     def __iter__(self):
         raise NotImplementedError('The __iter__() method was not implemented')
 
+    def set_initial_state(self):
+        """
+        This method should set the crawler's attributes which are used for iterating in their
+        initial state. Child classes must implement this method so that the crawler can be reused
+        """
+        raise NotImplementedError('The set_initial_state() method was not implemented')
+
     @classmethod
     def _http_get(cls, url, request_parameters=None):
         """Returns the contents of a Web page as a string"""
@@ -45,8 +52,12 @@ class OpenDAPCrawler(Crawler):
         The _urls attribute contains URLs to the resources which will be returned by the crawler
         The _to_process attribute contains URLs to pages which need to be searched for resources
         """
+        self.root_url = root_url
+        self.set_initial_state()
+
+    def set_initial_state(self):
         self._urls = []
-        self._to_process = [root_url.rstrip('/')]
+        self._to_process = [self.root_url.rstrip('/')]
 
     def __iter__(self):
         """Make the crawler iterable"""
@@ -141,12 +152,16 @@ class CopernicusOpenSearchAPICrawler(Crawler):
     LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
 
     def __init__(self, url, search_terms='*', username=None, password=None,
-                 page_size=100, offset=0):
+                 page_size=100, initial_offset=0):
         self.url = url
         self.search_terms = search_terms
         self._credentials = (username, password) if username and password else None
         self.page_size = page_size
-        self.offset = offset
+        self.initial_offset = initial_offset
+        self.set_initial_state()
+
+    def set_initial_state(self):
+        self.offset = self.initial_offset
         self._urls = []
 
     def __iter__(self):

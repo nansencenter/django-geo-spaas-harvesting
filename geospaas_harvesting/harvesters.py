@@ -48,12 +48,14 @@ class Harvester():
 
     def harvest(self):
         """
-        Crawl through the URLs and ingest files
+        Loop through the crawlers and ingest files for each one.
         Looping by using the iterator explicitly enables to resume after a deserialization
         """
         while True:
             try:
                 self._ingester.ingest(self._current_crawler)
+                # When the crawler is done iterating, reset it so that it can be reused
+                self._current_crawler.set_initial_state()
                 self._current_crawler = next(self._crawlers_iterator)
             except StopIteration:
                 break

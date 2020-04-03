@@ -24,6 +24,9 @@ class StubCrawler(crawlers.Crawler):
 
         self.current_index = 0
 
+    def set_initial_state(self):
+        pass
+
     def __iter__(self):
         return self
 

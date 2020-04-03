@@ -97,6 +97,17 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         self.assertListEqual(crawler._urls, [])
         self.assertListEqual(crawler._to_process, [self.TEST_DATA['root']['url']])
 
+    def test_set_initial_state(self):
+        """Tests that the set_initial_state() method sets the correct values"""
+        #Create a crawler and start iterating to set a non-initial state
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
+        with self.assertLogs(crawler.LOGGER):
+            next(iter(crawler))
+
+        crawler.set_initial_state()
+        self.assertListEqual(crawler._to_process, [crawler.root_url])
+        self.assertListEqual(crawler._urls, [])
+
     def test_get_correct_html_contents(self):
         """Test that the _http_get() method returns the correct HTML string"""
         data_file = open(os.path.join(os.path.dirname(__file__), 'data/opendap/root.html'))
@@ -221,7 +232,8 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         self.opened_files = []
 
         self.crawler = crawlers.CopernicusOpenSearchAPICrawler(
-            self.BASE_URL, self.SEARCH_TERMS, 'user', 'pass', page_size=self.PAGE_SIZE, offset=0)
+            self.BASE_URL, self.SEARCH_TERMS, 'user', 'pass',
+            page_size=self.PAGE_SIZE, initial_offset=0)
 
     def tearDown(self):
         self.patcher_requests_get.stop()
@@ -236,8 +248,19 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         self.assertEqual(self.crawler.search_terms, self.SEARCH_TERMS)
         self.assertEqual(self.crawler._credentials, ('user', 'pass'))
         self.assertEqual(self.crawler.page_size, self.PAGE_SIZE)
+        self.assertEqual(self.crawler.initial_offset, 0)
         self.assertEqual(self.crawler.offset, 0)
         self.assertEqual(self.crawler._urls, [])
+
+    def test_set_initial_state(self):
+        """Tests that the set_initial_state() method sets the correct values"""
+        #Create a crawler and start iterating to set a non-initial state
+        with self.assertLogs(self.crawler.LOGGER):
+            next(iter(self.crawler))
+
+        self.crawler.set_initial_state()
+        self.assertEqual(self.crawler.offset, self.crawler.initial_offset)
+        self.assertListEqual(self.crawler._urls, [])
 
     def test_get_next_page(self):
         """Test the next page content"""
