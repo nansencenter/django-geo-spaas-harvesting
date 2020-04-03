@@ -76,6 +76,7 @@ class Configuration():
 
     def _load_configuration(self):
         """Loads the harvesting configuration from a file"""
+        LOGGER.info("Loading configuration from '%s'", self._path)
         try:
             with open(self._path, 'rb') as config_stream:
                 self._data = yaml.safe_load(config_stream)

@@ -32,7 +32,8 @@ class ConfigurationTestCase(unittest.TestCase):
 
     def test_loading_valid_conf(self):
         """Correct configuration file parsing"""
-        configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
+        with self.assertLogs(harvest.LOGGER):
+            configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
         self.assertDictEqual(
             configuration._data,
             {
@@ -48,21 +49,24 @@ class ConfigurationTestCase(unittest.TestCase):
     def test_loading_empty_conf(self):
         """An exception must be raised if the configuration file is empty"""
         with self.assertRaises(AssertionError, msg='Configuration data is empty'):
-            _ = harvest.Configuration(CONFIGURATION_FILES['empty'])
+            with self.assertLogs(harvest.LOGGER):
+                _ = harvest.Configuration(CONFIGURATION_FILES['empty'])
 
     def test_loading_conf_without_harvester_section(self):
         """
         An exception must be raised if the configuration does not contain a 'harvesters' section
         """
         with self.assertRaises(AssertionError, msg='Invalid top-level keys'):
-            _ = harvest.Configuration(CONFIGURATION_FILES['no_harvesters_section'])
+            with self.assertLogs(harvest.LOGGER):
+                _ = harvest.Configuration(CONFIGURATION_FILES['no_harvesters_section'])
 
     def test_loading_conf_without_harvesters(self):
         """
         An exception must be raised if the 'harvesters' section is empty
         """
         with self.assertRaises(AssertionError, msg='No harvesters are configured'):
-            _ = harvest.Configuration(CONFIGURATION_FILES['no_harvesters'])
+            with self.assertLogs(harvest.LOGGER):
+                _ = harvest.Configuration(CONFIGURATION_FILES['no_harvesters'])
 
     def test_loading_conf_without_class(self):
         """
@@ -70,7 +74,8 @@ class ConfigurationTestCase(unittest.TestCase):
         """
         message_regex = "^Harvester configuration must contain the following keys: .*$"
         with self.assertRaisesRegex(AssertionError, message_regex):
-            _ = harvest.Configuration(CONFIGURATION_FILES['no_class'])
+            with self.assertLogs(harvest.LOGGER):
+                _ = harvest.Configuration(CONFIGURATION_FILES['no_class'])
 
     def test_inexistent_config_file(self):
         """
@@ -90,12 +95,14 @@ class ConfigurationTestCase(unittest.TestCase):
 
         # Test short argument
         with mock.patch.object(sys, 'argv', [harvest.__file__, '-c', conf_file_path]):
-            configuration = harvest.Configuration()
+            with self.assertLogs(harvest.LOGGER):
+                configuration = harvest.Configuration()
         self.assertEqual(configuration._path, conf_file_path)
 
         # Test long argument
         with mock.patch.object(sys, 'argv', [harvest.__file__, '--config', conf_file_path]):
-            configuration = harvest.Configuration()
+            with self.assertLogs(harvest.LOGGER):
+                configuration = harvest.Configuration()
         self.assertEqual(configuration._path, conf_file_path)
 
     @mock.patch.object(sys, 'argv', ['harvest.py'])
@@ -106,18 +113,21 @@ class ConfigurationTestCase(unittest.TestCase):
         If the file path cannot be obtained from the CLI or constructor arguments, the default value
         must be used
         """
-        configuration = harvest.Configuration()
+        with self.assertLogs(harvest.LOGGER):
+            configuration = harvest.Configuration()
         self.assertEqual(configuration._path, CONFIGURATION_FILES['ok'])
 
     def test_subscriptable(self):
         """Configuration objects must be subscriptable"""
-        configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
+        with self.assertLogs(harvest.LOGGER):
+            configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
         self.assertTrue(callable(getattr(configuration, '__getitem__')))
         self.assertIsNotNone(configuration['harvesters'])
 
     def test_length(self):
         """the __len__ method must be correctly implemented"""
-        configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
+        with self.assertLogs(harvest.LOGGER):
+            configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
         self.assertTrue(callable(getattr(configuration, '__len__')))
         self.assertEqual(len(configuration), 1)
 
