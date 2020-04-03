@@ -15,7 +15,8 @@ DATABASES = {
         'PORT': os.getenv('GEOSPAAS_DB_PORT', '5432'),
         'NAME': os.getenv('GEOSPAAS_DB_NAME', 'geodjango'),
         'USER': os.getenv('GEOSPAAS_DB_USER', 'geodjango'),
-        'PASSWORD': os.getenv('GEOSPAAS_DB_PASSWORD')
+        'PASSWORD': os.getenv('GEOSPAAS_DB_PASSWORD'),
+        'CONN_MAX_AGE': 600
     }
 }
 

@@ -135,7 +135,11 @@ class PODAACHarvester(Harvester):
         return [crawlers.OpenDAPCrawler(url) for url in self.config['urls']]
 
     def _create_ingester(self):
-        return ingesters.DDXIngester()
+        parameters = {}
+        for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
+            if parameter_name in self.config:
+                parameters[parameter_name] = self.config[parameter_name]
+        return ingesters.DDXIngester(**parameters)
 
 
 class CopernicusSentinelHarvester(Harvester):
@@ -151,6 +155,10 @@ class CopernicusSentinelHarvester(Harvester):
         ]
 
     def _create_ingester(self):
-        return ingesters.CopernicusODataIngester(
-            username=self.config.get('username', None),
-            password=os.getenv(self.config.get('password', ''), None))
+        parameters = {}
+        for parameter_name in ['username', 'max_fetcher_threads', 'max_db_threads']:
+            if parameter_name in self.config:
+                parameters[parameter_name] = self.config[parameter_name]
+        if 'password' in self.config:
+            parameters['password'] = os.getenv(self.config['password'])
+        return ingesters.CopernicusODataIngester(**parameters)

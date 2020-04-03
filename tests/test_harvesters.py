@@ -214,12 +214,14 @@ class ChildHarvestersTestCase(unittest.TestCase):
 
     def test_podaac_harvester(self):
         """The PODAAC harvester has the correct crawler and ingester"""
-        harvester = harvesters.PODAACHarvester(urls=[''])
+        harvester = harvesters.PODAACHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
         self.assertIsInstance(harvester._current_crawler, crawlers.OpenDAPCrawler)
         self.assertIsInstance(harvester._ingester, ingesters.DDXIngester)
 
     def test_copernicus_sentinel_harvester(self):
         """The Copernicus Sentinel harvester has the correct crawler and ingester"""
-        harvester = harvesters.CopernicusSentinelHarvester(url='', search_terms=[''])
+        harvester = harvesters.CopernicusSentinelHarvester(url='', search_terms=[''],
+                                                           max_fetcher_threads=1, max_db_threads=1,
+                                                           username='test', password='TEST')
         self.assertIsInstance(harvester._current_crawler, crawlers.CopernicusOpenSearchAPICrawler)
         self.assertIsInstance(harvester._ingester, ingesters.CopernicusODataIngester)

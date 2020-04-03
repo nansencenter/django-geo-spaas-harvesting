@@ -43,6 +43,7 @@ class StubCrawler(crawlers.Crawler):
 class StubIngester(ingesters.Ingester):
     """Stub ingester class """
     def __init__(self):
+        super().__init__()
         self.ingested_urls = []
 
     def ingest(self, urls):
@@ -55,6 +56,7 @@ class StubIngester(ingesters.Ingester):
 class StubInterruptIngester(ingesters.Ingester):
     """Stub ingester class"""
     def __init__(self):
+        super().__init__()
         self.countdown = 1
 
     def ingest(self, urls):

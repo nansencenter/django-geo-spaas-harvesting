@@ -9,8 +9,11 @@ import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from datetime import datetime
 
+import django.db
+import django.db.utils
 import django.test
 import requests
+import threading
 from dateutil.tz import tzutc
 from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset, DatasetURI
@@ -19,7 +22,7 @@ from geospaas.vocabularies.models import DataCenter, ISOTopicCategory
 import geospaas_harvesting.ingesters as ingesters
 
 
-class IngesterTestCase(django.test.TestCase):
+class IngesterTestCase(django.test.TransactionTestCase):
     """Test the base ingester class"""
 
     def setUp(self):
@@ -54,10 +57,10 @@ class IngesterTestCase(django.test.TestCase):
         self._create_dummy_dataset_uri(uri, dataset)
         self.assertTrue(self.ingester._uri_exists(uri))
 
-    def test_ingest_dataset_must_be_implemented(self):
-        """An error must be raised if the _ingest_dataset() method is not implemented"""
+    def test_get_normalized_attributes_must_be_implemented(self):
+        """An error must be raised if the _get_normalized_attributes() method is not implemented"""
         with self.assertRaises(NotImplementedError), self.assertLogs(ingesters.LOGGER):
-            self.ingester._ingest_dataset('')
+            self.ingester._get_normalized_attributes('')
 
     def test_ingest_same_uri_twice(self):
         """Ingestion of the same URI must not happen twice and the attempt must be logged"""
@@ -76,49 +79,76 @@ class IngesterTestCase(django.test.TestCase):
 
     def test_log_on_ingestion_error(self):
         """The cause of the error must be logged if an exception is raised while ingesting"""
-
+        self.ingester._to_ingest.put(('some_url', {}))
+        self.ingester._to_ingest.put(None)
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
             mock_ingest_dataset.side_effect = TypeError
-            with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
-                self.ingester.ingest(['some_url'])
-            self.assertEqual(len(logger_cm.records), 1)
+            with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
+                self.ingester._thread_ingest_dataset()
+            self.assertEqual(logger_cm.records[0].message,
+                             "Ingestion of the dataset at 'some_url' failed")
+
+    def test_log_on_ingestion_database_error(self):
+        """
+        The cause of the error must be logged if a database exception is raised while ingesting
+        """
+        patcher = mock.patch.object(ingesters.DataCenter.objects, 'get_or_create')
+        with patcher as mock_ingest_dataset:
+            mock_ingest_dataset.side_effect = django.db.utils.OperationalError
+            with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
+                self.ingester._ingest_dataset('', {'provider': ''})
+            self.assertTrue(logger_cm.records[0].message.startswith('Database insertion failed'))
 
     def test_log_on_ingestion_success(self):
         """All ingestion successes must be logged"""
-
+        self.ingester._to_ingest.put(('some_url', {}))
+        self.ingester._to_ingest.put(None)
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
             mock_ingest_dataset.return_value = (True, True)
             with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
-                self.ingester.ingest(['some_url'])
-            self.assertEqual(len(logger_cm.records), 1)
+                self.ingester._thread_ingest_dataset()
+                self.assertEqual(logger_cm.records[0].message,
+                                 "Successfully created dataset from url: 'some_url'")
 
     def test_log_error_on_dataset_created_with_existing_uri(self):
         """
         An error must be logged if a dataset is created during ingestion, even if its URI already
         exists in the database (this should not be possible)
         """
-
+        self.ingester._to_ingest.put(('some_url', {}))
+        self.ingester._to_ingest.put(None)
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
             mock_ingest_dataset.return_value = (True, False)
             with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
-                self.ingester.ingest(['some_url'])
-            self.assertEqual(len(logger_cm.records), 1)
+                self.ingester._thread_ingest_dataset()
+            self.assertEqual(logger_cm.records[0].message,
+                             "The Dataset's URI already exists. This should never happen.")
 
     def test_log_on_dataset_already_ingested_from_different_uri(self):
         """A message must be logged if a dataset was already ingested from a different URI"""
-
+        self.ingester._to_ingest.put(('some_url', {}))
+        self.ingester._to_ingest.put(None)
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
             mock_ingest_dataset.return_value = (False, True)
             with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
-                self.ingester.ingest(['some_url'])
-            self.assertEqual(len(logger_cm.records), 1)
+                self.ingester._thread_ingest_dataset()
+            self.assertEqual(logger_cm.records[0].message,
+                             "Dataset at 'some_url' already exists in the database.")
+
+    def test_log_on_metadata_fetching_error(self):
+        """A message must be logged if an error occurs while fetching the metadata for a dataset"""
+        with mock.patch.object(ingesters.Ingester, '_get_normalized_attributes') as mock_normalize:
+            mock_normalize.side_effect = TypeError
+            with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
+                self.ingester._thread_get_normalized_attributes('some_url')
+            self.assertEqual(logger_cm.records[0].message, "Could not get metadata from 'some_url'")
 
 
-class MetadataIngesterTestCase(django.test.TestCase):
+class MetanormIngesterTestCase(django.test.TestCase):
     """Test the base metadata ingester class"""
 
     def setUp(self):
-        self.ingester = ingesters.MetadataIngester()
+        self.ingester = ingesters.MetanormIngester()
 
     def test_get_normalized_attributes_must_be_implemented(self):
         """An error must be raised if the _get_normalized_attributes() method is not implemented"""
@@ -162,13 +192,12 @@ class MetadataIngesterTestCase(django.test.TestCase):
                                           ('Location_Subregion3', 'gcmd_location_subregion3')])
         }
 
-        # Create a dataset from these values
-        patcher = mock.patch.object(ingesters.MetadataIngester, '_get_normalized_attributes')
-        with patcher as mock_get_normalized_attributes:
-            mock_get_normalized_attributes.return_value = dataset_parameters
-            self.ingester._ingest_dataset('http://test.uri/dataset')
+        datasets_count = Dataset.objects.count()
 
-        self.assertTrue(Dataset.objects.count() == 1)
+        # Create a dataset from these values
+        self.ingester._ingest_dataset('http://test.uri/dataset', dataset_parameters)
+
+        self.assertTrue(Dataset.objects.count() == datasets_count + 1)
         inserted_dataset = Dataset.objects.latest('id')
 
         # Check that the dataset was created correctly
@@ -531,36 +560,31 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
 class NansatIngesterTestCase(django.test.TestCase):
     """Test the NansatIngester"""
 
-    def test_ingest_netcdf_with_nansat(self):
+    def test_normalize_netcdf_attributes_with_nansat(self):
         """Test the ingestion of a netcdf file using nansat"""
-        initial_datasets_count = Dataset.objects.count()
-
         ingester = ingesters.NansatIngester()
-        with self.assertLogs(ingesters.LOGGER):
-            ingester.ingest(
-                [os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
+        # with self.assertLogs(ingesters.LOGGER):
+        normalized_attributes = ingester._get_normalized_attributes(
+            os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc'))
 
-        self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
-        inserted_dataset = Dataset.objects.latest('id')
+        self.assertEqual(normalized_attributes['entry_title'], 'NONE')
+        self.assertEqual(normalized_attributes['summary'], 'NONE')
+        self.assertEqual(normalized_attributes['time_coverage_start'], datetime(
+            year=2017, month=5, day=18, hour=0, minute=0, second=0))
+        self.assertEqual(normalized_attributes['time_coverage_end'], datetime(
+            year=2017, month=5, day=27, hour=0, minute=0, second=0))
 
-        self.assertEqual(inserted_dataset.entry_title, 'NONE')
-        self.assertEqual(inserted_dataset.summary, 'NONE')
-        self.assertEqual(inserted_dataset.time_coverage_start, datetime(
-            year=2017, month=5, day=18, hour=0, minute=0, second=0, tzinfo=tzutc()))
-        self.assertEqual(inserted_dataset.time_coverage_end, datetime(
-            year=2017, month=5, day=27, hour=0, minute=0, second=0, tzinfo=tzutc()))
-
-        self.assertEqual(inserted_dataset.source.instrument.short_name, 'Computer')
-        self.assertEqual(inserted_dataset.source.instrument.long_name, 'Computer')
-        self.assertEqual(inserted_dataset.source.instrument.category,
+        self.assertEqual(normalized_attributes['instrument']['Short_Name'], 'Computer')
+        self.assertEqual(normalized_attributes['instrument']['Long_Name'], 'Computer')
+        self.assertEqual(normalized_attributes['instrument']['Category'],
                          'In Situ/Laboratory Instruments')
-        self.assertEqual(inserted_dataset.source.instrument.subtype, '')
-        self.assertEqual(inserted_dataset.source.instrument.instrument_class, 'Data Analysis')
+        self.assertEqual(normalized_attributes['instrument']['Subtype'], '')
+        self.assertEqual(normalized_attributes['instrument']['Class'], 'Data Analysis')
 
-        self.assertEqual(inserted_dataset.source.platform.short_name, 'MODELS')
-        self.assertEqual(inserted_dataset.source.platform.long_name, '')
-        self.assertEqual(inserted_dataset.source.platform.category, 'Models/Analyses')
-        self.assertEqual(inserted_dataset.source.platform.series_entity, '')
+        self.assertEqual(normalized_attributes['platform']['Short_Name'], 'MODELS')
+        self.assertEqual(normalized_attributes['platform']['Long_Name'], '')
+        self.assertEqual(normalized_attributes['platform']['Category'], 'Models/Analyses')
+        self.assertEqual(normalized_attributes['platform']['Series_Entity'], '')
 
         expected_geometry = GEOSGeometry(
             'POLYGON ((20.704223629342 89.99989256067724, 24.995696372329 89.99987077812315, ' +
@@ -589,19 +613,21 @@ class NansatIngesterTestCase(django.test.TestCase):
         )
 
         # This fails, which is why string representations are compared. Any explanation is welcome.
-        # self.assertTrue(inserted_dataset.geographic_location.geometry.equals(expected_geometry))
-        self.assertEqual(str(inserted_dataset.geographic_location.geometry), str(expected_geometry))
+        #self.assertTrue(normalized_attributes['location_geometry'].equals(expected_geometry))
+        self.assertEqual(str(normalized_attributes['location_geometry']), str(expected_geometry))
 
-        self.assertEqual(inserted_dataset.data_center.short_name, 'NERSC')
-        self.assertEqual(inserted_dataset.data_center.long_name,
+        self.assertEqual(normalized_attributes['provider']['Short_Name'], 'NERSC')
+        self.assertEqual(normalized_attributes['provider']['Long_Name'],
                          'Nansen Environmental and Remote Sensing Centre')
-        self.assertEqual(inserted_dataset.data_center.data_center_url,
+        self.assertEqual(normalized_attributes['provider']['Data_Center_URL'],
                          'http://www.nersc.no/main/index2.php')
 
-        self.assertEqual(inserted_dataset.ISO_topic_category.name, 'Oceans')
+        self.assertEqual(
+            normalized_attributes['iso_topic_category']['iso_topic_category'], 'Oceans')
 
-        self.assertEqual(inserted_dataset.gcmd_location.category, 'VERTICAL LOCATION')
-        self.assertEqual(inserted_dataset.gcmd_location.type, 'SEA SURFACE')
+        self.assertEqual(
+            normalized_attributes['gcmd_location']['Location_Category'], 'VERTICAL LOCATION')
+        self.assertEqual(normalized_attributes['gcmd_location']['Location_Type'], 'SEA SURFACE')
 
 
     #TODO: make this work
