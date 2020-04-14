@@ -234,6 +234,7 @@ class PersistenceTestCase(unittest.TestCase):
                 harvest.main()
 
         self.assertTrue(os.path.exists(harvest.PERSISTENCE_FILE))
+        self.assertTrue(os.path.getsize(harvest.PERSISTENCE_FILE) > 0)
 
 
     def test_dump_on_exception(self):
@@ -250,6 +251,7 @@ class PersistenceTestCase(unittest.TestCase):
                 harvest.main()
 
         self.assertTrue(os.path.exists(harvest.PERSISTENCE_FILE))
+        self.assertTrue(os.path.getsize(harvest.PERSISTENCE_FILE) > 0)
 
     def test_state_file_removed_after_loading(self):
         """The persistence file is removed after deserialization"""
