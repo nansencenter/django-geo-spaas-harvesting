@@ -20,6 +20,7 @@ from django.contrib.gis.geos import GEOSGeometry
 
 import pythesint as pti
 from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
+                                       HTTP_SERVICE, HTTP_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
 from geospaas.catalog.models import (Dataset, DatasetURI, GeographicLocation,
                                      Source)
@@ -70,12 +71,21 @@ class Ingester():
         return bool(DatasetURI.objects.filter(uri=uri))
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
-        """Returns a dictionary of normalized attribute which characterize a Dataset"""
+        """
+        Returns a dictionary of normalized attribute which characterize a Dataset. It should
+        contain the following extra entries: `geospaas_service` and `geospaas_service_name`, which
+        should respectively contain the `service` and `service_name` values necessary to create a
+        DatasetURI object.
+        """
         raise NotImplementedError('The _get_normalized_attributes() method was not implemented')
 
     def _ingest_dataset(self, url, normalized_attributes):
         """Writes a dataset to the database based on its attributes and URL"""
         try:
+            #Extract service information
+            service = normalized_attributes.pop('geospaas_service', 'UNKNOWN')
+            service_name = normalized_attributes.pop('geospaas_service_name', 'UNKNOWN')
+
             # Create the objects with which the dataset has relationships
             # (or get them if they already exist)
             data_center, _ = DataCenter.objects.get_or_create(
@@ -109,15 +119,6 @@ class Ingester():
                 gcmd_location=location,
                 ISO_topic_category=iso_topic_category,
                 source=source)
-
-            # TODO: generalize this. Maybe it should be an attribute of the harvester?
-            url_scheme = urlparse(url).scheme
-            if 'http' in url_scheme:
-                service_name = DAP_SERVICE_NAME
-                service = OPENDAP_SERVICE
-            else:
-                service_name = FILE_SERVICE_NAME
-                service = LOCAL_FILE_SERVICE
 
             #Create the URI for the created Dataset in the database
             _, created_dataset_uri = DatasetURI.objects.get_or_create(
@@ -310,7 +311,11 @@ class DDXIngester(MetanormIngester):
 
         # Get the parameters needed to create a geospaas catalog dataset from the
         # global attributes
-        return self._metadata_handler.get_parameters(dataset_global_attributes)
+        normalized_attributes = self._metadata_handler.get_parameters(dataset_global_attributes)
+        normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
+        normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
+
+        return normalized_attributes
 
 
 class CopernicusODataIngester(MetanormIngester):
@@ -346,7 +351,11 @@ class CopernicusODataIngester(MetanormIngester):
         raw_metadata = self._get_raw_metadata(url)
         attributes = {a['Name']: a['Value'] for a in raw_metadata['d']['Attributes']['results']}
 
-        return self._metadata_handler.get_parameters(attributes)
+        normalized_attributes = self._metadata_handler.get_parameters(attributes)
+        normalized_attributes['geospaas_service'] = HTTP_SERVICE
+        normalized_attributes['geospaas_service_name'] = HTTP_SERVICE_NAME
+
+        return normalized_attributes
 
 
 class NansatIngester(Ingester):
@@ -363,6 +372,15 @@ class NansatIngester(Ingester):
 
         # get metadata from Nansat and get objects from vocabularies
         n_metadata = nansat_object.get_metadata()
+
+        # set service info attributes
+        url_scheme = urlparse(url).scheme
+        if 'http' in url_scheme:
+            normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
+            normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
+        else:
+            normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
+            normalized_attributes['geospaas_service'] = LOCAL_FILE_SERVICE
 
         # set compulsory metadata (source)
         normalized_attributes['entry_title'] = n_metadata.get('entry_title', 'NONE')
