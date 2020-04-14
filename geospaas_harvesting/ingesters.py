@@ -43,7 +43,7 @@ class Ingester():
     documentation of the ingest() method for more detail.
     """
 
-    QUEUE_SIZE = 1000
+    QUEUE_SIZE = 500
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
         self.max_fetcher_threads = max_fetcher_threads
