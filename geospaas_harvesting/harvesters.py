@@ -67,6 +67,8 @@ class EndlessHarvesterIterator():
         self._current_index = 0
         self._harvesters_list = harvesters_list
 
+    def __iter__(self):
+        return self
 
     def __next__(self):
         try:

@@ -109,6 +109,7 @@ class HarvesterListTestCase(unittest.TestCase):
         harvester_list = harvesters.HarvesterList()
         iterator = iter(harvester_list)
         self.assertIsInstance(iterator, harvesters.EndlessHarvesterIterator)
+        self.assertIs(iter(iterator), iterator)
 
     def test_subscriptable(self):
         """HarvesterList is subscriptable"""
