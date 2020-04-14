@@ -317,7 +317,7 @@ class CopernicusODataIngester(MetanormIngester):
             raise ValueError('The URL does not match the expected pattern')
 
     def _get_raw_metadata(self, url):
-        """Opens a stream """
+        """Get the raw JSON metadata from a Copernicus OData URL"""
         try:
             metadata_url = self._build_metadata_url(url)
             stream = requests.get(metadata_url, auth=self._credentials, stream=True).content
