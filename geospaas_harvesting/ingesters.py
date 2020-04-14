@@ -198,6 +198,11 @@ class Ingester():
         which get the datasets' attributes put these attributes in the queue
         (see `_thread_get_normalized_attributes()`). The threads which handle database writing
         read from the queue and insert each dataset in the database.
+
+        If a KeyboardInterrupt exception occurs (which might mean that a SIGINT or SIGTERM was
+        received by the process), all scheduled metadata fetching threads are cancelled. We wait for
+        the currently running fetching threads to finish, then for the database threads to finish
+        processing the queue before exiting.
         """
         # Launch threads which read from the queue and create datasets in the database
         with concurrent.futures.ThreadPoolExecutor(
@@ -207,23 +212,31 @@ class Ingester():
                 db_executor.submit(self._thread_ingest_dataset)
 
             # Launch threads which fetch datasets attributes and put them in the queue
-            with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self.max_fetcher_threads,
-                    thread_name_prefix=self.__class__.__name__ + '.attr') as attr_executor:
-                attr_futures = []
-                for url in urls:
-                    if self._uri_exists(url):
-                        LOGGER.info("'%s' is already present in the database", url)
-                    else:
-                        attr_futures.append(attr_executor.submit(
-                            self._thread_get_normalized_attributes, url, *args, *kwargs))
-
-            # Wait for all queue elements to be processed and stop database access threads
-            LOGGER.debug('Waiting for all the datasets in the queue to be ingested...')
-            self._to_ingest.join()
-            LOGGER.debug('Stopping all database access threads')
-            for _ in range(self.max_db_threads):
-                self._to_ingest.put(None)
+            try:
+                with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=self.max_fetcher_threads,
+                        thread_name_prefix=self.__class__.__name__ + '.attr') as attr_executor:
+                    attr_futures = []
+                    for url in urls:
+                        if self._uri_exists(url):
+                            LOGGER.info("'%s' is already present in the database", url)
+                        else:
+                            attr_futures.append(attr_executor.submit(
+                                self._thread_get_normalized_attributes, url, *args, *kwargs))
+            except KeyboardInterrupt:
+                for future in attr_futures:
+                    future.cancel()
+                LOGGER.debug(
+                    'Cancelled future fetching threads, waiting for the running threads to finish')
+                concurrent.futures.wait(attr_futures)
+                raise
+            finally:
+                # Wait for all queue elements to be processed and stop database access threads
+                LOGGER.debug('Waiting for all the datasets in the queue to be ingested...')
+                self._to_ingest.join()
+                LOGGER.debug('Stopping all database access threads')
+                for _ in range(self.max_db_threads):
+                    self._to_ingest.put(None)
 
 
 class MetanormIngester(Ingester):

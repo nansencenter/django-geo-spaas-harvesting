@@ -4,6 +4,7 @@
 import json
 import logging
 import os
+import time
 import unittest.mock as mock
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
@@ -13,7 +14,6 @@ import django.db
 import django.db.utils
 import django.test
 import requests
-import threading
 from dateutil.tz import tzutc
 from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset, DatasetURI
@@ -142,6 +142,32 @@ class IngesterTestCase(django.test.TransactionTestCase):
             with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
                 self.ingester._thread_get_normalized_attributes('some_url')
             self.assertEqual(logger_cm.records[0].message, "Could not get metadata from 'some_url'")
+
+    def test_fetching_threads_stop_on_keyboard_interrupt(self):
+        """
+        Test that the scheduled threads which fetch datasets metadata are stopped when a
+        KeyboardInterrupt (i.e. SIGINT or SIGTERM) occurs. If the exception is not correctly
+        handled, this test will hang.
+        """
+
+        ingester = ingesters.Ingester(max_fetcher_threads=100, max_db_threads=1)
+        fetcher_patcher = mock.patch.object(ingesters.Ingester, '_thread_get_normalized_attributes')
+        uri_exists_patcher = mock.patch.object(ingesters.Ingester, '_uri_exists')
+
+        def sleep():
+            time.sleep(1)
+
+        def uri_exists(uri):
+            if uri < 99:
+                return False
+            else:
+                raise KeyboardInterrupt
+
+        with fetcher_patcher as fetcher_mock, uri_exists_patcher as uri_exists_mock:
+            fetcher_mock.side_effect = sleep
+            uri_exists_mock.side_effect = uri_exists
+            with self.assertRaises(KeyboardInterrupt):
+                ingester.ingest(range(100))
 
 
 class MetanormIngesterTestCase(django.test.TestCase):
