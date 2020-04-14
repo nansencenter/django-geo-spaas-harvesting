@@ -85,7 +85,9 @@ class EndlessHarvesterIterator():
 
 
 class HarvesterList():
-    """Iterable class containing Harvester instances"""
+    """
+    Iterable class containing Harvester instances. Iterates endlessly over the harvesters list.
+    """
 
     def __init__(self, config=None):
         """
@@ -103,10 +105,10 @@ class HarvesterList():
                 for harvester_name, harvester_config in config.items():
                     try:
                         harvester_class = globals()[harvester_config['class']]
-                        self.append(harvester_class(
-                            **{key: value
-                               for (key, value) in harvester_config.items() if key != 'class'}
-                        ))
+                        self.append(harvester_class(**{
+                            key: value
+                            for (key, value) in harvester_config.items() if key != 'class'
+                        }))
                     except KeyError:
                         LOGGER.error("Wrong harvester class name for '%s'", harvester_name,
                                      exc_info=True)
@@ -122,7 +124,6 @@ class HarvesterList():
 
     def __getitem__(self, index):
         return self._harvesters[index]
-
 
     def __len__(self):
         return len(self._harvesters)
