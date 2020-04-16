@@ -7,6 +7,8 @@ import os.path
 import pickle
 import signal
 import sys
+from datetime import datetime
+
 import yaml
 
 import django
@@ -21,7 +23,6 @@ LOGGER = logging.getLogger(LOGGER_NAME)
 LOGGER.addHandler(logging.NullHandler())
 
 PERSISTENCE_DIR = os.getenv('GEOSPAAS_PERSISTENCE_DIR', os.path.join('/', 'var', 'run', 'geospaas'))
-PERSISTENCE_FILE = os.path.join(PERSISTENCE_DIR, 'harvesters_state')
 
 
 class Configuration():
@@ -88,6 +89,7 @@ def raise_keyboard_interrupt(*args):
     """Raises a KeyboardInterrupt exception, to be used for signals handling"""
     raise KeyboardInterrupt
 
+
 def dump(obj, path):
     """Convenience function to serialize objects"""
     try:
@@ -99,6 +101,7 @@ def dump(obj, path):
         LOGGER.error("An unexpected error occurred while dumping %s to %s",
                      str(obj), path, exc_info=True)
 
+
 def load(path):
     """Convenience function to deserialize objects"""
     try:
@@ -107,6 +110,31 @@ def load(path):
     except (FileNotFoundError, IsADirectoryError, TypeError):
         LOGGER.error("Could not load from %s", path, exc_info=True)
 
+
+def get_last_persistence_file_name(harvester_class_name=None):
+    """
+    Returns the name of the most recent persistence file. If `harvester_class_name` is specified,
+    The most recent file for the corresponding harvester is returned.
+    """
+    last_file = None
+    files = None
+
+    try:
+        files = sorted(os.listdir(PERSISTENCE_DIR), key=lambda s: s.split('_')[0], reverse=True)
+    except FileNotFoundError:
+        pass
+
+    if files:
+        if harvester_class_name:
+            for file_name in files:
+                if file_name.endswith(f"_{harvester_class_name}"):
+                    last_file = file_name
+                    break
+        else:
+            last_file = files[0]
+    return last_file
+
+
 def main():
     """Loads harvesting configuration and runs each harvester in turn"""
 
@@ -114,10 +142,11 @@ def main():
 
     # Deserialize the last known state if possible, otherwise initialize harvesters from
     # configuration
-    if os.path.exists(PERSISTENCE_FILE):
-        LOGGER.info("Loading saved state")
-        (current_harvester, harvesters_iterator) = load(PERSISTENCE_FILE)
-        os.remove(PERSISTENCE_FILE)
+    load_file_name = get_last_persistence_file_name()
+    if load_file_name:
+        load_file_path = os.path.join(PERSISTENCE_DIR, load_file_name)
+        LOGGER.info("Loading saved state from '%s'", load_file_path)
+        (current_harvester, harvesters_iterator) = load(load_file_path)
     else:
         try:
             config = Configuration()
@@ -139,12 +168,18 @@ def main():
         except KeyboardInterrupt:
             LOGGER.error("The process was killed", exc_info=True)
             LOGGER.info("Dumping current state")
-            dump((current_harvester, harvesters_iterator), PERSISTENCE_FILE)
+            dump((current_harvester, harvesters_iterator), os.path.join(PERSISTENCE_DIR, (
+                datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S-%f') + '_' +
+                current_harvester.__class__.__name__
+            )))
             sys.exit(1)
         except Exception:  # pylint: disable=broad-except
             LOGGER.error("An unexpected error occurred", exc_info=True)
             LOGGER.info("Dumping current state")
-            dump((current_harvester, harvesters_iterator), PERSISTENCE_FILE)
+            dump((current_harvester, harvesters_iterator), os.path.join(PERSISTENCE_DIR, (
+                datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S-%f') + '_' +
+                current_harvester.__class__.__name__
+            )))
             raise
         else:
             try:

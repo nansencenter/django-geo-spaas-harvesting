@@ -1,6 +1,7 @@
 """Tests for the daemon script"""
 #pylint: disable=protected-access
 
+import glob
 import logging
 import os
 import os.path
@@ -191,9 +192,37 @@ class PersistenceTestCase(unittest.TestCase):
     def tearDown(self):
         self.conf_patcher.stop()
         try:
-            os.remove(harvest.PERSISTENCE_FILE)
+            for file_to_remove in glob.glob(f"{harvest.PERSISTENCE_DIR}/*"):
+                os.remove(file_to_remove)
         except FileNotFoundError:
             pass
+
+    def test_get_last_persistence_file_name_without_argument(self):
+        """The get_last_persistence_file_name must return the file with the most recent timestamp"""
+        with mock.patch('os.listdir') as mock_listdir:
+            mock_listdir.return_value = [
+                '2020-04-16-08-43-49-606514_PODAACHarvester',
+                '2020-04-16-08-43-53-112204_PODAACHarvester',
+                '2020-04-16-08-43-58-756088_CopernicusSentinelHarvester',
+                '2020-04-16-08-44-02-201730_CopernicusSentinelHarvester'
+            ]
+            self.assertEqual(harvest.get_last_persistence_file_name(),
+                             '2020-04-16-08-44-02-201730_CopernicusSentinelHarvester')
+
+    def test_get_last_persistence_file_name_with_argument(self):
+        """
+        The get_last_persistence_file_name must return the file with the most recent timestamp for
+        the requested harvester
+        """
+        with mock.patch('os.listdir') as mock_listdir:
+            mock_listdir.return_value = [
+                '2020-04-16-08-43-49-606514_PODAACHarvester',
+                '2020-04-16-08-43-53-112204_PODAACHarvester',
+                '2020-04-16-08-43-58-756088_CopernicusSentinelHarvester',
+                '2020-04-16-08-44-02-201730_CopernicusSentinelHarvester'
+            ]
+            self.assertEqual(harvest.get_last_persistence_file_name('PODAACHarvester'),
+                             '2020-04-16-08-43-53-112204_PODAACHarvester')
 
     def test_log_on_dump_error(self):
         """
@@ -233,8 +262,10 @@ class PersistenceTestCase(unittest.TestCase):
             with assert_daemon_logs, assert_ingester_logs:
                 harvest.main()
 
-        self.assertTrue(os.path.exists(harvest.PERSISTENCE_FILE))
-        self.assertTrue(os.path.getsize(harvest.PERSISTENCE_FILE) > 0)
+        created_persistence_files = os.listdir(harvest.PERSISTENCE_DIR)
+        self.assertEqual(len(created_persistence_files), 1)
+        created_file_path = os.path.join(harvest.PERSISTENCE_DIR, created_persistence_files[0])
+        self.assertTrue(os.path.getsize(created_file_path) > 0)
 
 
     def test_dump_on_exception(self):
@@ -250,26 +281,10 @@ class PersistenceTestCase(unittest.TestCase):
             with assert_daemon_logs, assert_ingester_logs:
                 harvest.main()
 
-        self.assertTrue(os.path.exists(harvest.PERSISTENCE_FILE))
-        self.assertTrue(os.path.getsize(harvest.PERSISTENCE_FILE) > 0)
-
-    def test_state_file_removed_after_loading(self):
-        """The persistence file is removed after deserialization"""
-        harvester_interrupt_list_patcher = mock.patch.object(
-            harvesters, 'HarvesterList', StubInterruptHarvesterList)
-
-        assert_exit = self.assertRaises(SystemExit)
-        assert_daemon_logs = self.assertLogs(harvest.LOGGER_NAME)
-        assert_ingester_logs = self.assertLogs(ingesters.LOGGER)
-
-        with harvester_interrupt_list_patcher, assert_exit:
-            with assert_daemon_logs, assert_ingester_logs:
-                harvest.main()
-            self.assertTrue(os.path.exists(harvest.PERSISTENCE_FILE))
-
-        with assert_daemon_logs, assert_ingester_logs:
-            harvest.main()
-        self.assertFalse(os.path.exists(harvest.PERSISTENCE_FILE))
+        created_persistence_files = os.listdir(harvest.PERSISTENCE_DIR)
+        self.assertEqual(len(created_persistence_files), 1)
+        created_file_path = os.path.join(harvest.PERSISTENCE_DIR, created_persistence_files[0])
+        self.assertTrue(os.path.getsize(created_file_path) > 0)
 
     def test_resume_with_correct_url(self):
         """The correct harvester is used after deserialization"""
