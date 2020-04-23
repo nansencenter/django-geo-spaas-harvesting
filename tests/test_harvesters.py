@@ -198,7 +198,7 @@ class HarvesterTestCase(unittest.TestCase):
     def test_all_urls_ingested(self):
         """Tests that all root URLs are explored"""
         harvester = StubHarvester(urls=['https://random1.url', 'https://random2.url'])
-        with self.assertLogs(ingesters.LOGGER):
+        with self.assertLogs(StubIngester.LOGGER):
             harvester.harvest()
 
         self.assertListEqual(

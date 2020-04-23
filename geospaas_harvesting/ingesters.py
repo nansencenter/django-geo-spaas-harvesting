@@ -30,8 +30,7 @@ from geospaas.vocabularies.models import (DataCenter, Instrument,
 from metanorm.handlers import GeospatialMetadataHandler
 from nansat import Nansat
 
-LOGGER = logging.getLogger(__name__)
-LOGGER.addHandler(logging.NullHandler())
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
 class Ingester():
@@ -43,6 +42,7 @@ class Ingester():
     documentation of the ingest() method for more detail.
     """
 
+    LOGGER = logging.getLogger(__name__ + '.Ingester')
     QUEUE_SIZE = 500
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
@@ -127,7 +127,7 @@ class Ingester():
                 uri=url,
                 dataset=dataset)
         except django.db.utils.OperationalError:
-            LOGGER.error('Database insertion failed', exc_info=True)
+            self.LOGGER.error('Database insertion failed', exc_info=True)
             return (created_dataset if 'created_dataset' in locals() else False,
                     created_dataset_uri if 'created_dataset_uri' in locals() else False)
 
@@ -139,11 +139,11 @@ class Ingester():
         dictionary containing these attribtues in the queue to be written in the database.
         This method is meant to be run in a thread.
         """
-        LOGGER.debug("Getting metadata from '%s'", url)
+        self.LOGGER.debug("Getting metadata from '%s'", url)
         try:
             self._to_ingest.put((url, self._get_normalized_attributes(url, *args, **kwargs)))
         except Exception: #pylint: disable=broad-except
-            LOGGER.error("Could not get metadata from '%s'", url, exc_info=True)
+            self.LOGGER.error("Could not get metadata from '%s'", url, exc_info=True)
 
     def _thread_ingest_dataset(self):
         """
@@ -151,11 +151,11 @@ class Ingester():
         This method is meant to be run in a thread.
         """
         while True:
-            LOGGER.debug('Waiting on the queue for a dataset to ingest...')
-            LOGGER.debug('Queue size: %d', self._to_ingest.qsize())
+            self.LOGGER.debug('Waiting on the queue for a dataset to ingest...')
+            self.LOGGER.debug('Queue size: %d', self._to_ingest.qsize())
 
             item = self._to_ingest.get()
-            LOGGER.debug('Got "%s" from queue', item)
+            self.LOGGER.debug('Got "%s" from queue', item)
 
             if item is None:
                 self._to_ingest.task_done()
@@ -165,18 +165,18 @@ class Ingester():
             dataset_attributes = item[1]
 
             try:
-                LOGGER.debug("Ingesting '%s'", url)
+                self.LOGGER.debug("Ingesting '%s'", url)
                 (created_dataset, created_dataset_uri) = self._ingest_dataset(
                     url, dataset_attributes)
             except Exception:  # pylint: disable=broad-except
-                LOGGER.error("Ingestion of the dataset at '%s' failed", url, exc_info=True)
+                self.LOGGER.error("Ingestion of the dataset at '%s' failed", url, exc_info=True)
             else:
                 if created_dataset:
-                    LOGGER.info("Successfully created dataset from url: '%s'", url)
+                    self.LOGGER.info("Successfully created dataset from url: '%s'", url)
                 else:
-                    LOGGER.info("Dataset at '%s' already exists in the database.", url)
+                    self.LOGGER.info("Dataset at '%s' already exists in the database.", url)
                 if not created_dataset_uri:
-                    LOGGER.error("The Dataset's URI already exists. This should never happen.")
+                    self.LOGGER.error("The Dataset's URI already exists. This should never happen.")
             self._to_ingest.task_done()
         # It's important to close the database connection after the thread has done its work
         django.db.connection.close()
@@ -220,22 +220,22 @@ class Ingester():
                     attr_futures = []
                     for url in urls:
                         if self._uri_exists(url):
-                            LOGGER.info("'%s' is already present in the database", url)
+                            self.LOGGER.info("'%s' is already present in the database", url)
                         else:
                             attr_futures.append(attr_executor.submit(
                                 self._thread_get_normalized_attributes, url, *args, *kwargs))
             except KeyboardInterrupt:
                 for future in attr_futures:
                     future.cancel()
-                LOGGER.debug(
+                self.LOGGER.debug(
                     'Cancelled future fetching threads, waiting for the running threads to finish')
                 concurrent.futures.wait(attr_futures)
                 raise
             finally:
                 # Wait for all queue elements to be processed and stop database access threads
-                LOGGER.debug('Waiting for all the datasets in the queue to be ingested...')
+                self.LOGGER.debug('Waiting for all the datasets in the queue to be ingested...')
                 self._to_ingest.join()
-                LOGGER.debug('Stopping all database access threads')
+                self.LOGGER.debug('Stopping all database access threads')
                 for _ in range(self.max_db_threads):
                     self._to_ingest.put(None)
 
@@ -245,6 +245,8 @@ class MetanormIngester(Ingester):
     Base class for ingester which rely on normalized metadata. Such ingesters should inherit from
     this class and implement the _get_normalized_attributes() method.
     """
+
+    LOGGER = logging.getLogger(__name__ + '.MetanormIngester')
 
     DATASET_PARAMETER_NAMES = [
         'entry_title',
@@ -271,6 +273,7 @@ class MetanormIngester(Ingester):
 class DDXIngester(MetanormIngester):
     """Ingests metadata in DDX format from an OpenDAP server"""
 
+    LOGGER = logging.getLogger(__name__ + '.DDXIngester')
     GLOBAL_ATTRIBUTES_NAME = 'NC_GLOBAL'
     NAMESPACE_REGEX = r'^\{(\S+)\}Dataset$'
 
@@ -280,12 +283,12 @@ class DDXIngester(MetanormIngester):
             namespace_prefix = re.match(self.NAMESPACE_REGEX, root.tag)[1]  # first matched group
         except TypeError:
             namespace_prefix = ''
-            LOGGER.warning('Could not find XML namespace while reading DDX metadata')
+            self.LOGGER.warning('Could not find XML namespace while reading DDX metadata')
         return namespace_prefix
 
     def _extract_global_attributes(self, root):
         """Extracts the global attributes of a dataset from a DDX document"""
-        LOGGER.debug("Getting the dataset's global attributes.")
+        self.LOGGER.debug("Getting the dataset's global attributes.")
         namespaces = {'default': self._get_xml_namespace(root)}
         global_attributes = {}
         for attribute in root.findall(
@@ -321,6 +324,8 @@ class DDXIngester(MetanormIngester):
 class CopernicusODataIngester(MetanormIngester):
     """Ingest datasets from the metadata returned by calls to the Copernicus OData API"""
 
+    LOGGER = logging.getLogger(__name__ + '.CopernicusODataIngester')
+
     def __init__(self, username=None, password=None, max_fetcher_threads=1, max_db_threads=1):
         super().__init__(max_fetcher_threads, max_db_threads)
         self._credentials = (username, password) if username and password else None
@@ -340,8 +345,8 @@ class CopernicusODataIngester(MetanormIngester):
             metadata_url = self._build_metadata_url(url)
             stream = requests.get(metadata_url, auth=self._credentials, stream=True).content
         except (requests.exceptions.RequestException, ValueError):
-            LOGGER.error("Could not get metadata for the dataset located at '%s'", url,
-                         exc_info=True)
+            self.LOGGER.error("Could not get metadata for the dataset located at '%s'", url,
+                              exc_info=True)
         else:
             return json.load(io.BytesIO(stream))
 
@@ -360,6 +365,8 @@ class CopernicusODataIngester(MetanormIngester):
 
 class NansatIngester(Ingester):
     """Ingester class using Nansat to open files or streams"""
+
+    LOGGER = logging.getLogger(__name__ + '.NansatIngester')
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Gets dataset attributes using nansat"""

@@ -59,7 +59,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
 
     def test_get_normalized_attributes_must_be_implemented(self):
         """An error must be raised if the _get_normalized_attributes() method is not implemented"""
-        with self.assertRaises(NotImplementedError), self.assertLogs(ingesters.LOGGER):
+        with self.assertRaises(NotImplementedError), self.assertLogs(self.ingester.LOGGER):
             self.ingester._get_normalized_attributes('')
 
     def test_ingest_same_uri_twice(self):
@@ -70,7 +70,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self._create_dummy_dataset_uri(uri, dataset)
 
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
-            with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+            with self.assertLogs(self.ingester.LOGGER, level=logging.INFO) as logger_cm:
                 self.ingester.ingest([uri])
 
         self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database'))
@@ -83,7 +83,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.ingester._to_ingest.put(None)
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
             mock_ingest_dataset.side_effect = TypeError
-            with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
+            with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR) as logger_cm:
                 self.ingester._thread_ingest_dataset()
             self.assertEqual(logger_cm.records[0].message,
                              "Ingestion of the dataset at 'some_url' failed")
@@ -95,7 +95,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         patcher = mock.patch.object(ingesters.DataCenter.objects, 'get_or_create')
         with patcher as mock_ingest_dataset:
             mock_ingest_dataset.side_effect = django.db.utils.OperationalError
-            with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
+            with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR) as logger_cm:
                 self.ingester._ingest_dataset('', {'provider': ''})
             self.assertTrue(logger_cm.records[0].message.startswith('Database insertion failed'))
 
@@ -105,7 +105,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.ingester._to_ingest.put(None)
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
             mock_ingest_dataset.return_value = (True, True)
-            with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+            with self.assertLogs(self.ingester.LOGGER, level=logging.INFO) as logger_cm:
                 self.ingester._thread_ingest_dataset()
                 self.assertEqual(logger_cm.records[0].message,
                                  "Successfully created dataset from url: 'some_url'")
@@ -119,7 +119,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.ingester._to_ingest.put(None)
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
             mock_ingest_dataset.return_value = (True, False)
-            with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
+            with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR) as logger_cm:
                 self.ingester._thread_ingest_dataset()
             self.assertEqual(logger_cm.records[0].message,
                              "The Dataset's URI already exists. This should never happen.")
@@ -130,7 +130,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.ingester._to_ingest.put(None)
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
             mock_ingest_dataset.return_value = (False, True)
-            with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+            with self.assertLogs(self.ingester.LOGGER, level=logging.INFO) as logger_cm:
                 self.ingester._thread_ingest_dataset()
             self.assertEqual(logger_cm.records[0].message,
                              "Dataset at 'some_url' already exists in the database.")
@@ -139,7 +139,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         """A message must be logged if an error occurs while fetching the metadata for a dataset"""
         with mock.patch.object(ingesters.Ingester, '_get_normalized_attributes') as mock_normalize:
             mock_normalize.side_effect = TypeError
-            with self.assertLogs(ingesters.LOGGER, level=logging.ERROR) as logger_cm:
+            with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR) as logger_cm:
                 self.ingester._thread_get_normalized_attributes('some_url')
             self.assertEqual(logger_cm.records[0].message, "Could not get metadata from 'some_url'")
 
@@ -178,7 +178,7 @@ class MetanormIngesterTestCase(django.test.TestCase):
 
     def test_get_normalized_attributes_must_be_implemented(self):
         """An error must be raised if the _get_normalized_attributes() method is not implemented"""
-        with self.assertRaises(NotImplementedError), self.assertLogs(ingesters.LOGGER):
+        with self.assertRaises(NotImplementedError), self.assertLogs(self.ingester.LOGGER):
             self.ingester._get_normalized_attributes('')
 
     def test_ingest_from_metadata(self):
@@ -343,7 +343,7 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.DDXIngester()
 
-        with self.assertLogs(ingesters.LOGGER, level=logging.WARNING):
+        with self.assertLogs(ingester.LOGGER, level=logging.WARNING):
             namespace = ingester._get_xml_namespace(root)
 
         self.assertEqual(namespace, '')
@@ -432,11 +432,11 @@ class DDXIngesterTestCase(django.test.TestCase):
         initial_datasets_count = Dataset.objects.count()
 
         ingester = ingesters.DDXIngester()
-        with self.assertLogs(ingesters.LOGGER):
+        with self.assertLogs(ingester.LOGGER):
             ingester.ingest([self.TEST_DATA['full_ddx']['url']])
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
-        with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+        with self.assertLogs(ingester.LOGGER, level=logging.INFO) as logger_cm:
             ingester.ingest([self.TEST_DATA['full_ddx_2']['url']])
 
         self.assertTrue(logger_cm.records[0].msg.endswith('already exists in the database.'))
@@ -512,12 +512,12 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
 
     def test_log_on_inexistent_metadata_page(self):
         """An error must be logged in case the metadata URL points to nothing"""
-        with self.assertLogs(ingesters.LOGGER, level=logging.ERROR):
+        with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR):
             self.ingester._get_raw_metadata('http://nothing/$value')
 
     def test_log_on_invalid_dataset_url(self):
         """An An error must be logged in case the dataset URL does not match the ingester's regex"""
-        with self.assertLogs(ingesters.LOGGER, level=logging.ERROR):
+        with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR):
             self.ingester._get_raw_metadata('')
 
     def test_get_normalized_attributes(self):
@@ -589,7 +589,6 @@ class NansatIngesterTestCase(django.test.TestCase):
     def test_normalize_netcdf_attributes_with_nansat(self):
         """Test the ingestion of a netcdf file using nansat"""
         ingester = ingesters.NansatIngester()
-        # with self.assertLogs(ingesters.LOGGER):
         normalized_attributes = ingester._get_normalized_attributes(
             os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc'))
 
@@ -665,7 +664,7 @@ class NansatIngesterTestCase(django.test.TestCase):
     #     ingester.ingest([os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc')])
     #     self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
-    #     with self.assertLogs(ingesters.LOGGER, level=logging.INFO) as logger_cm:
+    #     with self.assertLogs(ingester.LOGGER, level=logging.INFO) as logger_cm:
     #         ingester.ingest([
     #             os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset_2.nc')])
 
