@@ -5,13 +5,13 @@ import glob
 import logging
 import os
 import os.path
+import signal
 import sys
 import unittest
 import unittest.mock as mock
 
-import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.harvesters as harvesters
-from .stubs import StubExceptionHarvesterList, StubInterruptHarvesterList
+import tests.stubs as stubs
 
 os.environ.setdefault('GEOSPAAS_PERSISTENCE_DIR', os.path.join('/', 'tmp', 'harvesting_tests'))
 import geospaas_harvesting.harvest as harvest
@@ -43,7 +43,8 @@ class ConfigurationTestCase(unittest.TestCase):
                         'class': 'TestHarvester',
                         'urls': ['https://random1.url', 'https://random2.url']
                     }
-                }
+                },
+                'poll_interval': 0.1
             }
         )
 
@@ -130,18 +131,33 @@ class ConfigurationTestCase(unittest.TestCase):
         with self.assertLogs(harvest.LOGGER):
             configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
         self.assertTrue(callable(getattr(configuration, '__len__')))
-        self.assertEqual(len(configuration), 1)
+        self.assertEqual(len(configuration), 2)
+
+    def test_iterable(self):
+        """Configuration objects must be iterable"""
+        with self.assertLogs(harvest.LOGGER):
+            configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
+        self.assertTrue(callable(getattr(configuration, '__iter__')))
+        config_iterator = iter(configuration)
+        self.assertEqual(next(config_iterator), 'harvesters')
+        self.assertEqual(next(config_iterator), 'poll_interval')
+        with self.assertRaises(StopIteration):
+            next(config_iterator)
 
 class MainTestCase(unittest.TestCase):
     """Test the main() function in the daemon script"""
 
-    class TestHarvester(harvesters.Harvester):
-        """Dummy Harvester used for tests"""
-        def _create_crawlers(self):
+    def setUp(self):
+        try:
+            os.mkdir(harvest.PERSISTENCE_DIR)
+        except FileExistsError:
             pass
-        def _create_ingester(self):
-            pass
-        def harvest(self):
+
+    def tearDown(self):
+        try:
+            for file_to_remove in glob.glob(f"{harvest.PERSISTENCE_DIR}/*"):
+                os.remove(file_to_remove)
+        except FileNotFoundError:
             pass
 
     @mock.patch.object(sys, 'argv', ['harvest.py'])
@@ -162,17 +178,26 @@ class MainTestCase(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt):
             harvest.raise_keyboard_interrupt()
 
-    def test_log_on_harvest_value_error(self):
-        """An error must be logged if a ValueError is raised in a Harvester.harvest() call"""
-        harvester_list_patcher = mock.patch.object(
-            harvesters, 'HarvesterList', StubInterruptHarvesterList)
-        configuration_patcher = mock.patch('geospaas_harvesting.harvest.Configuration')
-        harvest_patcher = mock.patch.object(harvesters.Harvester, 'harvest', side_effect=ValueError)
+    def test_init_worker(self):
+        """Workers must ignore SIGINT"""
+        harvest.init_worker()
+        self.assertEqual(signal.getsignal(signal.SIGINT), signal.SIG_IGN)
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-        with harvester_list_patcher, configuration_patcher, harvest_patcher:
-            with self.assertRaises(ValueError):
-                with self.assertLogs(harvest.LOGGER, level=logging.ERROR):
-                    harvest.main()
+    @mock.patch.object(sys, 'argv', ['harvest.py'])
+    @mock.patch.object(
+        harvest.Configuration, 'DEFAULT_CONFIGURATION_PATH', CONFIGURATION_FILES['ok'])
+    def test_main_ends_on_workers_exceptions(self):
+        """The main process must end if all workers finished with exceptions"""
+        setattr(harvesters, 'TestHarvester', stubs.StubExceptionHarvester)
+        with self.assertLogs(harvest.LOGGER_NAME, level=logging.ERROR) as daemon_logs_cm:
+            harvest.main()
+        self.assertEqual(daemon_logs_cm.records[0].message,
+                         "All harvester processes encountered errors")
+
+    #TODO
+    # def test_interrupt_main_process(self):
+    #     """Main process terminates workers and exits on interruption"""
 
 
 class PersistenceTestCase(unittest.TestCase):
@@ -187,7 +212,7 @@ class PersistenceTestCase(unittest.TestCase):
             pass
 
         self.conf_patcher = mock.patch('geospaas_harvesting.harvest.Configuration')
-        self.conf_patcher.start()
+        self.conf_mock = self.conf_patcher.start()
 
     def tearDown(self):
         self.conf_patcher.stop()
@@ -197,32 +222,44 @@ class PersistenceTestCase(unittest.TestCase):
         except FileNotFoundError:
             pass
 
-    def test_get_last_persistence_file_name_without_argument(self):
-        """The get_last_persistence_file_name must return the file with the most recent timestamp"""
+    def test_get_persistence_files(self):
+        """Test that the persistence files are correctly retrieved and sorted"""
         with mock.patch('os.listdir') as mock_listdir:
             mock_listdir.return_value = [
-                '2020-04-16-08-43-49-606514_PODAACHarvester',
-                '2020-04-16-08-43-53-112204_PODAACHarvester',
-                '2020-04-16-08-43-58-756088_CopernicusSentinelHarvester',
-                '2020-04-16-08-44-02-201730_CopernicusSentinelHarvester'
+                '2020-04-16-08-43-53-112204_podaac',
+                '2020-04-16-08-44-02-201730_copernicus_sentinel',
+                '2020-04-16-08-43-58-756088_copernicus_sentinel',
+                '2020-04-16-08-43-49-606514_podaac'
             ]
-            self.assertEqual(harvest.get_last_persistence_file_name(),
-                             '2020-04-16-08-44-02-201730_CopernicusSentinelHarvester')
+            self.assertListEqual(harvest.get_persistence_files(), [
+                '2020-04-16-08-44-02-201730_copernicus_sentinel',
+                '2020-04-16-08-43-58-756088_copernicus_sentinel',
+                '2020-04-16-08-43-53-112204_podaac',
+                '2020-04-16-08-43-49-606514_podaac'
+            ])
 
-    def test_get_last_persistence_file_name_with_argument(self):
+    def test_get_persistence_files_inexistent_directory(self):
         """
-        The get_last_persistence_file_name must return the file with the most recent timestamp for
-        the requested harvester
+        The get_persistence_files() function must return an empty list in case the directory does
+        not exist
+        """
+        with mock.patch.object(harvest, 'PERSISTENCE_DIR', '/path/does/not/exist'):
+            self.assertListEqual(harvest.get_persistence_files(), [])
+
+    def test_get_last_persistence_file_name(self):
+        """
+        The get_harvester_file_name(harvester_name) function must return the file with the most
+        recent timestamp and which matches the harvester's name.
         """
         with mock.patch('os.listdir') as mock_listdir:
             mock_listdir.return_value = [
-                '2020-04-16-08-43-49-606514_PODAACHarvester',
-                '2020-04-16-08-43-53-112204_PODAACHarvester',
-                '2020-04-16-08-43-58-756088_CopernicusSentinelHarvester',
-                '2020-04-16-08-44-02-201730_CopernicusSentinelHarvester'
+                '2020-04-16-08-43-49-606514_podaac',
+                '2020-04-16-08-43-53-112204_podaac',
+                '2020-04-16-08-43-58-756088_copernicus_sentinel',
+                '2020-04-16-08-44-02-201730_copernicus_sentinel'
             ]
-            self.assertEqual(harvest.get_last_persistence_file_name('PODAACHarvester'),
-                             '2020-04-16-08-43-53-112204_PODAACHarvester')
+            self.assertEqual(harvest.get_harvester_file_name('podaac'),
+                             '2020-04-16-08-43-53-112204_podaac')
 
     def test_log_on_dump_error(self):
         """
@@ -251,16 +288,15 @@ class PersistenceTestCase(unittest.TestCase):
 
     def test_dump_on_keyboard_interrupt(self):
         """The harvesters state is dumped when a KeyboardInterrupt exception is raised"""
-
-        harvester_list_patcher = mock.patch.object(
-            harvesters, 'HarvesterList', StubInterruptHarvesterList)
-
+        setattr(harvesters, 'StubInterruptHarvester', stubs.StubInterruptHarvester)
         assert_daemon_logs = self.assertLogs(harvest.LOGGER)
-        assert_ingester_logs = self.assertLogs(ingesters.LOGGER)
+        assert_ingester_logs = self.assertLogs(stubs.StubExceptionIngester.LOGGER)
 
-        with harvester_list_patcher, self.assertRaises(SystemExit):
-            with assert_daemon_logs, assert_ingester_logs:
-                harvest.main()
+        with self.assertRaises(SystemExit), assert_daemon_logs, assert_ingester_logs:
+            harvest.launch_harvest('stub_interrupt_harvester', {
+                'class': 'StubInterruptHarvester',
+                'urls': ['https://random1.url']
+            })
 
         created_persistence_files = os.listdir(harvest.PERSISTENCE_DIR)
         self.assertEqual(len(created_persistence_files), 1)
@@ -270,38 +306,50 @@ class PersistenceTestCase(unittest.TestCase):
 
     def test_dump_on_exception(self):
         """The harvesters state is dumped when any other exception is raised"""
-
-        harvester_list_patcher = mock.patch.object(
-            harvesters, 'HarvesterList', StubExceptionHarvesterList)
-
+        setattr(harvesters, 'StubExceptionHarvester', stubs.StubExceptionHarvester)
         assert_daemon_logs = self.assertLogs(harvest.LOGGER_NAME)
-        assert_ingester_logs = self.assertLogs(ingesters.LOGGER)
+        assert_ingester_logs = self.assertLogs(stubs.StubExceptionIngester.LOGGER)
 
-        with harvester_list_patcher, self.assertRaises(IndexError):
-            with assert_daemon_logs, assert_ingester_logs:
-                harvest.main()
+        with self.assertRaises(ZeroDivisionError), assert_daemon_logs, assert_ingester_logs:
+            harvest.launch_harvest('stub_exception_harvester', {
+                'class': 'StubExceptionHarvester',
+                'urls': ['https://random1.url']
+            })
 
         created_persistence_files = os.listdir(harvest.PERSISTENCE_DIR)
         self.assertEqual(len(created_persistence_files), 1)
         created_file_path = os.path.join(harvest.PERSISTENCE_DIR, created_persistence_files[0])
         self.assertTrue(os.path.getsize(created_file_path) > 0)
 
+    def test_load_last_dumped_harvester(self):
+        """Test that the last dumped harvester is correctly loaded"""
+        original_harvester = harvesters.PODAACHarvester(urls=['url1', 'url2'])
+        with self.assertLogs(harvest.LOGGER):
+            harvest.dump_with_timestamp(original_harvester, 'test_harvester')
+            loaded_harvester = harvest.load_last_dumped_harvester('test_harvester')
+        self.assertDictEqual(original_harvester.config, loaded_harvester.config)
+        self.assertEqual(len(os.listdir(harvest.PERSISTENCE_DIR)), 0)
+
     def test_resume_with_correct_url(self):
-        """The correct harvester is used after deserialization"""
-        harvester_interrupt_list_patcher = mock.patch.object(
-            harvesters, 'HarvesterList', StubInterruptHarvesterList)
+        """The correct url is ingested after deserialization"""
+        setattr(harvesters, 'StubExceptionHarvester', stubs.StubExceptionHarvester)
 
-        assert_exit = self.assertRaises(SystemExit)
+        assert_exit = self.assertRaises(ZeroDivisionError)
         assert_daemon_logs = self.assertLogs(harvest.LOGGER_NAME)
-        assert_ingester_logs = self.assertLogs(ingesters.LOGGER)
+        assert_ingester_logs = self.assertLogs(stubs.StubExceptionIngester.LOGGER)
 
-        with harvester_interrupt_list_patcher, assert_exit, assert_daemon_logs:
-            with assert_ingester_logs as ingester_logs_cm:
-                harvest.main()
+        with assert_exit, assert_daemon_logs, assert_ingester_logs as ingester_logs_cm:
+            harvest.launch_harvest('stub_harvester', {
+                'class': 'StubExceptionHarvester',
+                'urls': ['https://random1.url']
+            })
         self.assertEqual(ingester_logs_cm.records[0].message, "https://random1.url/ressource_1")
 
         with assert_daemon_logs, assert_ingester_logs as ingester_logs_cm:
-            harvest.main()
+            harvest.launch_harvest('stub_harvester', {
+                'class': 'StubExceptionHarvester',
+                'urls': ['https://random1.url']
+            })
         self.assertEqual(ingester_logs_cm.records[0].message, "https://random1.url/ressource_3")
 
     # TODO: test persistence for each crawler and harvester

@@ -1,12 +1,15 @@
 """Daemon script for GeoSPaaS data harvesting"""
 
 import argparse
+import collections.abc
 import logging
+import multiprocessing
 import os
 import os.path
 import pickle
 import signal
 import sys
+import time
 from datetime import datetime
 
 import yaml
@@ -25,11 +28,11 @@ LOGGER.addHandler(logging.NullHandler())
 PERSISTENCE_DIR = os.getenv('GEOSPAAS_PERSISTENCE_DIR', os.path.join('/', 'var', 'run', 'geospaas'))
 
 
-class Configuration():
+class Configuration(collections.abc.Mapping):
     """Manages harvesting configuration"""
 
     DEFAULT_CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'harvest.yml')
-    TOP_LEVEL_KEYS = set(['harvesters'])
+    TOP_LEVEL_KEYS = set(['harvesters', 'poll_interval'])
     HARVESTER_CLASS_KEY = 'class'
 
     def __init__(self, config_path=None):
@@ -41,6 +44,9 @@ class Configuration():
 
     def __getitem__(self, key):
         return self._data[key]
+
+    def __iter__(self):
+        return iter(self._data)
 
     def __len__(self):
         return len(self._data)
@@ -102,6 +108,15 @@ def dump(obj, path):
                      str(obj), path, exc_info=True)
 
 
+def dump_with_timestamp(obj, suffix=None):
+    """Dump an object in a file named with a timestamp and the object's class name"""
+    LOGGER.info("Dumping current state of %s", str(obj))
+    dump(obj, os.path.join(PERSISTENCE_DIR, (
+        datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S-%f') + '_' +
+        suffix or obj.__class__.__name__
+    )))
+
+
 def load(path):
     """Convenience function to deserialize objects"""
     try:
@@ -111,82 +126,116 @@ def load(path):
         LOGGER.error("Could not load from %s", path, exc_info=True)
 
 
-def get_last_persistence_file_name(harvester_class_name=None):
-    """
-    Returns the name of the most recent persistence file. If `harvester_class_name` is specified,
-    The most recent file for the corresponding harvester is returned.
-    """
-    last_file = None
-    files = None
-
+def get_persistence_files():
+    """Returns a list containing the names of all persistence files"""
+    files = []
     try:
         files = sorted(os.listdir(PERSISTENCE_DIR), key=lambda s: s.split('_')[0], reverse=True)
     except FileNotFoundError:
         pass
+    return files
 
-    if files:
-        if harvester_class_name:
-            for file_name in files:
-                if file_name.endswith(f"_{harvester_class_name}"):
-                    last_file = file_name
-                    break
-        else:
-            last_file = files[0]
-    return last_file
+
+def get_harvester_file_name(harvester_name):
+    """Returns the name of the most recent file matching the harvester's name"""
+    harvester_file = None
+    for file_name in get_persistence_files():
+        if file_name.endswith(harvester_name):
+            harvester_file = file_name
+            break
+    return harvester_file
+
+
+def load_last_dumped_harvester(harvester_name):
+    """
+    Returns a harvester unpickled from a persistence file, based on `run_id` and `harvester_name`.
+    """
+    harvester = None
+    harvester_file_name = get_harvester_file_name(harvester_name)
+    if harvester_file_name:
+        harvester_file_path = os.path.join(PERSISTENCE_DIR, harvester_file_name)
+        LOGGER.info("Loading harvester from '%s'", harvester_file_path)
+        harvester = load(harvester_file_path)
+        os.remove(harvester_file_path)
+    return harvester
+
+
+def load_or_create_harvester(harvester_name, harvester_config):
+    """
+    Try to load the last dumped harvester. If no havester was found, instantiate one using the
+    configuration
+    """
+    LOGGER.info('Trying to load last dumped harvester')
+    harvester = load_last_dumped_harvester(harvester_name)
+
+    if not harvester:
+        LOGGER.info('No dumped harvester found, instantiating a new one')
+        harvester_class = getattr(harvesters, harvester_config['class'])
+        harvester = (harvester_class(**{
+            key: value
+            for (key, value) in harvester_config.items() if key != 'class'
+        }))
+    return harvester
+
+
+def launch_harvest(harvester_name, harvester_config):
+    """Launch the harvest operation and process errors. Meant to be run in a separate process"""
+    try:
+        harvester = load_or_create_harvester(harvester_name, harvester_config)
+        harvester.harvest()
+    except KeyboardInterrupt:
+        LOGGER.error("The process was killed", exc_info=True)
+        dump_with_timestamp(harvester, f"{harvester_name}")
+        sys.exit(1)
+    except Exception:  # pylint: disable=broad-except
+        LOGGER.error("An unexpected error occurred", exc_info=True)
+        dump_with_timestamp(harvester, f"{harvester_name}")
+        raise
+    LOGGER.info("%s finished harvesting", harvester_name)
+
+
+def init_worker():
+    """Initialization function for child processes. Defines signals handling."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    # signal.signal(signal.SIGTERM, raise_keyboard_interrupt)
 
 
 def main():
-    """Loads harvesting configuration and runs each harvester in turn"""
-
+    """Loads harvesting configuration and runs each harvester in its own process"""
     signal.signal(signal.SIGTERM, raise_keyboard_interrupt)
 
-    # Deserialize the last known state if possible, otherwise initialize harvesters from
-    # configuration
-    load_file_name = get_last_persistence_file_name()
-    if load_file_name:
-        load_file_path = os.path.join(PERSISTENCE_DIR, load_file_name)
-        LOGGER.info("Loading saved state from '%s'", load_file_path)
-        (current_harvester, harvesters_iterator) = load(load_file_path)
-    else:
-        try:
-            config = Configuration()
-        except AssertionError:
-            LOGGER.error('Invalid configuration', exc_info=True)
-            sys.exit(1)
-        harvesters_iterator = iter(harvesters.HarvesterList(config['harvesters']))
-        current_harvester = next(harvesters_iterator)
+    try:
+        config = Configuration()
+    except AssertionError:
+        LOGGER.error('Invalid configuration', exc_info=True)
+        sys.exit(1)
 
-    # Infinite loop
-    while True:
-        try:
-            current_harvester.harvest()
-        except ValueError:
-            LOGGER.error(
-                "Could not iterate over harvesters list, please check the configuration file",
-                exc_info=True)
-            raise
-        except KeyboardInterrupt:
-            LOGGER.error("The process was killed", exc_info=True)
-            LOGGER.info("Dumping current state")
-            dump((current_harvester, harvesters_iterator), os.path.join(PERSISTENCE_DIR, (
-                datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S-%f') + '_' +
-                current_harvester.__class__.__name__
-            )))
-            sys.exit(1)
-        except Exception:  # pylint: disable=broad-except
-            LOGGER.error("An unexpected error occurred", exc_info=True)
-            LOGGER.info("Dumping current state")
-            dump((current_harvester, harvesters_iterator), os.path.join(PERSISTENCE_DIR, (
-                datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S-%f') + '_' +
-                current_harvester.__class__.__name__
-            )))
-            raise
-        else:
-            try:
-                current_harvester = next(harvesters_iterator)
-            except StopIteration:
-                LOGGER.warning('The loop over the harvesters ended, it is not supposed to happen')
-                break
+    processes_number = len(config['harvesters'])
+    try:
+        with multiprocessing.Pool(processes_number, initializer=init_worker) as pool:
+            results = {}
+            # While all the processes do not end in error, launch the harvesters and check
+            # regularly if they are finished.
+            while not (
+                    results and all([r.ready() and not r.successful() for r in results.values()])):
+                # Loop over the harvesters defined in the configuration file
+                for harvester_name, harvester_config in config['harvesters'].items():
+                    #If the harvester has not been launched yet or has finished executing, launch it
+                    # (again). Otherwise it is executing, so do nothing
+                    previous_result = results.get(harvester_name, None)
+                    if (previous_result and previous_result.ready() and previous_result.successful()
+                            or not previous_result):
+                        #Start a new process
+                        results[harvester_name] = pool.apply_async(
+                            launch_harvest, (harvester_name, harvester_config))
+                time.sleep(config.get('poll_interval', 600))
+            LOGGER.error("All harvester processes encountered errors")
+            pool.close()
+            pool.join()
+    except KeyboardInterrupt:
+        pool.terminate()
+        pool.join()
+        sys.exit(1)
 
 
 if __name__ == '__main__':

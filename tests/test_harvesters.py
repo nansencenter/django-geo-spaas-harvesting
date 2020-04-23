@@ -1,7 +1,6 @@
 """Tests for the harvesters"""
 #pylint: disable=protected-access
 
-import logging
 import unittest
 import unittest.mock as mock
 
@@ -9,145 +8,9 @@ import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.harvesters as harvesters
 
-from .stubs import StubHarvester
+from .stubs import StubHarvester, StubIngester
 
 TOP_PACKAGE = 'geospaas_harvesting'
-
-
-class HarvesterListTestCase(unittest.TestCase):
-    """Test the HarvesterList behavior"""
-
-    class TestHarvester(harvesters.Harvester):
-        """Dummy Harvester used for tests"""
-        def __init__(self, **config):
-            self.config = config
-
-        def _create_crawlers(self):
-            pass
-
-        def _create_ingester(self):
-            pass
-
-        def harvest(self):
-            pass
-
-    def test_init_no_conf(self):
-        """Must be empty if no configuration is given"""
-        harvester_list = harvesters.HarvesterList()
-        self.assertEqual(harvester_list._harvesters, [])
-
-    def test_init_empty_conf(self):
-        """Must be empty if an empty configuration is given"""
-        harvester_list = harvesters.HarvesterList({})
-        self.assertEqual(harvester_list._harvesters, [])
-
-    def test_iterate_over_empty_list(self):
-        """StopIteration must be raised if the list is empty"""
-        harvester_list = harvesters.HarvesterList({})
-        iterator = iter(harvester_list)
-        with self.assertRaises(StopIteration):
-            _ = next(iterator)
-
-    def test_init_conf_is_wrong_type(self):
-        """
-        If the config argument is of the wrong type, an error message must be logged and the
-        HarvesterList must remain empty
-        """
-        with self.assertLogs(harvesters.LOGGER, level=logging.ERROR):
-            harvester_list = harvesters.HarvesterList(1)
-        self.assertEqual(harvester_list._harvesters, [])
-
-    def test_init_from_config(self):
-        """Standard initialization"""
-        harvesters_mocks = {
-            'Harvester1': self.TestHarvester,
-            'Harvester2': self.TestHarvester
-        }
-        globals_mock = mock.Mock(side_effect=lambda: harvesters_mocks)
-
-        with mock.patch(f"{TOP_PACKAGE}.harvesters.globals", globals_mock):
-            harvester_list = harvesters.HarvesterList({
-                'harvester1': {
-                    'class': 'Harvester1',
-                    'urls': ['https://random1.url']
-                },
-                'harvester2': {
-                    'class': 'Harvester2',
-                    'urls': ['https://random2.url']
-                }
-            })
-
-        self.assertEqual(len(harvester_list), 2)
-        self.assertIsInstance(harvester_list[0], harvesters.Harvester)
-        self.assertIsInstance(harvester_list[1], harvesters.Harvester)
-
-    def test_init_wrong_harvester_class(self):
-        """An error must be logged if one of the harvesters has a inexistent class"""
-        with self.assertLogs(harvesters.LOGGER, level=logging.ERROR):
-            _ = harvesters.HarvesterList({
-                'harvester1': {
-                    'class': 'InexistentHarvester'
-                }
-            })
-
-    def test_append(self):
-        """Test append() method"""
-        harvester_list = harvesters.HarvesterList()
-        harvester_list.append(self.TestHarvester())
-        harvester_list.append(self.TestHarvester())
-        self.assertIsInstance(harvester_list._harvesters[0], self.TestHarvester)
-        self.assertIsInstance(harvester_list._harvesters[1], self.TestHarvester)
-
-    def test_append_wrong_type(self):
-        """An exception must be raised if a non Harvester object is appended"""
-        harvester_list = harvesters.HarvesterList()
-        with self.assertRaises(TypeError):
-            harvester_list.append(1)
-
-    def test_iterable(self):
-        """HarvesterList is iterable"""
-        harvester_list = harvesters.HarvesterList()
-        iterator = iter(harvester_list)
-        self.assertIsInstance(iterator, harvesters.EndlessHarvesterIterator)
-        self.assertIs(iter(iterator), iterator)
-
-    def test_subscriptable(self):
-        """HarvesterList is subscriptable"""
-        harvester_list = harvesters.HarvesterList()
-
-        self.assertTrue(callable(getattr(harvester_list, '__getitem__')))
-
-        harvester_list.append(self.TestHarvester())
-        self.assertIsNotNone(harvester_list[0])
-
-    def test_exception_on_wrong_index_type(self):
-        """An exception must be raised if anything but an integer is used a index"""
-        harvester_list = harvesters.HarvesterList()
-        harvester_list.append(self.TestHarvester())
-        with self.assertRaises(TypeError):
-            _ = harvester_list['v']
-
-    def test_len(self):
-        """harvester_list has a length"""
-        harvester_list = harvesters.HarvesterList()
-
-        self.assertTrue(callable(getattr(harvester_list, '__len__')))
-
-        self.assertEqual(len(harvester_list), 0)
-
-        harvester_list.append(self.TestHarvester())
-        self.assertEqual(len(harvester_list), 1)
-
-    def test_endless_iteration(self):
-        """The iterator for a HarvesterList must start over at the end of a loop"""
-        harvester_list = harvesters.HarvesterList()
-        harvester_list.append(self.TestHarvester(id=1))
-        harvester_list.append(self.TestHarvester(id=2))
-
-        iterator = iter(harvester_list)
-        self.assertEqual(next(iterator).config['id'], 1)
-        self.assertEqual(next(iterator).config['id'], 2)
-        self.assertEqual(next(iterator).config['id'], 1)
 
 
 class HarvesterTestCase(unittest.TestCase):
