@@ -1,4 +1,4 @@
-"""Harvesters which use crawlers and ingesters to get data from """
+"""Harvesters which use crawlers and ingesters to get data from providers' websites"""
 
 import logging
 import os
