@@ -448,7 +448,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
 
     TEST_DATA = {
         'full': {
-            'url': "https://random.url/full?$format=json&$expand=Attributes",
+            'url': "https://scihub.copernicus.eu/full?$format=json&$expand=Attributes",
             'file_path': "data/copernicus_opensearch/full.json"}
     }
 
@@ -496,14 +496,14 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
 
     def test_build_metadata_url(self):
         """Test that the metadata URL is correctly built from the dataset URL"""
-        test_url = 'http://ramdom.url/dataset/$value'
-        expected_result = 'http://ramdom.url/dataset?$format=json&$expand=Attributes'
+        test_url = 'http://scihub.copernicus.eu/dataset/$value'
+        expected_result = 'http://scihub.copernicus.eu/dataset?$format=json&$expand=Attributes'
 
         self.assertEqual(self.ingester._build_metadata_url(test_url), expected_result)
 
     def test_get_raw_metadata(self):
         """Test that the raw metadata is correctly fetched"""
-        raw_metadata = self.ingester._get_raw_metadata('https://random.url/full/$value')
+        raw_metadata = self.ingester._get_raw_metadata('https://scihub.copernicus.eu/full/$value')
         test_file_path = os.path.join(
             os.path.dirname(__file__), self.TEST_DATA['full']['file_path'])
 
@@ -523,7 +523,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
     def test_get_normalized_attributes(self):
         """Test that the correct attributes are extracted from Sentinel-SAFE JSON metadata"""
         normalized_parameters = self.ingester._get_normalized_attributes(
-            'https://random.url/full/$value')
+            'https://scihub.copernicus.eu/full/$value')
 
         self.assertEqual(normalized_parameters['entry_title'],
                          'S1A_IW_GRDH_1SDV_20200318T062305_20200318T062330_031726_03A899_F558')

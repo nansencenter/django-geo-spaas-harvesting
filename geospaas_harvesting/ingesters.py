@@ -269,6 +269,12 @@ class MetanormIngester(Ingester):
         """Returns a dictionary of normalized attribute which characterize a Dataset"""
         raise NotImplementedError('The _ingest_dataset() method was not implemented')
 
+    @staticmethod
+    def add_url(url, raw_attributes):
+        """Utility method to add the dataset's URL to the raw attributes in case it is not there"""
+        if 'url' not in raw_attributes:
+            raw_attributes['url'] = url
+
 
 class DDXIngester(MetanormIngester):
     """Ingests metadata in DDX format from an OpenDAP server"""
@@ -355,6 +361,8 @@ class CopernicusODataIngester(MetanormIngester):
 
         raw_metadata = self._get_raw_metadata(url)
         attributes = {a['Name']: a['Value'] for a in raw_metadata['d']['Attributes']['results']}
+
+        self.add_url(url, attributes)
 
         normalized_attributes = self._metadata_handler.get_parameters(attributes)
         normalized_attributes['geospaas_service'] = HTTP_SERVICE
