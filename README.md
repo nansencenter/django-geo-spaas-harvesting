@@ -94,7 +94,7 @@ More details below.
 
 The role of crawlers is to explore a data repository and find the URLs of the relevant datasets.
 
-Crawlers are iterables which, given a data repository URL, return the URLs found when exploring this
+They are iterables which, given a data repository URL, return the URLs found when exploring this
 repository.
 
 The currently available crawlers are:
@@ -132,6 +132,7 @@ The currently available ingesters are:
 #### Harvesters
 
 The role of harvesters is to aggregate crawlers and ingesters into an element which can be used to
+harvest data from a given provider.
 
 Each harvester has at least two attributes:
 
