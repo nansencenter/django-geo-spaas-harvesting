@@ -1,4 +1,11 @@
+[![Build Status](https://travis-ci.org/nansencenter/django-geo-spaas-harvesting.svg?branch=master)](https://travis-ci.org/nansencenter/django-geo-spaas-harvesting)
+[![Coverage Status](https://coveralls.io/repos/github/nansencenter/django-geo-spaas-harvesting/badge.svg?branch=master)](https://coveralls.io/github/nansencenter/django-geo-spaas-harvesting?branch=master)
+
 # Data gathering for GeoSPaaS
+
+This application crawls through data repositories to ingest metadata into a GeoSPaaS database. It
+relies on the Django for data access. Specifically, it uses the models defined in
+[django-geo-spaas](https://github.com/nansencenter/django-geo-spaas).
 
 ## Command line
 
