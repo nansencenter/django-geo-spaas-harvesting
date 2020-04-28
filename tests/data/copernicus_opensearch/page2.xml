@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns="http://www.w3.org/2005/Atom">
+<title>Sentinels Scientific Data Hub search results for: (platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0</title>
+<subtitle>Displaying 2 to 3 of 2404540 total results. Request done in 0.411 seconds.</subtitle>
+<updated>2020-03-18T09:34:18.154Z</updated>
+<author>
+<name>Sentinels Scientific Data Hub</name>
+</author>
+<id>https://scihub.copernicus.eu/dhus/search?q=(platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0</id>
+<opensearch:totalResults>4</opensearch:totalResults>
+<opensearch:startIndex>2</opensearch:startIndex>
+<opensearch:itemsPerPage>2</opensearch:itemsPerPage>
+<opensearch:Query role="request" searchTerms="(platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0" startPage="1"/>
+<link rel="self" type="application/atom+xml" href="https://scihub.copernicus.eu/dhus/search?q=(platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0&amp;start=2&amp;rows=2"/>
+<link rel="first" type="application/atom+xml" href="https://scihub.copernicus.eu/dhus/search?q=(platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0&amp;start=0&amp;rows=2"/>
+<link rel="next" type="application/atom+xml" href="https://scihub.copernicus.eu/dhus/search?q=(platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0&amp;start=4&amp;rows=2"/>
+<link rel="last" type="application/atom+xml" href="https://scihub.copernicus.eu/dhus/search?q=(platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0&amp;start=2404539&amp;rows=2"/>
+<link rel="search" type="application/opensearchdescription+xml" href="opensearch_description.xml"/>
+<entry>
+<title>S3B_OL_1_EFR____20200317T045045_20200317T045345_20200318T084832_0179_036_347_1800_LN1_O_NT_002</title>
+<link href="https://scihub.copernicus.eu/dhus/odata/v1/Products('e2842bc8-8b3e-4161-a88c-84c2b43e60f9')/$value"/>
+<link rel="alternative" href="https://scihub.copernicus.eu/dhus/odata/v1/Products('e2842bc8-8b3e-4161-a88c-84c2b43e60f9')/"/>
+<link rel="icon" href="https://scihub.copernicus.eu/dhus/odata/v1/Products('e2842bc8-8b3e-4161-a88c-84c2b43e60f9')/Products('Quicklook')/$value"/>
+<id>e2842bc8-8b3e-4161-a88c-84c2b43e60f9</id>
+<summary>Date: 2020-03-17T04:50:44.983Z, Instrument: OLCI, Mode: , Satellite: Sentinel-3, Size: 653.07 MB</summary>
+<date name="beginposition">2020-03-17T04:50:44.983Z</date>
+<date name="endposition">2020-03-17T04:53:44.983Z</date>
+<date name="creationdate">2020-03-18T08:48:32Z</date>
+<date name="ingestiondate">2020-03-18T09:32:44.528Z</date>
+<int name="orbitnumber">9859</int>
+<int name="relativeorbitnumber">347</int>
+<str name="ecmwf">ANALYSIS</str>
+<str name="productlevel">L1</str>
+<str name="gmlfootprint">&lt;gml:Polygon srsName="http://www.opengis.net/gml/srs/epsg.xml#4326" xmlns:gml="http://www.opengis.net/gml"&gt;
+   &lt;gml:outerBoundaryIs&gt;
+      &lt;gml:LinearRing&gt;
+         &lt;gml:coordinates&gt;62.9267,74.0934 62.8875,75.4294 62.8278,76.7888 62.7556,78.1358 62.6709,79.4694 62.5732,80.8019 62.4631,82.1235 62.3381,83.4507 62.2058,84.7489 62.0587,86.037 61.8945,87.2985 61.7244,88.5579 61.5431,89.8022 61.3478,91.0557 61.144,92.2702 60.9288,93.472 60.7086,94.6398 60.4739,95.802 60.2304,96.955 59.9726,98.0931 62.4103,100.532 64.8084,103.387 67.1455,106.773 69.4008,110.843 69.7586,109.377 70.0975,107.873 70.4258,106.323 70.7356,104.737 71.0364,103.085 71.3216,101.386 71.5958,99.5983 71.849,97.797 72.0844,95.9531 72.3076,94.0791 72.5073,92.1438 72.6854,90.164 72.8492,88.119 72.9896,86.0629 73.1088,83.981 73.2065,81.879 73.2832,79.7372 73.3378,77.5769 73.3631,75.4549 70.7544,75.1395 68.1428,74.8019 65.5322,74.4533 62.9267,74.0934&lt;/gml:coordinates&gt;
+      &lt;/gml:LinearRing&gt;
+   &lt;/gml:outerBoundaryIs&gt;
+&lt;/gml:Polygon&gt;</str>
+<str name="footprint">MULTIPOLYGON (((98.0931 59.9726, 100.532 62.4103, 103.387 64.8084, 106.773 67.1455, 110.843 69.4008, 109.377 69.7586, 107.873 70.0975, 106.323 70.4258, 104.737 70.7356, 103.085 71.0364, 101.386 71.3216, 99.5983 71.5958, 97.797 71.849, 95.9531 72.0844, 94.0791 72.3076, 92.1438 72.5073, 90.164 72.6854, 88.119 72.8492, 86.0629 72.9896, 83.981 73.1088, 81.879 73.2065, 79.7372 73.2832, 77.5769 73.3378, 75.4549 73.3631, 75.1395 70.7544, 74.8019 68.1428, 74.4533 65.5322, 74.0934 62.9267, 75.4294 62.8875, 76.7888 62.8278, 78.1358 62.7556, 79.4694 62.6709, 80.8019 62.5732, 82.1235 62.4631, 83.4507 62.3381, 84.7489 62.2058, 86.037 62.0587, 87.2985 61.8945, 88.5579 61.7244, 89.8022 61.5431, 91.0557 61.3478, 92.2702 61.144, 93.472 60.9288, 94.6398 60.7086, 95.802 60.4739, 96.955 60.2304, 98.0931 59.9726)))</str>
+<str name="platformname">Sentinel-3</str>
+<str name="platformidentifier">2018-039A</str>
+<str name="format">SAFE</str>
+<str name="filename">S3B_OL_1_EFR____20200317T045045_20200317T045345_20200318T084832_0179_036_347_1800_LN1_O_NT_002.SEN3</str>
+<str name="instrumentname">Ocean Land Colour Instrument</str>
+<str name="instrumentshortname">OLCI</str>
+<str name="sensoroperationalmode">Earth Observation</str>
+<str name="mode">EO</str>
+<str name="producttype">OL_1_EFR___</str>
+<str name="timeliness">Non Time Critical</str>
+<str name="size">653.07 MB</str>
+<str name="pduduration">179</str>
+<str name="pdualongtrackcoord">1800</str>
+<str name="orbitdirection">descending</str>
+<str name="relorbitdir">descending</str>
+<str name="relpassnumber">694</str>
+<str name="relpassdirection">descending</str>
+<str name="passnumber">19718</str>
+<str name="passdirection">descending</str>
+<str name="processingname">Data Processing</str>
+<str name="processinglevel">1</str>
+<str name="procfacilityname">Land OLCI Processing and Archiving Centre [LN1]</str>
+<str name="procfacilityorg">European Space Agency</str>
+<str name="onlinequalitycheck">PASSED</str>
+<str name="identifier">S3B_OL_1_EFR____20200317T045045_20200317T045345_20200318T084832_0179_036_347_1800_LN1_O_NT_002</str>
+<str name="uuid">e2842bc8-8b3e-4161-a88c-84c2b43e60f9</str>
+</entry>
+<entry>
+<title>S3B_OL_1_EFR____20200317T045345_20200317T045645_20200318T084853_0179_036_347_1980_LN1_O_NT_002</title>
+<link href="https://scihub.copernicus.eu/dhus/odata/v1/Products('b54171e1-078b-4234-ae0a-7b27abb14baa')/$value"/>
+<link rel="alternative" href="https://scihub.copernicus.eu/dhus/odata/v1/Products('b54171e1-078b-4234-ae0a-7b27abb14baa')/"/>
+<link rel="icon" href="https://scihub.copernicus.eu/dhus/odata/v1/Products('b54171e1-078b-4234-ae0a-7b27abb14baa')/Products('Quicklook')/$value"/>
+<id>b54171e1-078b-4234-ae0a-7b27abb14baa</id>
+<summary>Date: 2020-03-17T04:53:44.983Z, Instrument: OLCI, Mode: , Satellite: Sentinel-3, Size: 670.76 MB</summary>
+<date name="beginposition">2020-03-17T04:53:44.983Z</date>
+<date name="endposition">2020-03-17T04:56:44.983Z</date>
+<date name="creationdate">2020-03-18T08:48:53Z</date>
+<date name="ingestiondate">2020-03-18T09:32:38.494Z</date>
+<int name="orbitnumber">9859</int>
+<int name="relativeorbitnumber">347</int>
+<str name="ecmwf">ANALYSIS</str>
+<str name="productlevel">L1</str>
+<str name="gmlfootprint">&lt;gml:Polygon srsName="http://www.opengis.net/gml/srs/epsg.xml#4326" xmlns:gml="http://www.opengis.net/gml"&gt;
+   &lt;gml:outerBoundaryIs&gt;
+      &lt;gml:LinearRing&gt;
+         &lt;gml:coordinates&gt;52.4643,72.574 52.4103,73.5684 52.3399,74.5829 52.2612,75.5898 52.1745,76.5876 52.0788,77.5872 51.975,78.5806 51.8599,79.5864 51.7422,80.5669 51.6135,81.5441 51.4712,82.506 51.3263,83.474 51.1735,84.4356 51.0123,85.4009 50.8445,86.3458 50.6695,87.282 50.491,88.2015 50.3015,89.1216 50.1062,90.0403 49.8973,90.9627 52.445,92.4471 54.9787,94.1038 57.4889,95.9686 59.9702,98.0909 60.2279,96.9529 60.4715,95.8 60.7061,94.6378 60.9264,93.47 61.1415,92.2684 61.3453,91.0539 61.5406,89.8006 61.7219,88.5564 61.892,87.2971 62.0561,86.0355 62.2032,84.7477 62.3355,83.4495 62.4605,82.1224 62.5706,80.8009 62.6684,79.4686 62.7537,78.1238 62.8253,76.7882 62.8849,75.429 62.9242,74.093 60.3103,73.724 57.6948,73.3469 55.0778,72.9634 52.4643,72.574&lt;/gml:coordinates&gt;
+      &lt;/gml:LinearRing&gt;
+   &lt;/gml:outerBoundaryIs&gt;
+&lt;/gml:Polygon&gt;</str>
+<str name="footprint">MULTIPOLYGON (((90.9627 49.8973, 92.4471 52.445, 94.1038 54.9787, 95.9686 57.4889, 98.0909 59.9702, 96.9529 60.2279, 95.8 60.4715, 94.6378 60.7061, 93.47 60.9264, 92.2684 61.1415, 91.0539 61.3453, 89.8006 61.5406, 88.5564 61.7219, 87.2971 61.892, 86.0355 62.0561, 84.7477 62.2032, 83.4495 62.3355, 82.1224 62.4605, 80.8009 62.5706, 79.4686 62.6684, 78.1238 62.7537, 76.7882 62.8253, 75.429 62.8849, 74.093 62.9242, 73.724 60.3103, 73.3469 57.6948, 72.9634 55.0778, 72.574 52.4643, 73.5684 52.4103, 74.5829 52.3399, 75.5898 52.2612, 76.5876 52.1745, 77.5872 52.0788, 78.5806 51.975, 79.5864 51.8599, 80.5669 51.7422, 81.5441 51.6135, 82.506 51.4712, 83.474 51.3263, 84.4356 51.1735, 85.4009 51.0123, 86.3458 50.8445, 87.282 50.6695, 88.2015 50.491, 89.1216 50.3015, 90.0403 50.1062, 90.9627 49.8973)))</str>
+<str name="platformname">Sentinel-3</str>
+<str name="platformidentifier">2018-039A</str>
+<str name="format">SAFE</str>
+<str name="filename">S3B_OL_1_EFR____20200317T045345_20200317T045645_20200318T084853_0179_036_347_1980_LN1_O_NT_002.SEN3</str>
+<str name="instrumentname">Ocean Land Colour Instrument</str>
+<str name="instrumentshortname">OLCI</str>
+<str name="sensoroperationalmode">Earth Observation</str>
+<str name="mode">EO</str>
+<str name="producttype">OL_1_EFR___</str>
+<str name="timeliness">Non Time Critical</str>
+<str name="size">670.76 MB</str>
+<str name="pduduration">179</str>
+<str name="pdualongtrackcoord">1980</str>
+<str name="orbitdirection">descending</str>
+<str name="relorbitdir">descending</str>
+<str name="relpassnumber">694</str>
+<str name="relpassdirection">descending</str>
+<str name="passnumber">19718</str>
+<str name="passdirection">descending</str>
+<str name="processingname">Data Processing</str>
+<str name="processinglevel">1</str>
+<str name="procfacilityname">Land OLCI Processing and Archiving Centre [LN1]</str>
+<str name="procfacilityorg">European Space Agency</str>
+<str name="onlinequalitycheck">PASSED</str>
+<str name="identifier">S3B_OL_1_EFR____20200317T045345_20200317T045645_20200318T084853_0179_036_347_1980_LN1_O_NT_002</str>
+<str name="uuid">b54171e1-078b-4234-ae0a-7b27abb14baa</str>
+</entry>
+</feed>

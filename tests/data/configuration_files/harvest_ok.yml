@@ -1,0 +1,9 @@
+---
+harvesters:
+  test:
+    class: 'TestHarvester'
+    urls:
+      - 'https://random1.url'
+      - 'https://random2.url'
+poll_interval: 0.1
+...
