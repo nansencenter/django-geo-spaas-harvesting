@@ -1,7 +1,11 @@
-"""A set of crawlers used to explore data provider interfaces and get resources URLs"""
-
+"""
+A set of crawlers used to explore data provider interfaces and get resources URLs. Each crawler
+should inherit from the Crawler class and implement the abstract methods defined in Crawler.
+"""
+import calendar
 import logging
 import re
+from datetime import datetime, timedelta
 from html.parser import HTMLParser
 
 import feedparser
@@ -39,76 +43,6 @@ class Crawler():
         return html_page
 
 
-class OpenDAPCrawler(Crawler):
-    """Crawler for OpenDAP resources"""
-
-    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
-    FOLDERS_SUFFIXES = ('/contents.html')
-    FILES_SUFFIXES = ('.nc', '.nc.gz')
-    EXCLUDE = ('?')
-
-    def __init__(self, root_url):
-        """
-        The _urls attribute contains URLs to the resources which will be returned by the crawler
-        The _to_process attribute contains URLs to pages which need to be searched for resources
-        """
-        self.root_url = root_url
-        self.set_initial_state()
-
-    def set_initial_state(self):
-        self._urls = []
-        self._to_process = [self.root_url.rstrip('/')]
-
-    def __iter__(self):
-        """Make the crawler iterable"""
-        return self
-
-    def __next__(self):
-        """Make the crawler an iterator"""
-        try:
-            # Return all resource URLs from the previously processed folder
-            result = self._urls.pop()
-        except IndexError:
-            # If no more URLs from the previously processed folder are available,
-            # process the next one
-            try:
-                self._explore_page(self._to_process.pop())
-                result = self.__next__()
-            except IndexError:
-                raise StopIteration
-        return result
-
-    def _explore_page(self, folder_url):
-        """Gets all relevant links from a page and feeds the _urls and _to_process attributes"""
-        self.LOGGER.info("Looking for resources in '%s'...", folder_url)
-
-        current_location = re.sub(r'/\w+\.\w+$', '', folder_url)
-        links = self._get_links(self._http_get(folder_url))
-        for link in links:
-            # Select links which do not contain any of the self.EXCLUDE strings
-            if all(map(lambda s, l=link: s not in l, self.EXCLUDE)):
-                if link.endswith(self.FOLDERS_SUFFIXES):
-                    folder_url = f"{current_location}/{link}"
-                    if folder_url not in self._to_process:
-                        self.LOGGER.debug("Adding '%s' to the list of pages to process.", link)
-                        self._to_process.append(folder_url)
-                elif link.endswith(self.FILES_SUFFIXES):
-                    resource_url = f"{current_location}/{link}"
-                    if resource_url not in self._urls:
-                        self.LOGGER.debug("Adding '%s' to the list of resources.", link)
-                        self._urls.append(resource_url)
-
-    @classmethod
-    def _get_links(cls, html):
-        """Returns the list of links contained in an HTML page, passed as a string"""
-
-        parser = LinkExtractor()
-        cls.LOGGER.debug("Parsing HTML data.")
-        parser.feed(html)
-
-        return parser.links
-
-
 class LinkExtractor(HTMLParser):
     """
     HTML parser which extracts links from an HTML page
@@ -141,6 +75,158 @@ class LinkExtractor(HTMLParser):
             for attr in attrs:
                 if attr[0] == 'href':
                     self._links.append(attr[1])
+
+
+class OpenDAPCrawler(Crawler):
+    """Crawler for OpenDAP resources"""
+
+    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
+    FOLDERS_SUFFIXES = ('/contents.html')
+    FILES_SUFFIXES = ('.nc', '.nc.gz')
+    EXCLUDE = ('?')
+
+    YEAR_PATTERN = r'(\d{4})'
+    MONTH_PATTERN = r'(1[0-2]|0[1-9]|[1-9])'
+    DAY_OF_MONTH_PATTERN = r'(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9])'
+    DAY_OF_YEAR_PATTERN = r'(36[0-6]|3[0-5]\d|[1-2]\d\d|0[1-9]\d|00[1-9]|[1-9]\d|0[1-9]|[1-9])'
+
+    YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/.*$')
+    MONTH_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}/.*$')
+    DAY_OF_MONTH_MATCHER = re.compile(
+        f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}/{DAY_OF_MONTH_PATTERN}/.*$')
+    DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}/.*$')
+
+    TIMESTAMP_MATCHER = re.compile((
+        r'(\d{4})(1[0-2]|0[1-9]|[1-9])(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9])'
+        r'(2[0-3]|[0-1]\d|\d)([0-5]\d|\d)(6[0-1]|[0-5]\d|\d)'))
+
+    def __init__(self, root_url, time_range=(None, None)):
+        """
+        `root_url` is the URL of the data repository to explore.
+        `time_range` is a tuple of datetime.datetime objects defining the time range of the datasets
+        returned the crawler.
+        """
+        self.root_url = root_url
+        self.time_range = time_range
+        self.set_initial_state()
+
+    def set_initial_state(self):
+        """
+        The `_urls` attribute contains URLs to the resources which will be returned by the crawler.
+        The `_to_process` attribute contains URLs to pages which need to be searched for resources.
+        """
+        self._urls = []
+        self._to_process = [self.root_url.rstrip('/')]
+
+    def __iter__(self):
+        """Make the crawler iterable"""
+        return self
+
+    def __next__(self):
+        """Make the crawler an iterator"""
+        try:
+            # Return all resource URLs from the previously processed folder
+            result = self._urls.pop()
+        except IndexError:
+            # If no more URLs from the previously processed folder are available,
+            # process the next one
+            try:
+                self._explore_page(self._to_process.pop())
+                result = self.__next__()
+            except IndexError:
+                raise StopIteration
+        return result
+
+    def _folder_coverage(self, folder_url):
+        """
+        Find out if the folder has date info in its path. The resolution is one day.
+        For now, it supports the following structures:
+          - .../year/...
+          - .../year/month/...
+          - .../year/month/day/...
+          - .../year/day_of_year/...
+        It will need to be updated to support new structures.
+        """
+        match_year = self.YEAR_MATCHER.search(folder_url)
+        if match_year:
+            match_month = self.MONTH_MATCHER.search(folder_url)
+            if match_month:
+                match_day = self.DAY_OF_MONTH_MATCHER.search(folder_url)
+                if match_day:
+                    folder_coverage_start = datetime(
+                        int(match_year[1]), int(match_month[2]), int(match_day[3]), 0, 0, 0)
+                    folder_coverage_stop = datetime(
+                        int(match_year[1]), int(match_month[2]), int(match_day[3]), 23, 59, 59)
+                else:
+                    last_day_of_month = calendar.monthrange(
+                        int(match_year[1]), int(match_month[2]))[1]
+                    folder_coverage_start = datetime(
+                        int(match_year[1]), int(match_month[2]), 1, 0, 0, 0)
+                    folder_coverage_stop = datetime(
+                        int(match_year[1]), int(match_month[2]), last_day_of_month, 23, 59, 59)
+            else:
+                match_day_of_year = self.DAY_OF_YEAR_MATCHER.search(folder_url)
+                if match_day_of_year:
+                    offset = timedelta(int(match_day_of_year[2]) - 1)
+                    folder_coverage_start = (datetime(int(match_year[1]), 1, 1, 0, 0, 0)
+                                             + offset)
+                    folder_coverage_stop = (datetime(int(match_year[1]), 1, 1, 23, 59, 59)
+                                            + offset)
+                else:
+                    folder_coverage_start = datetime(int(match_year[1]), 1, 1, 0, 0, 0)
+                    folder_coverage_stop = datetime(int(match_year[1]), 12, 31, 23, 59, 59)
+        else:
+            folder_coverage_start = folder_coverage_stop = None
+
+        return (folder_coverage_start, folder_coverage_stop)
+
+    def _dataset_timestamp(self, dataset_name):
+        """Tries to find a timestamp in the dataset's name"""
+        timestamp_match = self.TIMESTAMP_MATCHER.search(dataset_name)
+        if timestamp_match:
+            return datetime.strptime(timestamp_match[0], '%Y%m%d%H%M%S')
+        else:
+            return None
+
+    def _intersects_time_range(self, start_time=None, stop_time=None):
+        """
+        Return True if:
+          - a time coverage was extracted from the folder's path or a timestamp from the dataset's
+            name, and this time coverage intersects with the Crawler's time range
+          - no time range was defined when instantiating the crawler
+          - no time coverage was extracted from the folder's url or dataset's name
+        """
+        return ((not start_time or not self.time_range[1] or start_time <= self.time_range[1]) and
+                (not stop_time or not self.time_range[0] or stop_time >= self.time_range[0]))
+
+    def _explore_page(self, folder_url):
+        """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
+        self.LOGGER.info("Looking for resources in '%s'...", folder_url)
+        current_location = re.sub(r'/\w+\.\w+$', '', folder_url)
+        links = self._get_links(self._http_get(folder_url))
+        for link in links:
+            # Select links which do not contain any of the self.EXCLUDE strings
+            if all(map(lambda s, l=link: s not in l, self.EXCLUDE)):
+                if link.endswith(self.FOLDERS_SUFFIXES):
+                    folder_url = f"{current_location}/{link}"
+                    if folder_url not in self._to_process:
+                        if self._intersects_time_range(*self._folder_coverage(folder_url)):
+                            self.LOGGER.debug("Adding '%s' to the list of pages to process.", link)
+                            self._to_process.append(folder_url)
+                elif link.endswith(self.FILES_SUFFIXES):
+                    resource_url = f"{current_location}/{link}"
+                    if resource_url not in self._urls:
+                        if self._intersects_time_range(*(self._dataset_timestamp(link),) * 2):
+                            self.LOGGER.debug("Adding '%s' to the list of resources.", link)
+                            self._urls.append(resource_url)
+
+    @classmethod
+    def _get_links(cls, html):
+        """Returns the list of links contained in an HTML page, passed as a string"""
+        parser = LinkExtractor()
+        cls.LOGGER.debug("Parsing HTML data.")
+        parser.feed(html)
+        return parser.links
 
 
 class CopernicusOpenSearchAPICrawler(Crawler):
