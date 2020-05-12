@@ -3,6 +3,7 @@
 
 import unittest
 import unittest.mock as mock
+from datetime import datetime
 
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
@@ -72,6 +73,56 @@ class HarvesterTestCase(unittest.TestCase):
              'https://random2.url/ressource_a',
              'https://random2.url/ressource_b',
              'https://random2.url/ressource_c'])
+
+    def test_get_time_range_standard(self):
+        """Get a standard time range from the configuration"""
+        harvester = StubHarvester(urls=[''], time_range=['20191215161800', '20191215201800'])
+        self.assertTupleEqual(harvester.get_time_range(), (
+            datetime(2019, 12, 15, 16, 18, 00), datetime(2019, 12, 15, 20, 18, 00)
+        ))
+
+    def test_get_time_range_no_lower_limit(self):
+        """Get a time range without a lower limit from the configuration"""
+        harvester = StubHarvester(urls=[''], time_range=[None, '20191215201800'])
+        self.assertTupleEqual(harvester.get_time_range(), (
+            None, datetime(2019, 12, 15, 20, 18, 00)
+        ))
+
+    def test_get_time_range_no_upper_limit(self):
+        """Get a time range without an upper limit from the configuration"""
+        harvester = StubHarvester(urls=[''], time_range=['20191215161800', None])
+        self.assertTupleEqual(harvester.get_time_range(), (
+            datetime(2019, 12, 15, 16, 18, 00), None
+        ))
+
+    def test_get_time_range_no_conf(self):
+        """Get (None, None) when `time_range` is empty in the configuration"""
+        harvester = StubHarvester(urls=[''])
+        self.assertTupleEqual(harvester.get_time_range(), (None, None))
+
+    def test_raise_error_on_invalid_time_range(self):
+        """An error must be raised if the first value of the time range is superior to the second"""
+        harvester = StubHarvester(urls=[''], time_range=['20191215201800', '20191215161800'])
+        with self.assertRaises(ValueError):
+            _ = harvester.get_time_range()
+
+    def test_raise_error_on_invalid_date_format(self):
+        """
+        An error must be raised if the format of one or both of the dates is not parseable by
+        dateutil
+        """
+        harvester = StubHarvester(urls=[''], time_range=['some_string', 'some_other_string'])
+        with self.assertRaises(ValueError):
+            _ = harvester.get_time_range()
+
+    def test_raise_error_on_wrong_time_range_length(self):
+        """
+        An error must be raised if the time_range length is different than 2 in the configuration
+        """
+        harvester = StubHarvester(urls=[''], time_range=['20191215161800'])
+        with self.assertRaises(ValueError):
+            _ = harvester.get_time_range()
+
 
 class ChildHarvestersTestCase(unittest.TestCase):
     """Tests for the Harvesters which inherit from the base Harvester class"""
