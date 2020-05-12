@@ -86,7 +86,10 @@ class Harvester():
 class PODAACHarvester(Harvester):
     """Harvester class for PODAAC data (NASA)"""
     def _create_crawlers(self):
-        return [crawlers.OpenDAPCrawler(url) for url in self.config['urls']]
+        return [
+            crawlers.OpenDAPCrawler(url, time_range=(self.get_time_range()))
+            for url in self.config['urls']
+        ]
 
     def _create_ingester(self):
         parameters = {}
