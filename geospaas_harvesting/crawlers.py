@@ -13,6 +13,8 @@ import requests
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
+MIN_DATETIME = datetime(1, 1, 1)
+
 
 class Crawler():
     """Base Crawler class"""
@@ -237,18 +239,41 @@ class CopernicusOpenSearchAPICrawler(Crawler):
 
     LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
 
-    def __init__(self, url, search_terms='*', username=None, password=None,
+    def __init__(self, url, search_terms='*', time_range=(None, None),
+                 username=None, password=None,
                  page_size=100, initial_offset=0):
         self.url = url
-        self.search_terms = search_terms
-        self._credentials = (username, password) if username and password else None
-        self.page_size = page_size
         self.initial_offset = initial_offset
+        self.request_parameters = self._build_request_parameters(
+            search_terms, time_range, username, password, page_size, initial_offset)
         self.set_initial_state()
 
     def set_initial_state(self):
-        self.offset = self.initial_offset
+        self.request_parameters['params']['start'] = self.initial_offset
         self._urls = []
+
+    @staticmethod
+    def _build_request_parameters(search_terms, time_range, username, password, page_size,
+                                  initial_offset):
+        """Build a dict containing the parameters used to query the Copernicus API"""
+        if time_range:
+            api_date_format = '%Y-%m-%dT%H:%M:%SZ'
+            start = (time_range[0] or MIN_DATETIME).strftime(api_date_format)
+            end = time_range[1].strftime(api_date_format) if time_range[1] else 'NOW'
+            time_condition = f"beginposition:[{start} TO {end}]"
+
+        request_parameters = {
+            'params': {
+                'q': f"({search_terms}) AND ({time_condition})",
+                'start': initial_offset,
+                'rows': page_size,
+                'orderby': 'beginposition asc'
+            }
+        }
+
+        if username and password:
+            request_parameters['auth'] = (username, password)
+        return request_parameters
 
     def __iter__(self):
         """Makes the crawler iterable"""
@@ -263,7 +288,7 @@ class CopernicusOpenSearchAPICrawler(Crawler):
             # If no more URLs from the previously processed page are available, process the next one
             if not self._get_resources_urls(self._get_next_page()):
                 self.LOGGER.debug("No more entries found at '%s' matching '%s'",
-                                  self.url, self.search_terms)
+                                  self.url, self.request_parameters['params']['q'])
                 raise StopIteration
             result = self.__next__()
         return result
@@ -274,21 +299,11 @@ class CopernicusOpenSearchAPICrawler(Crawler):
         if products are added while the harvesting is happening (it will generally be the case)
         """
         self.LOGGER.info("Looking for ressources at '%s', matching '%s' with an offset of %s",
-                         self.url, self.search_terms, self.offset)
+                         self.url, self.request_parameters['params']['q'],
+                         self.request_parameters['params']['start'])
 
-        request_parameters = {
-            'params': {
-                'q': self.search_terms,
-                'start': self.offset,
-                'rows': self.page_size,
-                'orderby': 'ingestiondate asc'
-            }
-        }
-        if self._credentials:
-            request_parameters['auth'] = self._credentials
-
-        current_page = self._http_get(self.url, request_parameters)
-        self.offset += self.page_size
+        current_page = self._http_get(self.url, self.request_parameters)
+        self.request_parameters['params']['start'] += self.request_parameters['params']['rows']
 
         return current_page
 
