@@ -11,8 +11,6 @@ import geospaas_harvesting.harvesters as harvesters
 
 from .stubs import StubHarvester, StubIngester
 
-TOP_PACKAGE = 'geospaas_harvesting'
-
 
 class HarvesterTestCase(unittest.TestCase):
     """Test the base harvester"""
