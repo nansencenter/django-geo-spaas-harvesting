@@ -104,10 +104,11 @@ class CopernicusSentinelHarvester(Harvester):
     def _create_crawlers(self):
         return [
             crawlers.CopernicusOpenSearchAPICrawler(
-                self.config['url'],
+                url=self.config['url'],
                 search_terms=search,
                 username=self.config.get('username', None),
-                password=os.getenv(self.config.get('password', ''), None))
+                password=os.getenv(self.config.get('password', ''), None),
+                time_range=(self.get_time_range()))
             for search in self.config['search_terms']
         ]
 
