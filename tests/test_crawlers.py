@@ -5,6 +5,7 @@ import logging
 import os
 import unittest
 import unittest.mock as mock
+from datetime import datetime, timezone
 
 import requests
 
@@ -25,31 +26,43 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     TEST_DATA = {
         'root': {
-            'url': "https://test-opendap.com",
+            'urls': ["https://test-opendap.com"],
             'file_path': "data/opendap/root.html"},
         'root_duplicates': {
-            'url': "https://test2-opendap.com",
+            'urls': ["https://test2-opendap.com"],
             'file_path': "data/opendap/root_duplicates.html"},
-        'root_dataset': {
-            'url': 'https://test-opendap.com/dataset.nc',
-            'file_path': None},
-        'root_dataset_2': {
-            'url': 'https://test2-opendap.com/dataset.nc',
+        'dataset': {
+            'urls': [
+                'https://test-opendap.com/dataset.nc',
+                'https://test2-opendap.com/dataset.nc',
+                'https://test-opendap.com/folder/dataset.nc',
+                'https://test-opendap.com/folder/2019/02/14/20190214000000_dataset.nc',
+                'https://test-opendap.com/folder/2019/046/20190215000000_dataset.nc'
+            ],
             'file_path': None},
         'folder': {
-            'url': 'https://test-opendap.com/folder/contents.html',
-            'file_path': 'data/opendap/folder.html'},
-        'folder_2': {
-            'url': 'https://test2-opendap.com/folder/contents.html',
-            'file_path': 'data/opendap/folder.html'},
-        'folder_dataset': {
-            'url': 'https://test-opendap.com/folder/dataset.nc',
-            'file_path': None},
+            'urls': [
+                'https://test-opendap.com/folder/contents.html',
+                'https://test2-opendap.com/folder/contents.html'
+            ],
+            'file_path': 'data/opendap/folder/contents.html'},
+        'folder_year': {
+            'urls': ['https://test-opendap.com/folder/2019/contents.html'],
+            'file_path': 'data/opendap/folder/2019/contents.html'},
+        'folder_month': {
+            'urls': ['https://test-opendap.com/folder/2019/02/contents.html'],
+            'file_path': 'data/opendap/folder/2019/02/contents.html'},
+        'folder_day_of_month': {
+            'urls': ['https://test-opendap.com/folder/2019/02/14/contents.html'],
+            'file_path': 'data/opendap/folder/2019/02/14/contents.html'},
+        'folder_day_of_year': {
+            'urls': ['https://test-opendap.com/folder/2019/046/contents.html'],
+            'file_path': 'data/opendap/folder/2019/046/contents.html'},
         'empty': {
-            'url': 'http://empty.com',
+            'urls': ['http://empty.com'],
             'file_path': 'data/empty.html'},
         'inexistent': {
-            'url': 'http://random.url',
+            'urls': ['http://random.url'],
             'file_path': None}
     }
 
@@ -57,8 +70,9 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         """Side effect function used to mock calls to requests.get().text"""
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
-            if url == test_data['url']:
+            if url in test_data['urls']:
                 data_file_relative_path = test_data['file_path']
+                break
 
         response = requests.Response()
 
@@ -92,15 +106,17 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_instantiation(self):
         """Test the correct instantiation of an Opendap crawler"""
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
         self.assertIsInstance(crawler, crawlers.Crawler)
+        self.assertEqual(crawler.root_url, self.TEST_DATA['root']['urls'][0])
+        self.assertEqual(crawler.time_range, (None, None))
         self.assertListEqual(crawler._urls, [])
-        self.assertListEqual(crawler._to_process, [self.TEST_DATA['root']['url']])
+        self.assertListEqual(crawler._to_process, [self.TEST_DATA['root']['urls'][0]])
 
     def test_set_initial_state(self):
         """Tests that the set_initial_state() method sets the correct values"""
         #Create a crawler and start iterating to set a non-initial state
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
             next(iter(crawler))
 
@@ -114,14 +130,14 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         html = data_file.read()
         data_file.close()
 
-        html_from_method = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['root']['url'])
+        html_from_method = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['root']['urls'][0])
 
         self.assertEqual(html, html_from_method)
 
     @mock.patch('logging.Logger.error')
     def test_get_html_logs_error_on_http_status(self, mock_error_logger):
         """Test that an exception is raised in case of HTTP error code"""
-        _ = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['inexistent']['url'])
+        _ = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['inexistent']['urls'][0])
         mock_error_logger.assert_called_once()
 
     def test_get_right_number_of_links(self):
@@ -149,35 +165,230 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         Explore root page and make sure the _url and _to_process attributes of the crawler have the
         right values
         """
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
             crawler._explore_page(crawler._to_process.pop())
-        self.assertListEqual(crawler._urls, [self.TEST_DATA['root_dataset']['url']])
-        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['url']])
+        self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][0]])
+        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['urls'][0]])
 
     def test_explore_page_with_duplicates(self):
         """If the same URL is present twice in the page, it should only be processed once"""
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['url'])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
             crawler._explore_page(crawler._to_process.pop())
-        self.assertListEqual(crawler._urls, [self.TEST_DATA['root_dataset_2']['url']])
-        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder_2']['url']])
+        self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][1]])
+        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['urls'][1]])
+
+    def test_explore_page_with_time_restriction_discriminated_by_timestamp(self):
+        """
+        Explore a page and make sure the _url and _to_process attributes of the crawler have the
+        right values according to a time restriction
+        """
+        crawler = crawlers.OpenDAPCrawler(
+            self.TEST_DATA['folder_day_of_year']['urls'][0],
+            time_range=(datetime(2019, 2, 15, 11, 0, 0), datetime(2019, 2, 15, 13, 0, 0)))
+        with self.assertLogs(crawler.LOGGER):
+            crawler._explore_page(crawler._to_process.pop())
+        self.assertListEqual(crawler._urls,
+                             ['https://test-opendap.com/folder/2019/046/20190215120000_dataset.nc'])
+        self.assertListEqual(crawler._to_process, [])
+
+    def test_explore_page_with_time_restriction_discriminated_by_folder_coverage(self):
+        """
+        Explore a page and make sure the _url and _to_process attributes of the crawler have the
+        right values according to a time restriction
+        """
+        crawler = crawlers.OpenDAPCrawler(
+            self.TEST_DATA['folder_day_of_year']['urls'][0],
+            time_range=(datetime(2019, 2, 11, 11, 0, 0), datetime(2019, 2, 11, 13, 0, 0)))
+        with self.assertLogs(crawler.LOGGER):
+            crawler._explore_page(crawler._to_process.pop())
+        self.assertListEqual(crawler._urls, [])
+        self.assertListEqual(crawler._to_process, [])
 
     def test_iterating(self):
         """Test the call to the __iter__ method"""
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['url'])
+        crawler = crawlers.OpenDAPCrawler(
+            self.TEST_DATA['root']['urls'][0],
+            time_range=(datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 9, 0, 0)))
         crawler_iterator = iter(crawler)
 
         # Test the values returned by the iterator
         with self.assertLogs(crawler.LOGGER):
-            self.assertEqual(next(crawler_iterator), self.TEST_DATA['root_dataset']['url'])
-            self.assertEqual(next(crawler_iterator), self.TEST_DATA['folder_dataset']['url'])
+            self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][0])
+            self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][2])
+            self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][3])
 
         # Test that a StopIteration is returned at the end. The nested context managers are
         # necessary because the StopIteration exception is raised inside an 'except KeyError:' block
         with self.assertRaises(StopIteration):
             with self.assertRaises(KeyError):
                 next(crawler)
+
+    def test_get_year_folder_coverage(self):
+        """Get the correct time range from a year folder"""
+        crawler = crawlers.OpenDAPCrawler('')
+        self.assertEqual(
+            crawler._folder_coverage('https://test-opendap.com/folder/2019/contents.html'),
+            (datetime(2019, 1, 1, 0, 0, 0), datetime(2019, 12, 31, 23, 59, 59))
+        )
+
+    def test_get_month_folder_coverage(self):
+        """Get the correct time range from a month folder"""
+        crawler = crawlers.OpenDAPCrawler('')
+        self.assertEqual(
+            crawler._folder_coverage('https://test-opendap.com/folder/2019/02/contents.html'),
+            (datetime(2019, 2, 1, 0, 0, 0), datetime(2019, 2, 28, 23, 59, 59))
+        )
+
+    def test_get_day_of_month_folder_coverage(self):
+        """Get the correct time range from a day of month folder"""
+        crawler = crawlers.OpenDAPCrawler('')
+        self.assertEqual(
+            crawler._folder_coverage('https://test-opendap.com/folder/2019/02/14/contents.html'),
+            (datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 23, 59, 59))
+        )
+
+    def test_get_day_of_year_folder_coverage(self):
+        """Get the correct time range from a day of year folder"""
+        crawler = crawlers.OpenDAPCrawler('')
+        self.assertEqual(
+            crawler._folder_coverage('https://test-opendap.com/folder/2019/046/contents.html'),
+            (datetime(2019, 2, 15, 0, 0, 0), datetime(2019, 2, 15, 23, 59, 59))
+        )
+
+    def test_none_when_no_folder_coverage(self):
+        """
+        The `_folder_coverage` method should return `None` if no time range is inferred from the
+        folder's path
+        """
+        crawler = crawlers.OpenDAPCrawler('')
+        self.assertEqual(
+            crawler._folder_coverage('https://test-opendap.com/folder/contents.html'), (None, None))
+        self.assertEqual(
+            crawler._folder_coverage('https://test-opendap.com/folder/046/contents.html'),
+            (None, None)
+        )
+        self.assertEqual(
+            crawler._folder_coverage('https://test-opendap.com/folder/02/contents.html'),
+            (None, None)
+        )
+
+    def test_get_dataset_timestamp(self):
+        """Get the correct date from a dataset prefixed by a timestamp"""
+        crawler = crawlers.OpenDAPCrawler('')
+        self.assertEqual(
+            crawler._dataset_timestamp('20190214090812_dataset_name.nc'),
+            datetime(2019, 2, 14, 9, 8, 12),
+        )
+
+    def test_none_when_no_dataset_timestamp(self):
+        """
+        The `_dataset_timestamp` method should return `None` if no timestamp is found in the
+        dataset's name
+        """
+        crawler = crawlers.OpenDAPCrawler('')
+        self.assertEqual(crawler._dataset_timestamp('dataset_name.nc'), None)
+
+
+    def test_intersects_time_range_finite_limits(self):
+        """
+        Test the behavior of the `_intersects_time_range` method with a finite time range limitation
+        `time_range[0]` and `time_range[1]` are the limits defined in the crawler
+        `start_time` and `stop_time` are the limits of the time range which is tested against the
+        crawler's condition
+        """
+        crawler = crawlers.OpenDAPCrawler(
+            '', time_range=(datetime(2019, 2, 14), datetime(2019, 2, 20)))
+
+        # start_time < time_range[0] < stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 10), datetime(2019, 2, 17)))
+        # start_time < time_range[0] == stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 10), datetime(2019, 2, 14)))
+        # time_range[0] < start_time < time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 17), datetime(2019, 2, 25)))
+        # time_range[0] < start_time == time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 20), datetime(2019, 2, 25)))
+        # time_range[0] < start_time < stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 15), datetime(2019, 2, 19)))
+        # start_time < time_range[0] < time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 13), datetime(2019, 2, 25)))
+        # start_time < stop_time < time_range[0] < time_range[1]
+        self.assertFalse(crawler._intersects_time_range(
+            datetime(2019, 2, 10), datetime(2019, 2, 13)))
+        # time_range[0] < time_range[1] < start_time < stop_time
+        self.assertFalse(crawler._intersects_time_range(
+            datetime(2019, 2, 25), datetime(2019, 2, 26)))
+        # no start_time < time_range[0] < time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 27)))
+        # no start_time < time_range[0] < stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 17)))
+        # no start_time < stop_time < time_range[0] < time_range[1]
+        self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 10)))
+        # start_time < time_range[0] < time_range[1] < no stop time
+        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 10), None))
+        # time_range[0] < start_time < time_range[1] < no stop time
+        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 18), None))
+        # time_range[0] < time_range[1] < start_time < no stop time
+        self.assertFalse(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+
+    def test_intersects_time_range_no_lower_limit(self):
+        """
+        Test the behavior of the `_intersects_time_range` method without a lower limit for the
+        crawler's time range.
+        `time_range[1]` is the upper limit defined in the crawler
+        `start_time` and `stop_time` are the limits of the time range which is tested against the
+        crawler's condition
+        """
+        crawler = crawlers.OpenDAPCrawler('', time_range=(None, datetime(2019, 2, 20)))
+
+        # no lower limit < time_range[1] < start_time < stop_time
+        self.assertFalse(crawler._intersects_time_range(
+            datetime(2019, 2, 25), datetime(2019, 2, 26)))
+        # no lower limit < start_time < time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 18), datetime(2019, 2, 26)))
+        # no lower limit < start_time < stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 18), datetime(2019, 2, 19)))
+        # no lower limit and no start time
+        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
+        # no lower limit and no stop_time, with intersection
+        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 19), None))
+        # no lower limit and no stop_time, without intersection
+        self.assertFalse(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+
+    def test_intersects_time_range_no_upper_limit(self):
+        """
+        Test the behavior of the `_intersects_time_range` method without an upper limit for the
+        crawler's time range.
+        `time_range[0]` is the upper limit defined in the crawler
+        `start_time` and `stop_time` are the limits of the time range which is tested against the
+        crawler's condition
+        """
+        crawler = crawlers.OpenDAPCrawler('', time_range=(datetime(2019, 2, 20), None))
+
+        # start_time < stop_time < time_range[0] < no upper limit
+        self.assertFalse(crawler._intersects_time_range(
+            datetime(2019, 2, 10), datetime(2019, 2, 15)))
+        # start_time < time_range[0] < stop_time < no upper limit
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 18), datetime(2019, 2, 26)))
+        # time_range[0] < start_time < stop_time < no upper limit
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 21), datetime(2019, 2, 25)))
+        # no upper limit and no stop_time
+        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+        # no upper limit and no start_time, with intersection
+        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
+        # no upper limit and no start_time, without intersection
+        self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
 
 class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
@@ -202,7 +413,7 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
             if (url == self.BASE_URL
-                    and request_parameters['params']['q'] == self.SEARCH_TERMS
+                    and request_parameters['params']['q'].startswith(f"({self.SEARCH_TERMS}) AND ")
                     and request_parameters['params']['start'] == test_data['offset']
                     and request_parameters['params']['rows'] == self.PAGE_SIZE):
                 data_file_relative_path = test_data['file_path']
@@ -232,7 +443,7 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         self.opened_files = []
 
         self.crawler = crawlers.CopernicusOpenSearchAPICrawler(
-            self.BASE_URL, self.SEARCH_TERMS, 'user', 'pass',
+            url=self.BASE_URL, search_terms=self.SEARCH_TERMS, username='user', password='pass',
             page_size=self.PAGE_SIZE, initial_offset=0)
 
     def tearDown(self):
@@ -245,12 +456,66 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         """Test the correct instantiation of a Copernicus OpenSearch API crawler"""
         self.assertIsInstance(self.crawler, crawlers.Crawler)
         self.assertEqual(self.crawler.url, self.BASE_URL)
-        self.assertEqual(self.crawler.search_terms, self.SEARCH_TERMS)
-        self.assertEqual(self.crawler._credentials, ('user', 'pass'))
-        self.assertEqual(self.crawler.page_size, self.PAGE_SIZE)
         self.assertEqual(self.crawler.initial_offset, 0)
-        self.assertEqual(self.crawler.offset, 0)
+        self.assertDictEqual(self.crawler.request_parameters, {
+            'params': {
+                'q': f"({self.SEARCH_TERMS}) AND (beginposition:[1-01-01T00:00:00Z TO NOW])",
+                'start': 0,
+                'rows': self.PAGE_SIZE,
+                'orderby': 'beginposition asc'
+            },
+            'auth': ('user', 'pass')
+        })
         self.assertEqual(self.crawler._urls, [])
+
+    def test_build_parameters_with_standard_time_range(self):
+        """Build the request parameters with a time range composed of two datetime objects"""
+        request_parameters = crawlers.CopernicusOpenSearchAPICrawler._build_request_parameters(
+            search_terms=self.SEARCH_TERMS, username='user', password='pass',
+            page_size=self.PAGE_SIZE, initial_offset=0,
+            time_range=(datetime(2020, 2, 10, tzinfo=timezone.utc),
+                        datetime(2020, 2, 11, tzinfo=timezone.utc)))
+
+        self.assertDictEqual(request_parameters, {
+            'params': {
+                'q': f"({self.SEARCH_TERMS}) AND " +
+                     "(beginposition:[2020-02-10T00:00:00Z TO 2020-02-11T00:00:00Z])",
+                'start': 0,
+                'rows': self.PAGE_SIZE,
+                'orderby': 'beginposition asc'
+            },
+            'auth': ('user', 'pass')
+        })
+
+    def test_build_parameters_with_time_range_without_lower_limit(self):
+        """Build the request parameters with a time range in which the first element is None"""
+        request_parameters = crawlers.CopernicusOpenSearchAPICrawler._build_request_parameters(
+            search_terms=self.SEARCH_TERMS, username='user', password='pass',
+            page_size=self.PAGE_SIZE, initial_offset=0,
+            time_range=(None, datetime(2020, 2, 11, tzinfo=timezone.utc)))
+        self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS}) AND " +
+                         "(beginposition:[1-01-01T00:00:00Z TO 2020-02-11T00:00:00Z])")
+
+    def test_build_parameters_with_time_range_without_upper_limit(self):
+        """Build the request parameters with a time range in which the second element is None"""
+        request_parameters = crawlers.CopernicusOpenSearchAPICrawler._build_request_parameters(
+            search_terms=self.SEARCH_TERMS, username='user', password='pass',
+            page_size=self.PAGE_SIZE, initial_offset=0,
+            time_range=(datetime(2020, 2, 10, tzinfo=timezone.utc), None))
+        self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS}) AND " +
+                         "(beginposition:[2020-02-10T00:00:00Z TO NOW])")
+
+    def test_build_parameters_without_time_range(self):
+        """
+        Build the request parameters with a time range in which the both elements are None
+        The result is equivalent to a search without a time condition.
+        """
+        request_parameters = crawlers.CopernicusOpenSearchAPICrawler._build_request_parameters(
+            search_terms=self.SEARCH_TERMS, username='user', password='pass',
+            page_size=self.PAGE_SIZE, initial_offset=0,
+            time_range=(None, None))
+        self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS}) AND " +
+                         "(beginposition:[1-01-01T00:00:00Z TO NOW])")
 
     def test_set_initial_state(self):
         """Tests that the set_initial_state() method sets the correct values"""
@@ -259,7 +524,8 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
             next(iter(self.crawler))
 
         self.crawler.set_initial_state()
-        self.assertEqual(self.crawler.offset, self.crawler.initial_offset)
+        self.assertEqual(self.crawler.request_parameters['params']['start'],
+                         self.crawler.initial_offset)
         self.assertListEqual(self.crawler._urls, [])
 
     def test_get_next_page(self):

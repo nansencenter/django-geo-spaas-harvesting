@@ -32,7 +32,7 @@ class Configuration(collections.abc.Mapping):
     """Manages harvesting configuration"""
 
     DEFAULT_CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'harvest.yml')
-    TOP_LEVEL_KEYS = set(['harvesters', 'poll_interval'])
+    TOP_LEVEL_KEYS = set(['harvesters', 'poll_interval', 'endless'])
     HARVESTER_CLASS_KEY = 'class'
 
     def __init__(self, config_path=None):
@@ -228,6 +228,8 @@ def main():
                         #Start a new process
                         results[harvester_name] = pool.apply_async(
                             launch_harvest, (harvester_name, harvester_config))
+                if not config.get('endless', False):
+                    break
                 time.sleep(config.get('poll_interval', 600))
             LOGGER.error("All harvester processes encountered errors")
             pool.close()

@@ -39,8 +39,10 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
 
 **Top-level keys**:
 
-- **poll_interval**: The interval in seconds at which the main process checks if the running
-  harvester processes have finished executing.
+- **endless** (default: False): boolean controlling the endless harvesting mode. If True, the 
+  harvesters will be indefinitely re-run after they finish harvesting.
+- **poll_interval** (default: 600): the interval in seconds at which the main process checks if the
+  running harvester processes have finished executing.
 - **harvesters**: dictionary mapping the harvesters names to a dictionary containing their 
   properties.
 
@@ -77,6 +79,9 @@ The properties which are common to every harvester are:
   (like a web interface or API).
 
 The rest depends on the harvester and will be detailed in each harvester's documentation.
+
+- **time_range** (optional): a two-elements list containing two date strings which define a time
+  range to which the crawler will be limited.
 
 ## Design
 

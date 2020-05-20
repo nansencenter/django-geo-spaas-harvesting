@@ -3,6 +3,8 @@
 import logging
 import os
 
+import dateutil.parser
+
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 
@@ -43,6 +45,29 @@ class Harvester():
         self._crawlers_iterator = iter(self._crawlers)
         self._current_crawler = next(self._crawlers_iterator)
 
+    def get_time_range(self):
+        """
+        Build a couple representing the time coverage of the harvester based on its configuration
+        Time zones are ignored because we generally don't get the information. The time range must
+        be defined according to the format of the dates in the remote repository.
+        """
+        time_range = (None, None)
+        try:
+            if len(self.config['time_range']) == 2:
+                time_range = tuple(dateutil.parser.parse(date, ignoretz=True) if date else None
+                                   for date in self.config['time_range'])
+            else:
+                raise ValueError("time_range must have two elements")
+        except dateutil.parser.ParserError as error:
+            raise ValueError("dateutil can't parse the dates in time_range") from error
+        except (KeyError, TypeError):
+            pass
+
+        if time_range and all(time_range) and time_range[0] > time_range[1]:
+            raise ValueError("The first value of the time range must be inferior to the second")
+
+        return time_range
+
     def harvest(self):
         """
         Loop through the crawlers and ingest files for each one.
@@ -61,7 +86,10 @@ class Harvester():
 class PODAACHarvester(Harvester):
     """Harvester class for PODAAC data (NASA)"""
     def _create_crawlers(self):
-        return [crawlers.OpenDAPCrawler(url) for url in self.config['urls']]
+        return [
+            crawlers.OpenDAPCrawler(url, time_range=(self.get_time_range()))
+            for url in self.config['urls']
+        ]
 
     def _create_ingester(self):
         parameters = {}
@@ -76,10 +104,11 @@ class CopernicusSentinelHarvester(Harvester):
     def _create_crawlers(self):
         return [
             crawlers.CopernicusOpenSearchAPICrawler(
-                self.config['url'],
+                url=self.config['url'],
                 search_terms=search,
                 username=self.config.get('username', None),
-                password=os.getenv(self.config.get('password', ''), None))
+                password=os.getenv(self.config.get('password', ''), None),
+                time_range=(self.get_time_range()))
             for search in self.config['search_terms']
         ]
 
