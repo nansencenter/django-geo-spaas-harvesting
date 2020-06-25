@@ -1,6 +1,6 @@
 FROM nansencenter/geospaas:v1.0.0 as base
 
-ARG METANORM_VERSION=0.0.3
+ARG METANORM_VERSION=1.0.0
 RUN pip install --no-cache-dir \
     https://github.com/nansencenter/metanorm/releases/download/${METANORM_VERSION}/metanorm-${METANORM_VERSION}-py3-none-any.whl \
     graypy==2.1.0 \
