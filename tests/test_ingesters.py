@@ -537,9 +537,8 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
             year=2020, month=3, day=18, hour=6, minute=23, second=30, microsecond=975000,
             tzinfo=tzutc()))
 
-        self.assertEqual(normalized_parameters['instrument']['Short_Name'], 'SAR')
-        self.assertEqual(normalized_parameters['instrument']['Long_Name'],
-                         'Synthetic Aperture Radar')
+        self.assertEqual(normalized_parameters['instrument']['Short_Name'], 'SENTINEL-1 C-SAR')
+        self.assertEqual(normalized_parameters['instrument']['Long_Name'], '')
         self.assertEqual(normalized_parameters['instrument']['Category'],
                          'Earth Remote Sensing Instruments')
         self.assertEqual(normalized_parameters['instrument']['Subtype'], '')
