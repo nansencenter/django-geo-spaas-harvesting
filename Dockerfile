@@ -1,4 +1,6 @@
-FROM nansencenter/geospaas:v1.0.0 as base
+ARG BASE_IMAGE=nansencenter/geospaas
+
+FROM ${BASE_IMAGE} as base
 
 ARG METANORM_VERSION=1.0.0
 RUN pip install --no-cache-dir \

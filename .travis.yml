@@ -11,7 +11,7 @@ services:
 
 env:
   global:
-    - BASE_IMAGE_NAME="${DOCKER_ORG}/geospaas:v1.0.0"
+    - BASE_IMAGE_NAME="${DOCKER_ORG}/geospaas:v1.0.1"
     - METANORM_VERSION='1.0.0'
 
 jobs:
@@ -61,6 +61,7 @@ jobs:
         - >
           docker build .
           --cache-from "${IMAGE_NAME}"
+          --build-arg "BASE_IMAGE=$BASE_IMAGE_NAME"
           --build-arg "METANORM_VERSION=$METANORM_VERSION"
           -t "${IMAGE_NAME}:${DOCKER_TMP_TAG}"
         - docker run --rm --entrypoint '' "${IMAGE_NAME}:${DOCKER_TMP_TAG}" python -c 'import geospaas_harvesting'
