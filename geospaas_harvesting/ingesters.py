@@ -277,7 +277,7 @@ class MetanormIngester(Ingester):
         'provider',
         'iso_topic_category',
         'gcmd_location',
-        'geospaas_parameters'
+        'dataset_parameters'
     ]
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
