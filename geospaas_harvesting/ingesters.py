@@ -127,11 +127,10 @@ class Ingester():
                 uri=url,
                 dataset=dataset)
 
-            for geos_parameter_id in range(len(geos_para_list)):
-                geos_parameter_info = geos_para_list[geos_parameter_id]
-                standard_name = geos_parameter_info.get('standard_name', None)
-                short_name = geos_parameter_info.get('short_name', None)
-                units = geos_parameter_info.get('units', None)
+            for dataset_parameter_info in dataset_parameters_list:
+                standard_name = dataset_parameter_info.get('standard_name', None)
+                short_name = dataset_parameter_info.get('short_name', None)
+                units = dataset_parameter_info.get('units', None)
                 if standard_name in ['latitude', 'longitude', None]:
                     continue
                 params = Parameter.objects.filter(standard_name=standard_name)
