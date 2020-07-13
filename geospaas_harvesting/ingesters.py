@@ -108,7 +108,7 @@ class Ingester():
                 platform=platform,
                 instrument=instrument,
                 specs=normalized_attributes.pop('specs', ''))
-            geos_para_list = normalized_attributes.pop('geospaas_parameters')
+            dataset_parameters_list = normalized_attributes.pop('dataset_parameters')
             # Create Dataset in the database. The normalized_attributes dict contains the
             # "basic parameter", which are not objects in the database.
             # The objects we just created in the database are passed separately.
