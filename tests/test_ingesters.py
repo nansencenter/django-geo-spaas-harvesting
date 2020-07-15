@@ -169,6 +169,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
             with self.assertRaises(KeyboardInterrupt):
                 ingester.ingest(range(100))
 
+
 class MetanormIngesterTestCase(django.test.TestCase):
     """Test the base metadata ingester class"""
 
@@ -215,7 +216,7 @@ class MetanormIngesterTestCase(django.test.TestCase):
                                           ('Location_Subregion1', 'gcmd_location_subregion1'),
                                           ('Location_Subregion2', 'gcmd_location_subregion2'),
                                           ('Location_Subregion3', 'gcmd_location_subregion3')]),
-            'dataset_parameters' : [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave')]
+            'dataset_parameters': [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave')]
         }
 
         datasets_count = Dataset.objects.count()
@@ -284,7 +285,7 @@ class DDXIngesterTestCase(django.test.TestCase):
             'file_path': "data/opendap/ddx_no_ns.xml"},
     }
 
-    def requests_get_side_effect(self, url, **kwargs): # pylint: disable=unused-argument
+    def requests_get_side_effect(self, url, **kwargs):  # pylint: disable=unused-argument
         """Side effect function used to mock calls to requests.get().text"""
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
@@ -445,7 +446,7 @@ class DDXIngesterTestCase(django.test.TestCase):
 
 class CopernicusODataIngesterTestCase(django.test.TestCase):
     """Test the CopernicusODataIngester"""
-    fixtures = [os.path.join(os.path.dirname(__file__),"fixtures","harvest")]
+    fixtures = [os.path.join(os.path.dirname(__file__), "fixtures", "harvest")]
     TEST_DATA = {
         'full': {
             'url': "https://scihub.copernicus.eu/full?$format=json&$expand=Attributes",
@@ -557,7 +558,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
             '-4.065843 52.891499,' +
             '-4.436811 51.396446,' +
             '-0.694377 50.983601)))',
-            srid='4326' #TODO: check whether this should be an integer in metanorm
+            srid='4326'  # TODO: check whether this should be an integer in metanorm
         ))
 
         self.assertEqual(normalized_parameters['provider']
@@ -584,7 +585,6 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
     def test_parameter_assigment_for_attributes(self):
         """Shall assign the correct parameter to dataset
         from Sentinel-SAFE JSON metadata (only one time execution)"""
-#        normalized_parameters= MetanormIngesterTestCase.value_for_testing
 
         value_for_testing = {
             'entry_title': 'title_value',
@@ -618,32 +618,33 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
                                           ('Location_Subregion1', 'gcmd_location_subregion1'),
                                           ('Location_Subregion2', 'gcmd_location_subregion2'),
                                           ('Location_Subregion3', 'gcmd_location_subregion3')]),
-            'dataset_parameters' : [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave')]
+            'dataset_parameters': [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave')]
         }
-        duplicate_value_for_testing=value_for_testing.copy()
+        duplicate_value_for_testing = value_for_testing.copy()
         created_dataset, created_dataset_uri = self.ingester._ingest_dataset(
-            'https://scihub.copernicus.eu/full/$value',value_for_testing)
-        self.assertEqual(Dataset.objects.count(),1)
-        self.assertEqual(Dataset.objects.first().datasetparameter_set.count(),1)
+            'https://scihub.copernicus.eu/full/$value', value_for_testing)
+        self.assertEqual(Dataset.objects.count(), 1)
+        self.assertEqual(Dataset.objects.first().datasetparameter_set.count(), 1)
         # the parameter that has added (by above variable of "value_for_testing") to the dataset
         # should be equal to the first object of parameter table
         # which is created by fixtures inside the database
         self.assertEqual(
-            Dataset.objects.first().datasetparameter_set.first().parameter,Parameter.objects.first())
-        self.assertEqual(created_dataset,True)
-        self.assertEqual(created_dataset_uri,True)
+            Dataset.objects.first().datasetparameter_set.first().parameter, Parameter.objects.first())
+        self.assertEqual(created_dataset, True)
+        self.assertEqual(created_dataset_uri, True)
 
         # No parameter or dataset should be added for the second time of executing this command
         # with same normalized attributes (same variable of "value_for_testing")
         created_dataset, created_dataset_uri = self.ingester._ingest_dataset(
-            'https://scihub.copernicus.eu/full/$value',duplicate_value_for_testing)
+            'https://scihub.copernicus.eu/full/$value', duplicate_value_for_testing)
 
-        self.assertEqual(Dataset.objects.count(),1)
-        self.assertEqual(Dataset.objects.first().datasetparameter_set.count(),1)
+        self.assertEqual(Dataset.objects.count(), 1)
+        self.assertEqual(Dataset.objects.first().datasetparameter_set.count(), 1)
         self.assertEqual(
-            Dataset.objects.first().datasetparameter_set.first().parameter,Parameter.objects.first())
-        self.assertEqual(created_dataset,False)
-        self.assertEqual(created_dataset_uri,False)
+            Dataset.objects.first().datasetparameter_set.first().parameter, Parameter.objects.first())
+        self.assertEqual(created_dataset, False)
+        self.assertEqual(created_dataset_uri, False)
+
 
 class NansatIngesterTestCase(django.test.TestCase):
     """Test the NansatIngester"""
@@ -700,7 +701,7 @@ class NansatIngesterTestCase(django.test.TestCase):
         )
 
         # This fails, which is why string representations are compared. Any explanation is welcome.
-        #self.assertTrue(normalized_attributes['location_geometry'].equals(expected_geometry))
+        # self.assertTrue(normalized_attributes['location_geometry'].equals(expected_geometry))
         self.assertEqual(str(normalized_attributes['location_geometry']), str(expected_geometry))
 
         self.assertEqual(normalized_attributes['provider']['Short_Name'], 'NERSC')
@@ -716,8 +717,7 @@ class NansatIngesterTestCase(django.test.TestCase):
             normalized_attributes['gcmd_location']['Location_Category'], 'VERTICAL LOCATION')
         self.assertEqual(normalized_attributes['gcmd_location']['Location_Type'], 'SEA SURFACE')
 
-
-    #TODO: make this work
+    # TODO: make this work
     # def test_ingest_dataset_twice_different_urls(self):
     #     """The same dataset must not be ingested twice even if it is present at different URLs"""
     #     initial_datasets_count = Dataset.objects.count()
