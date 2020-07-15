@@ -9,7 +9,7 @@ import unittest.mock as mock
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from datetime import datetime
-
+import pythesint as pti
 import django.db
 import django.db.utils
 import django.test
@@ -17,7 +17,7 @@ import requests
 from dateutil.tz import tzutc
 from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset, DatasetURI
-from geospaas.vocabularies.models import DataCenter, ISOTopicCategory
+from geospaas.vocabularies.models import DataCenter, ISOTopicCategory, Parameter
 
 import geospaas_harvesting.ingesters as ingesters
 
@@ -169,7 +169,6 @@ class IngesterTestCase(django.test.TransactionTestCase):
             with self.assertRaises(KeyboardInterrupt):
                 ingester.ingest(range(100))
 
-
 class MetanormIngesterTestCase(django.test.TestCase):
     """Test the base metadata ingester class"""
 
@@ -184,7 +183,7 @@ class MetanormIngesterTestCase(django.test.TestCase):
     def test_ingest_from_metadata(self):
         """Test that a dataset is created with the correct values from metadata"""
 
-        dataset_parameters = {
+        value_for_testing = {
             'entry_title': 'title_value',
             'summary': 'summary_value',
             'time_coverage_start': datetime(
@@ -215,13 +214,14 @@ class MetanormIngesterTestCase(django.test.TestCase):
                                           ('Location_Type', 'gcmd_location_type'),
                                           ('Location_Subregion1', 'gcmd_location_subregion1'),
                                           ('Location_Subregion2', 'gcmd_location_subregion2'),
-                                          ('Location_Subregion3', 'gcmd_location_subregion3')])
+                                          ('Location_Subregion3', 'gcmd_location_subregion3')]),
+            'dataset_parameters' : [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave')]
         }
 
         datasets_count = Dataset.objects.count()
 
         # Create a dataset from these values
-        self.ingester._ingest_dataset('http://test.uri/dataset', dataset_parameters)
+        self.ingester._ingest_dataset('http://test.uri/dataset', value_for_testing)
 
         self.assertTrue(Dataset.objects.count() == datasets_count + 1)
         inserted_dataset = Dataset.objects.latest('id')
@@ -230,9 +230,9 @@ class MetanormIngesterTestCase(django.test.TestCase):
         self.assertEqual(inserted_dataset.entry_title, 'title_value')
         self.assertEqual(inserted_dataset.summary, 'summary_value')
         self.assertEqual(inserted_dataset.time_coverage_start,
-                         dataset_parameters['time_coverage_start'])
+                         value_for_testing['time_coverage_start'])
         self.assertEqual(inserted_dataset.time_coverage_end,
-                         dataset_parameters['time_coverage_end'])
+                         value_for_testing['time_coverage_end'])
 
         self.assertEqual(inserted_dataset.source.platform.category, 'platform_category')
         self.assertEqual(inserted_dataset.source.platform.series_entity, 'platform_series_entity')
@@ -445,7 +445,7 @@ class DDXIngesterTestCase(django.test.TestCase):
 
 class CopernicusODataIngesterTestCase(django.test.TestCase):
     """Test the CopernicusODataIngester"""
-
+    fixtures = [os.path.join(os.path.dirname(__file__),"fixtures","harvest")]
     TEST_DATA = {
         'full': {
             'url': "https://scihub.copernicus.eu/full?$format=json&$expand=Attributes",
@@ -531,10 +531,10 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
             'Date: 2020-03-18T06:23:05.976Z, Instrument: SAR-C, Mode: IW, ' +
             'Satellite: Sentinel-1, Size: 1.65 GB'))
         self.assertEqual(normalized_parameters['time_coverage_start'], datetime(
-            year=2020, month=3, day=18, hour=6, minute=23, second=5, microsecond=976000,
+            year=2020, month=3, day=18, hour=6, minute=23, second=5,
             tzinfo=tzutc()))
         self.assertEqual(normalized_parameters['time_coverage_end'], datetime(
-            year=2020, month=3, day=18, hour=6, minute=23, second=30, microsecond=975000,
+            year=2020, month=3, day=18, hour=6, minute=23, second=30,
             tzinfo=tzutc()))
 
         self.assertEqual(normalized_parameters['instrument']['Short_Name'], 'SENTINEL-1 C-SAR')
@@ -581,6 +581,69 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['gcmd_location']['Location_Subregion2'], '')
         self.assertEqual(normalized_parameters['gcmd_location']['Location_Subregion3'], '')
 
+    def test_parameter_assigment_for_attributes(self):
+        """Shall assign the correct parameter to dataset
+        from Sentinel-SAFE JSON metadata (only one time execution)"""
+#        normalized_parameters= MetanormIngesterTestCase.value_for_testing
+
+        value_for_testing = {
+            'entry_title': 'title_value',
+            'summary': 'summary_value',
+            'time_coverage_start': datetime(
+                year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()),
+            'time_coverage_end': datetime(
+                year=2020, month=1, day=1, hour=0, minute=5, second=59, tzinfo=tzutc()),
+            'platform': OrderedDict([
+                ('Category', 'platform_category'),
+                ('Series_Entity', 'platform_series_entity'),
+                ('Short_Name', 'platform_short_name'),
+                ('Long_Name', 'platform_long_name')]),
+            'instrument': OrderedDict([('Category', 'instrument_category'),
+                                       ('Class', 'instrument_class'),
+                                       ('Type', 'instrument_type'),
+                                       ('Subtype', 'instrument_subtype'),
+                                       ('Short_Name', 'instrument_short_name'),
+                                       ('Long_Name', 'instrument_long_name')]),
+            'location_geometry': GEOSGeometry(('POLYGON((1 1, 1 2, 2 2, 2 1, 1 1))'), srid=4326),
+            'provider': OrderedDict([('Bucket_Level0', 'provider_bucket_level0'),
+                                     ('Bucket_Level1', 'provider_bucket_level1'),
+                                     ('Bucket_Level2', 'provider_bucket_level2'),
+                                     ('Bucket_Level3', 'provider_bucket_level3'),
+                                     ('Short_Name', 'provider_short_name'),
+                                     ('Long_Name', 'provider_long_name'),
+                                     ('Data_Center_URL', 'provider_data_center_url')]),
+            'iso_topic_category': OrderedDict([('iso_topic_category', 'category_value')]),
+            'gcmd_location': OrderedDict([('Location_Category', 'gcmd_location_category'),
+                                          ('Location_Type', 'gcmd_location_type'),
+                                          ('Location_Subregion1', 'gcmd_location_subregion1'),
+                                          ('Location_Subregion2', 'gcmd_location_subregion2'),
+                                          ('Location_Subregion3', 'gcmd_location_subregion3')]),
+            'dataset_parameters' : [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave')]
+        }
+        duplicate_value_for_testing=value_for_testing.copy()
+        created_dataset, created_dataset_uri = self.ingester._ingest_dataset(
+            'https://scihub.copernicus.eu/full/$value',value_for_testing)
+        self.assertEqual(Dataset.objects.count(),1)
+        self.assertEqual(Dataset.objects.first().datasetparameter_set.count(),1)
+        # the parameter that has added (by above variable of "value_for_testing") to the dataset
+        # should be equal to the first object of parameter table
+        # which is created by fixtures inside the database
+        self.assertEqual(
+            Dataset.objects.first().datasetparameter_set.first().parameter,Parameter.objects.first())
+        self.assertEqual(created_dataset,True)
+        self.assertEqual(created_dataset_uri,True)
+
+        # No parameter or dataset should be added for the second time of executing this command
+        # with same normalized attributes (same variable of "value_for_testing")
+        created_dataset, created_dataset_uri = self.ingester._ingest_dataset(
+            'https://scihub.copernicus.eu/full/$value',duplicate_value_for_testing)
+
+        self.assertEqual(Dataset.objects.count(),1)
+        self.assertEqual(Dataset.objects.first().datasetparameter_set.count(),1)
+        self.assertEqual(
+            Dataset.objects.first().datasetparameter_set.first().parameter,Parameter.objects.first())
+        self.assertEqual(created_dataset,False)
+        self.assertEqual(created_dataset_uri,False)
 
 class NansatIngesterTestCase(django.test.TestCase):
     """Test the NansatIngester"""
