@@ -23,10 +23,10 @@ from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
                                        HTTP_SERVICE, HTTP_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
 from geospaas.catalog.models import (Dataset, DatasetURI, GeographicLocation,
-                                     Source)
+                                     Source, DatasetParameter)
 from geospaas.utils.utils import nansat_filename
 from geospaas.vocabularies.models import (DataCenter, Instrument,
-                                          ISOTopicCategory, Location, Platform)
+                                          ISOTopicCategory, Location, Parameter, Platform)
 from metanorm.handlers import GeospatialMetadataHandler
 from nansat import Nansat
 
@@ -108,7 +108,7 @@ class Ingester():
                 platform=platform,
                 instrument=instrument,
                 specs=normalized_attributes.pop('specs', ''))
-
+            dataset_parameters_list = normalized_attributes.pop('dataset_parameters')
             # Create Dataset in the database. The normalized_attributes dict contains the
             # "basic parameter", which are not objects in the database.
             # The objects we just created in the database are passed separately.
@@ -121,11 +121,28 @@ class Ingester():
                 source=source)
 
             #Create the URI for the created Dataset in the database
-            _, created_dataset_uri = DatasetURI.objects.get_or_create(
+            _ , created_dataset_uri = DatasetURI.objects.get_or_create(
                 name=service_name,
                 service=service,
                 uri=url,
                 dataset=dataset)
+
+            for dataset_parameter_info in dataset_parameters_list:
+                standard_name = dataset_parameter_info.get('standard_name', None)
+                short_name = dataset_parameter_info.get('short_name', None)
+                units = dataset_parameter_info.get('units', None)
+                if standard_name in ['latitude', 'longitude', None]:
+                    continue
+                params = Parameter.objects.filter(standard_name=standard_name)
+                if params.count() > 1 and short_name is not None:
+                    params = params.filter(short_name=short_name)
+                if params.count() > 1 and units is not None:
+                    params = params.filter(units=units)
+                if params.count() >= 1:
+                    dsp, dsp_created = DatasetParameter.objects.get_or_create(
+                            dataset=dataset, parameter=params[0])
+                    dataset.parameters.add(params[0])
+
         except django.db.utils.OperationalError:
             self.LOGGER.error('Database insertion failed', exc_info=True)
             return (created_dataset if 'created_dataset' in locals() else False,
@@ -258,7 +275,8 @@ class MetanormIngester(Ingester):
         'location_geometry',
         'provider',
         'iso_topic_category',
-        'gcmd_location'
+        'gcmd_location',
+        'dataset_parameters'
     ]
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
