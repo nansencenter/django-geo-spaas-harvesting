@@ -85,9 +85,13 @@ class Harvester():
 
 class PODAACHarvester(Harvester):
     """Harvester class for PODAAC data (NASA)"""
+    ingester = ingesters.DDXIngester
+    crawler = crawlers.OpenDAPCrawler
+
+    """Harvester class for PODAAC data (NASA)"""
     def _create_crawlers(self):
         return [
-            crawlers.OpenDAPCrawler(url, time_range=(self.get_time_range()))
+            self.crawler(url, time_range=(self.get_time_range()))
             for url in self.config['urls']
         ]
 
@@ -96,7 +100,7 @@ class PODAACHarvester(Harvester):
         for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
             if parameter_name in self.config:
                 parameters[parameter_name] = self.config[parameter_name]
-        return ingesters.DDXIngester(**parameters)
+        return self.ingester(**parameters)
 
 
 class CopernicusSentinelHarvester(Harvester):
@@ -123,8 +127,5 @@ class CopernicusSentinelHarvester(Harvester):
 
 class OSISAFHarvester(PODAACHarvester):
     """Harvester class for PODAAC data (NASA)"""
-    def _create_crawlers(self):
-        return [
-            crawlers.OSISAFCrawler(url, time_range=(self.get_time_range()))
-            for url in self.config['urls']
-        ]
+    ingester = ingesters.DDXOSISAFIngester
+    crawler = crawlers.OSISAFCrawler
