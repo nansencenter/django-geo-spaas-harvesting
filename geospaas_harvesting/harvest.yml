@@ -3,23 +3,24 @@ endless: False
 poll_interval: 600
 harvesters:
   podaac:
-    class: 'PODAACHarvester'
-    max_fetcher_threads: 30
+    class: 'OSISAFHarvester' #'PODAACHarvester'
+    max_fetcher_threads: 1
     max_db_threads: 1
     urls:
-      - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
-      - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
-      - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
-  copernicus_sentinel:
-    class: 'CopernicusSentinelHarvester'
-    max_fetcher_threads: 20
-    max_db_threads: 1
-    url: 'https://scihub.copernicus.eu/apihub/search'
-    search_terms:
-      - 'platformname:Sentinel-1 AND NOT L0'
-      - 'platformname:Sentinel-2 AND NOT L0'
-      - 'platformname:Sentinel-3 AND NOT L0'
-    username: 'topvoys'
-    # Environment variable name
-    password: 'COPERNICUS_OPEN_HUB_PASSWORD'
+      - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2016/catalog.html'
+      #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/OSPO/v2.61/2018/contents.html'
+      #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
+      #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
+  ###copernicus_sentinel:
+  ###  class: 'CopernicusSentinelHarvester'
+  ###  max_fetcher_threads: 1
+  ###  max_db_threads: 1
+  ###  url: 'https://scihub.copernicus.eu/apihub/search'
+  ###  search_terms:
+  ###    - 'platformname:Sentinel-1 AND NOT L0'
+  ####    - 'platformname:Sentinel-2 AND NOT L0'
+  ####    - 'platformname:Sentinel-3 AND NOT L0'
+  ###  username: 'topvoys'
+  ###  # Environment variable name
+  ###  password: 'COPERNICUS_OPEN_HUB_PASSWORD'
 ...

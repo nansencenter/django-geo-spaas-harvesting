@@ -120,3 +120,11 @@ class CopernicusSentinelHarvester(Harvester):
         if 'password' in self.config:
             parameters['password'] = os.getenv(self.config['password'])
         return ingesters.CopernicusODataIngester(**parameters)
+
+class OSISAFHarvester(PODAACHarvester):
+    """Harvester class for PODAAC data (NASA)"""
+    def _create_crawlers(self):
+        return [
+            crawlers.OSISAFCrawler(url, time_range=(self.get_time_range()))
+            for url in self.config['urls']
+        ]
