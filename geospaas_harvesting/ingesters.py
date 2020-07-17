@@ -327,10 +327,11 @@ class DDXIngester(MetanormIngester):
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
 
-        ddx_url = url if url.endswith('.ddx') else url + '.ddx'
-
+        prepared_url = url if url.endswith('.ddx') else url + '.ddx'
+        if '/osisaf/' in prepared_url:
+            prepared_url=prepared_url.replace(prepared_url[prepared_url.find("catalog/"):prepared_url.find("?dataset=")+9],"dodsC/")
         # Get the metadata from the dataset as an XML tree
-        stream = io.BytesIO(requests.get(ddx_url, stream=True).content)
+        stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
 
         # Get all the global attributes of the Dataset into a dictionary
         dataset_global_attributes = self._extract_global_attributes(

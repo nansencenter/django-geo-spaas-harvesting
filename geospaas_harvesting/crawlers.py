@@ -230,6 +230,9 @@ class OpenDAPCrawler(Crawler):
         parser.feed(html)
         return parser.links
 
+class OSISAFCrawler(OpenDAPCrawler):
+    EXCLUDE = ['/thredds/','http',]
+    FOLDERS_SUFFIXES = ('/catalog.html',)
 
 class CopernicusOpenSearchAPICrawler(Crawler):
     """
