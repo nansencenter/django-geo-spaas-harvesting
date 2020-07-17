@@ -323,13 +323,14 @@ class DDXIngester(MetanormIngester):
                 "./default:value", namespaces).text
 
         return global_attributes
+    def prepare_url(self, url):
+        return url
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
 
         prepared_url = url if url.endswith('.ddx') else url + '.ddx'
-        if '/osisaf/' in prepared_url:
-            prepared_url=prepared_url.replace(prepared_url[prepared_url.find("catalog/"):prepared_url.find("?dataset=")+9],"dodsC/")
+        prepared_url = self.prepare_url(prepared_url)
         # Get the metadata from the dataset as an XML tree
         stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
 
@@ -345,6 +346,9 @@ class DDXIngester(MetanormIngester):
 
         return normalized_attributes
 
+class DDXOSISAFIngester(DDXIngester):
+    def prepare_url(self, prepared_url):
+        return prepared_url.replace(prepared_url[prepared_url.find("catalog/"):prepared_url.find("?dataset=")+9],"dodsC/")
 
 class CopernicusODataIngester(MetanormIngester):
     """Ingest datasets from the metadata returned by calls to the Copernicus OData API"""
