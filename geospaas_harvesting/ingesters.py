@@ -276,12 +276,14 @@ class MetanormIngester(Ingester):
         'provider',
         'iso_topic_category',
         'gcmd_location',
-        'dataset_parameters'
+    ]
+    REPETITIVE_PARAMETER_NAMES = [
+        'dataset_parameters',
     ]
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
         super().__init__(max_fetcher_threads, max_db_threads)
-        self._metadata_handler = GeospatialMetadataHandler(self.DATASET_PARAMETER_NAMES)
+        self._metadata_handler = GeospatialMetadataHandler(self.DATASET_PARAMETER_NAMES,self.REPETITIVE_PARAMETER_NAMES)
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Returns a dictionary of normalized attribute which characterize a Dataset"""
