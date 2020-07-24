@@ -17,13 +17,21 @@ class HarvesterConfigurationError(Exception):
     missing mandatory sections
     """
 
+
 class Harvester():
     """
     Base Harvester class. Implements the basic behavior but is not meant to be used directly.
     It should be subclassed, and child classes should implement the following methods:
         - _create_crawlers()
         - _create_ingester()
+
+    Two attributes of ingester and crawler are set here as None (as they are in the parent class).
+    These two may be specified for each harvester in order for that harvestor to be operational.
+    These two attributes of "ingester" and "crawler" may need by definition of "_create_crawlers"
+    and "_create_ingester" methods for creating the diferent kind(s) of harvesters.
     """
+    ingester = None
+    crawler = None
 
     def _create_crawlers(self):
         """Should return a list of crawlers. Needs to be implemented in child classes"""
@@ -88,7 +96,6 @@ class PODAACHarvester(Harvester):
     ingester = ingesters.DDXIngester
     crawler = crawlers.OpenDAPCrawler
 
-    """Harvester class for PODAAC data (NASA)"""
     def _create_crawlers(self):
         return [
             self.crawler(url, time_range=(self.get_time_range()))
@@ -103,8 +110,15 @@ class PODAACHarvester(Harvester):
         return self.ingester(**parameters)
 
 
+class OSISAFHarvester(PODAACHarvester):
+    """Harvester class for PODAAC data (NASA)"""
+    ingester = ingesters.DDXOSISAFIngester
+    crawler = crawlers.ThreddsCrawler
+
+
 class CopernicusSentinelHarvester(Harvester):
     """Harvester class for Copernicus Sentinel data"""
+
     def _create_crawlers(self):
         return [
             crawlers.CopernicusOpenSearchAPICrawler(
@@ -124,8 +138,3 @@ class CopernicusSentinelHarvester(Harvester):
         if 'password' in self.config:
             parameters['password'] = os.getenv(self.config['password'])
         return ingesters.CopernicusODataIngester(**parameters)
-
-class OSISAFHarvester(PODAACHarvester):
-    """Harvester class for PODAAC data (NASA)"""
-    ingester = ingesters.DDXOSISAFIngester
-    crawler = crawlers.OSISAFCrawler

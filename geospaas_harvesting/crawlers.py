@@ -79,13 +79,13 @@ class LinkExtractor(HTMLParser):
                     self._links.append(attr[1])
 
 
-class OpenDAPCrawler(Crawler):
-    """Crawler for OpenDAP resources"""
-
-    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
-    FOLDERS_SUFFIXES = ('/contents.html')
-    FILES_SUFFIXES = ('.nc', '.nc.gz')
-    EXCLUDE = ('?')
+class BaseCrawler(Crawler):
+    """Base class (parent class) for all types of
+    crawlers which are used for various online data providers"""
+    LOGGER = None
+    FOLDERS_SUFFIXES = None
+    FILES_SUFFIXES = None
+    EXCLUDE = None
 
     YEAR_PATTERN = r'(\d{4})'
     MONTH_PATTERN = r'(1[0-2]|0[1-9]|[1-9])'
@@ -219,8 +219,13 @@ class OpenDAPCrawler(Crawler):
                     resource_url = f"{current_location}/{link}"
                     if resource_url not in self._urls:
                         if self._intersects_time_range(*(self._dataset_timestamp(link),) * 2):
-                            self.LOGGER.debug("Adding '%s' to the list of resources.", link)
+                            self.LOGGER.debug("Adding downloadable form of '%s' to the list of resources.", link)
+                            resource_url=self.url_exact_navigation(resource_url)
                             self._urls.append(resource_url)
+
+    def url_exact_navigation(self, resource_url):
+        raise NotImplementedError('The url_exact_navigation() method was not implemented in parent class')
+
 
     @classmethod
     def _get_links(cls, html):
@@ -230,17 +235,30 @@ class OpenDAPCrawler(Crawler):
         parser.feed(html)
         return parser.links
 
-class OSISAFCrawler(OpenDAPCrawler):
-    EXCLUDE = ['/thredds/','http',]
-    FOLDERS_SUFFIXES = ('/catalog.html',)
+class OpenDAPCrawler(BaseCrawler):
+    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
+    FOLDERS_SUFFIXES = ('/contents.html')
+    FILES_SUFFIXES = ('.nc', '.nc.gz')
+    EXCLUDE = ('?')
+    def url_exact_navigation(self, resource_url):
+        return resource_url
 
-class CopernicusOpenSearchAPICrawler(Crawler):
+class ThreddsCrawler(BaseCrawler):
+    LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
+    FOLDERS_SUFFIXES = ('/catalog.html',)
+    FILES_SUFFIXES = ('.nc', '.nc.gz')
+    EXCLUDE = ['/thredds/','http','_sh_polstere','ease',] #We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting provess
+    def url_exact_navigation(self, resource_url):
+        return resource_url.replace(resource_url[resource_url.find("catalog/"):resource_url.find("?dataset=")+9],"dodsC/")+'.dods'
+
+
+class CopernicusOpenSearchAPICrawler(BaseCrawler):
     """
     Crawler which returns the search results of an Opensearch API, given the URL and search
     terms
     """
-
     LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
+
 
     def __init__(self, url, search_terms='*', time_range=(None, None),
                  username=None, password=None,
@@ -320,3 +338,5 @@ class CopernicusOpenSearchAPICrawler(Crawler):
             self._urls.append(entry['link'])
 
         return bool(entries)
+    def url_exact_navigation(self, resource_url):
+        return resource_url
