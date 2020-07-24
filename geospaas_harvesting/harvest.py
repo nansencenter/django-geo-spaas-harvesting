@@ -8,18 +8,19 @@ import os
 import os.path
 import pickle
 import signal
+import subprocess
 import sys
 import time
 from datetime import datetime
-
-import yaml
-
 import django
-
-# Load Django settings to be able to interact with the database
+import yaml
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
 import geospaas_harvesting.harvesters as harvesters # pylint: disable=wrong-import-position
+
+from geospaas.vocabularies.management.commands import update_vocabularies
+
+# Load Django settings to be able to interact with the database
 
 LOGGER_NAME = 'geospaas_harvesting.daemon'
 LOGGER = logging.getLogger(LOGGER_NAME)
@@ -209,7 +210,13 @@ def main():
     except AssertionError:
         LOGGER.error('Invalid configuration', exc_info=True)
         sys.exit(1)
+    LOGGER.info('Executing update_vocabularies command before commencing the harvesting process in order to keep the vocabularies updated.')
+    #subprocess.run(["python", "settings.configure()"])  #subprocess.call()
+    #subprocess.run(["chmod", "+x", "manage.py"])  #subprocess.call()
+    update_vocabularies.Command().handle() #updating the vocabulary with this command
 
+    #subprocess.run(["python", "manage.py", "update_vocabularies"])  #subprocess.call()
+    LOGGER.info('updating the vocabularies is accomplished, now start the harvesting process')
     processes_number = len(config['harvesters'])
     try:
         with multiprocessing.Pool(processes_number, initializer=init_worker) as pool:

@@ -49,6 +49,10 @@ class Ingester():
         self.max_fetcher_threads = max_fetcher_threads
         self.max_db_threads = max_db_threads
         self._to_ingest = queue.Queue(self.QUEUE_SIZE)
+        # safety check in order to prevent harvesting process with an empty list of parameters
+        if Parameter.objects.count() < 1:
+            raise RuntimeError(
+                "Parameters must be updated (with 'update_vocabularies' command of django-geospaas) before harvesting process")
 
     def __getstate__(self):
         """
@@ -82,7 +86,7 @@ class Ingester():
     def _ingest_dataset(self, url, normalized_attributes):
         """Writes a dataset to the database based on its attributes and URL"""
         try:
-            #Extract service information
+            # Extract service information
             service = normalized_attributes.pop('geospaas_service', 'UNKNOWN')
             service_name = normalized_attributes.pop('geospaas_service_name', 'UNKNOWN')
 
@@ -120,8 +124,8 @@ class Ingester():
                 ISO_topic_category=iso_topic_category,
                 source=source)
 
-            #Create the URI for the created Dataset in the database
-            _ , created_dataset_uri = DatasetURI.objects.get_or_create(
+            # Create the URI for the created Dataset in the database
+            _, created_dataset_uri = DatasetURI.objects.get_or_create(
                 name=service_name,
                 service=service,
                 uri=url,
@@ -139,8 +143,8 @@ class Ingester():
                 if params.count() > 1 and units is not None:
                     params = params.filter(units=units)
                 if params.count() >= 1:
-                    dsp, dsp_created = DatasetParameter.objects.get_or_create(
-                            dataset=dataset, parameter=params[0])
+                    DatasetParameter.objects.get_or_create(
+                        dataset=dataset, parameter=params[0])
                     dataset.parameters.add(params[0])
 
         except django.db.utils.OperationalError:
@@ -159,7 +163,7 @@ class Ingester():
         self.LOGGER.debug("Getting metadata from '%s'", url)
         try:
             self._to_ingest.put((url, self._get_normalized_attributes(url, *args, **kwargs)))
-        except Exception: #pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
             self.LOGGER.error("Could not get metadata from '%s'", url, exc_info=True)
 
     def _thread_ingest_dataset(self):
@@ -277,13 +281,14 @@ class MetanormIngester(Ingester):
         'iso_topic_category',
         'gcmd_location',
     ]
-    REPETITIVE_PARAMETER_NAMES = [
+    DATASET_CUMULATIVE_PARAMETER_NAMES = [
         'dataset_parameters',
     ]
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
         super().__init__(max_fetcher_threads, max_db_threads)
-        self._metadata_handler = GeospatialMetadataHandler(self.DATASET_PARAMETER_NAMES,self.REPETITIVE_PARAMETER_NAMES)
+        self._metadata_handler = GeospatialMetadataHandler(
+            self.DATASET_PARAMETER_NAMES, self.DATASET_CUMULATIVE_PARAMETER_NAMES)
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Returns a dictionary of normalized attribute which characterize a Dataset"""
@@ -325,14 +330,15 @@ class DDXIngester(MetanormIngester):
                 "./default:value", namespaces).text
 
         return global_attributes
+
     def prepare_url(self, url):
+        url = url if url.endswith('.ddx') else url + '.ddx'
         return url
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
 
-        prepared_url = url if url.endswith('.ddx') else url + '.ddx'
-        prepared_url = self.prepare_url(prepared_url)
+        prepared_url = self.prepare_url(url)
         # Get the metadata from the dataset as an XML tree
         stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
 
@@ -348,9 +354,11 @@ class DDXIngester(MetanormIngester):
 
         return normalized_attributes
 
+
 class DDXOSISAFIngester(DDXIngester):
-    def prepare_url(self, prepared_url):
-        return prepared_url.replace(prepared_url[prepared_url.find("catalog/"):prepared_url.find("?dataset=")+9],"dodsC/")
+    def prepare_url(self, url):
+        return url[:-4]+'ddx'
+
 
 class CopernicusODataIngester(MetanormIngester):
     """Ingest datasets from the metadata returned by calls to the Copernicus OData API"""

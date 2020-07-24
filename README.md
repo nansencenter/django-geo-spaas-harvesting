@@ -29,6 +29,8 @@ Example:
 ```shell
 python harvest.py -c ./harvest.yml
 ```
+### HINT for commencing the harvest process
+Before commencing the harvest process, the vocabulary must be updated by ```update_vocabularies``` command of django-geo-spaas. This will be done each time the *harvest.py* is executed (before the start of harvesting process). Otherwise, without an updated vocabulary, it will not add (assign) any parameter to the harvested dataset.
 
 ## Configuration
 
@@ -39,11 +41,11 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
 
 **Top-level keys**:
 
-- **endless** (default: False): boolean controlling the endless harvesting mode. If True, the 
+- **endless** (default: False): boolean controlling the endless harvesting mode. If True, the
   harvesters will be indefinitely re-run after they finish harvesting.
 - **poll_interval** (default: 600): the interval in seconds at which the main process checks if the
   running harvester processes have finished executing.
-- **harvesters**: dictionary mapping the harvesters names to a dictionary containing their 
+- **harvesters**: dictionary mapping the harvesters names to a dictionary containing their
   properties.
 
 ### Environment variables
@@ -115,7 +117,7 @@ crawlers.
 Given the URL of a dataset, an ingester fetches the metadata from this URL, normalizes it into the
 format needed for GeoSPaaS, and writes it into the database.
 
-The tasks of an ingester are primarily I/O bound, so they are multi-threaded. Two thread pools are 
+The tasks of an ingester are primarily I/O bound, so they are multi-threaded. Two thread pools are
 used:
 
 - one contains threads which fetch and normalize the metadata
@@ -132,7 +134,7 @@ The currently available ingesters are:
 - DDX ingester: uses the DDX metadata provided by OpenDAP repositories
 - Copernicus OData API ingester: specific to the OData API from Copernicus API hub
 - Nansat ingester: uses [Nansat](https://github.com/nansencenter/nansat) to open a local or remote
-  file and get its metadata 
+  file and get its metadata
 
 #### Harvesters
 
