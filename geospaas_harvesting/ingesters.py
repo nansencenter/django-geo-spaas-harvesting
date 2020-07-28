@@ -306,6 +306,7 @@ class DDXIngester(MetanormIngester):
 
     LOGGER = logging.getLogger(__name__ + '.DDXIngester')
     GLOBAL_ATTRIBUTES_NAME = 'NC_GLOBAL'
+    SPECIFIC_ATTRIBUTES_NAME = 'ice_conc'
     NAMESPACE_REGEX = r'^\{(\S+)\}Dataset$'
 
     def _get_xml_namespace(self, root):
@@ -317,19 +318,30 @@ class DDXIngester(MetanormIngester):
             self.LOGGER.warning('Could not find XML namespace while reading DDX metadata')
         return namespace_prefix
 
-    def _extract_global_attributes(self, root):
-        """Extracts the global attributes of a dataset from a DDX document"""
+    def _extract_global_or_specific_attributes(self, root, attribute_names,global_or_specific):
+        """Extracts the global or specific attributes of a dataset or specific ones from a DDX document
+        global_or_specific='Attribute' means searching for global attributes OTHERWISE
+        global_or_specific='Grid' means searching for specific attributes"""
         self.LOGGER.debug("Getting the dataset's global attributes.")
         namespaces = {'default': self._get_xml_namespace(root)}
-        global_attributes = {}
-        for attribute in root.findall(
-                f"./default:Attribute[@name='{self.GLOBAL_ATTRIBUTES_NAME}']/default:Attribute",
-                namespaces):
+        global_or_specific_attributes = {}
+        if global_or_specific=='Attribute': # it means searching for global attributes which are known by 'NC_GLOBAL' attribute in the raw metadata
+            Xpath=f"./default:{global_or_specific}[@name='{attribute_names}']/default:{global_or_specific}"
+            value_path="./default:value"
+        elif global_or_specific=='Grid':# searching for specific attributes which are known by 'Grid' in the raw metadata
+            value_path="."
+            if attribute_names==None:
+                Xpath=f"./default:{global_or_specific}"
+            else:
+                Xpath=f"./default:{global_or_specific}[@name='{attribute_names}']"
 
-            global_attributes[attribute.get('name')] = attribute.find(
-                "./default:value", namespaces).text
 
-        return global_attributes
+        for attribute in root.findall(Xpath, namespaces):
+
+            global_or_specific_attributes[attribute.get('name')] = attribute.find(
+                value_path, namespaces).text
+
+        return global_or_specific_attributes
 
     def prepare_url(self, url):
         url = url if url.endswith('.ddx') else url + '.ddx'
@@ -341,13 +353,15 @@ class DDXIngester(MetanormIngester):
         prepared_url = self.prepare_url(url)
         # Get the metadata from the dataset as an XML tree
         stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
-
         # Get all the global attributes of the Dataset into a dictionary
-        dataset_global_attributes = self._extract_global_attributes(
-            ET.parse(stream).getroot())
+        dataset_global_attributes = self._extract_global_or_specific_attributes(ET.parse(stream).getroot(),self.GLOBAL_ATTRIBUTES_NAME,'Attribute')
+        stream.seek(0) # go to the starting point of the stream
+        dataset_specific_attributes = self._extract_global_or_specific_attributes(ET.parse(stream).getroot(),self.SPECIFIC_ATTRIBUTES_NAME,'Grid')
 
-        # Get the parameters needed to create a geospaas catalog dataset from the
-        # global attributes
+        # adding the specific ones to the global ones
+        if dataset_specific_attributes.keys():
+            dataset_global_attributes['raw_dataset_parameters']=list(dataset_specific_attributes.keys())
+        # Get the parameters needed to create a geospaas catalog dataset from the global attributes
         normalized_attributes = self._metadata_handler.get_parameters(dataset_global_attributes)
         normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
         normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
@@ -357,7 +371,7 @@ class DDXIngester(MetanormIngester):
 
 class DDXOSISAFIngester(DDXIngester):
     def prepare_url(self, url):
-        return url[:-4]+'ddx'
+        return url[:-4]+'ddx'# remove the '.dods' and add '.ddx' instead
 
 
 class CopernicusODataIngester(MetanormIngester):
