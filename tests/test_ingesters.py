@@ -370,7 +370,7 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.DDXIngester()
         self.assertDictEqual(
-            ingester._extract_global_or_specific_attributes(root,'NC_GLOBAL','Attribute'),
+            ingester._extract_global_or_specific_attributes(root,True),
             {
                 'Conventions': 'CF-1.7, ACDD-1.3',
                 'title': 'VIIRS L2P Sea Surface Skin Temperature'
