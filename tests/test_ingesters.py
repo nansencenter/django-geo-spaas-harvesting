@@ -10,7 +10,6 @@ import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from datetime import datetime
 import pythesint as pti
-from mock import Mock
 import django.db
 import django.db.utils
 import django.test
@@ -27,10 +26,9 @@ class IngesterTestCase(django.test.TransactionTestCase):
     """Test the base ingester class"""
 
     def setUp(self):
-        Parameter.objects.count = Mock()
-        Parameter.objects.count.return_value=2
+        Parameter.objects.count = mock.Mock()
+        Parameter.objects.count.return_value = 2
         self.ingester = ingesters.Ingester()
-
 
     def _create_dummy_dataset(self, title):
         """Create dummy dataset for testing purposes"""
@@ -178,10 +176,9 @@ class MetanormIngesterTestCase(django.test.TestCase):
     """Test the base metadata ingester class"""
 
     def setUp(self):
-        Parameter.objects.count = Mock()
-        Parameter.objects.count.return_value=2
+        Parameter.objects.count = mock.Mock()
+        Parameter.objects.count.return_value = 2
         self.ingester = ingesters.MetanormIngester()
-
 
     def test_get_normalized_attributes_must_be_implemented(self):
         """An error must be raised if the _get_normalized_attributes() method is not implemented"""
@@ -315,14 +312,13 @@ class DDXIngesterTestCase(django.test.TestCase):
         return response
 
     def setUp(self):
-        Parameter.objects.count = Mock()
-        Parameter.objects.count.return_value=2
+        Parameter.objects.count = mock.Mock()
+        Parameter.objects.count.return_value = 2
         # Mock requests.get()
         self.patcher_requests_get = mock.patch('geospaas_harvesting.ingesters.requests.get')
         self.mock_requests_get = self.patcher_requests_get.start()
         self.mock_requests_get.side_effect = self.requests_get_side_effect
         self.opened_files = []
-
 
     def tearDown(self):
         self.patcher_requests_get.stop()
@@ -370,9 +366,10 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         ingester = ingesters.DDXIngester()
         self.assertDictEqual(
-            ingester._extract_global_or_specific_attributes(root,True),
+            ingester._extract_attributes(root),
             {
                 'Conventions': 'CF-1.7, ACDD-1.3',
+                'raw_dataset_parameters': [],
                 'title': 'VIIRS L2P Sea Surface Skin Temperature'
             }
         )
@@ -493,8 +490,8 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.mock_requests_get = self.patcher_requests_get.start()
         self.mock_requests_get.side_effect = self.requests_get_side_effect
         self.opened_files = []
-        Parameter.objects.count = Mock()
-        Parameter.objects.count.return_value=2
+        Parameter.objects.count = mock.Mock()
+        Parameter.objects.count.return_value = 2
 
     def tearDown(self):
         self.patcher_requests_get.stop()

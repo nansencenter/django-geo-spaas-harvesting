@@ -128,7 +128,7 @@ class ChildHarvestersTestCase(unittest.TestCase):
     def test_podaac_harvester(self):
         """The PODAAC harvester has the correct crawler and ingester"""
         harvester = harvesters.PODAACHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertIsInstance(harvester._current_crawler, crawlers.OpenDAPCrawler)
+        self.assertIsInstance(harvester._current_crawler, crawlers.PODAACCrawler)
         self.assertIsInstance(harvester._ingester, ingesters.DDXIngester)
 
     def test_copernicus_sentinel_harvester(self):

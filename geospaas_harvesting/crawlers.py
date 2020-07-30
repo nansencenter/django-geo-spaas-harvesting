@@ -79,9 +79,11 @@ class LinkExtractor(HTMLParser):
                     self._links.append(attr[1])
 
 
-class BaseCrawler(Crawler):
-    """Base class (parent class) for all types of
-    crawlers which are used for various online data providers"""
+class WebDirectoryCrawler(Crawler):
+    """
+    Parent class for crawlers used on repositories which expose a directory-like structure
+    in the form of HTML pages
+    """
     LOGGER = None
     FOLDERS_SUFFIXES = None
     FILES_SUFFIXES = None
@@ -220,12 +222,11 @@ class BaseCrawler(Crawler):
                     if resource_url not in self._urls:
                         if self._intersects_time_range(*(self._dataset_timestamp(link),) * 2):
                             self.LOGGER.debug("Adding downloadable form of '%s' to the list of resources.", link)
-                            resource_url=self.url_exact_navigation(resource_url)
+                            resource_url = self.get_download_url(resource_url)
                             self._urls.append(resource_url)
 
-    def url_exact_navigation(self, resource_url):
-        raise NotImplementedError('The url_exact_navigation() method was not implemented in parent class')
-
+    def get_download_url(self, resource_url):
+        raise NotImplementedError('The get_download_url() method was not implemented')
 
     @classmethod
     def _get_links(cls, html):
@@ -235,30 +236,44 @@ class BaseCrawler(Crawler):
         parser.feed(html)
         return parser.links
 
-class OpenDAPCrawler(BaseCrawler):
-    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
+
+class PODAACCrawler(WebDirectoryCrawler):
+    """
+    Crawler for harvesting the data of PODAAC
+    """
+    LOGGER = logging.getLogger(__name__ + '.PODAACCrawler')
     FOLDERS_SUFFIXES = ('/contents.html')
     FILES_SUFFIXES = ('.nc', '.nc.gz')
-    EXCLUDE = ('?')
-    def url_exact_navigation(self, resource_url):
+    EXCLUDE = ['?']
+
+    def get_download_url(self, resource_url):
         return resource_url
 
-class ThreddsCrawler(BaseCrawler):
+
+class ThreddsCrawler(WebDirectoryCrawler):
+    """
+    Crawler for harvesting the data which are provided by Thredds from met.no
+    """
     LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
-    FILES_SUFFIXES = ('.nc', '.nc.gz')
-    EXCLUDE = ['/thredds/','http','_sh_polstere','ease',] #We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting provess
-    def url_exact_navigation(self, resource_url):
-        return resource_url.replace(resource_url[resource_url.find("catalog/"):resource_url.find("?dataset=")+9],"dodsC/")+'.dods'
+    FILES_SUFFIXES = ('.nc',)
+    # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting provess
+    EXCLUDE = ['/thredds/', 'http', '_sh_polstere', 'ease', ]
+
+    def get_download_url(self, resource_url):
+        links = self._get_links(self._http_get(resource_url))
+        for link in links:
+            if "dodsC" in link:
+                result = "https://thredds.met.no"+link[:-4]+'dods'
+        return result
 
 
-class CopernicusOpenSearchAPICrawler(BaseCrawler):
+class CopernicusOpenSearchAPICrawler(Crawler):
     """
     Crawler which returns the search results of an Opensearch API, given the URL and search
     terms
     """
     LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
-
 
     def __init__(self, url, search_terms='*', time_range=(None, None),
                  username=None, password=None,
@@ -338,5 +353,3 @@ class CopernicusOpenSearchAPICrawler(BaseCrawler):
             self._urls.append(entry['link'])
 
         return bool(entries)
-    def url_exact_navigation(self, resource_url):
-        return resource_url
