@@ -25,10 +25,9 @@ class Harvester():
         - _create_crawlers()
         - _create_ingester()
 
-    Two attributes of ingester and crawler are set here as None (as they are in the parent class).
-    These two may be specified for each harvester in order for that harvestor to be operational.
-    These two attributes of "ingester" and "crawler" may need by definition of "_create_crawlers"
-    and "_create_ingester" methods for creating the diferent kind(s) of harvesters.
+    Child classes should also assign values to the ingester and crawler class attributes.
+    These values should be the crawler and ingester classes to be used in the _create_crawlers()
+    and _create_ingester() methods.
     """
     ingester = None
     crawler = None
@@ -91,28 +90,52 @@ class Harvester():
                 break
 
 
-class PODAACHarvester(Harvester):
-    """Harvester class for PODAAC data (NASA)"""
-    ingester = ingesters.DDXIngester
-    crawler = crawlers.OpenDAPCrawler
+class WebDirectoryHarvester(Harvester):
+    """
+    class for harvesting online data sources that rely on webpages (and most of the time on opendap)
+    """
 
     def _create_crawlers(self):
-        return [
-            self.crawler(url, time_range=(self.get_time_range()))
-            for url in self.config['urls']
-        ]
+        try:
+            assert self.crawler
+            return [
+                self.crawler(url, time_range=(self.get_time_range()))
+                for url in self.config['urls']
+            ]
+        except (KeyError, TypeError, AttributeError, AssertionError) as error:
+            if isinstance(error, AssertionError):
+                raise HarvesterConfigurationError(
+                    "The class of crawler has not been specified properly") from error
+            else:
+                raise HarvesterConfigurationError(
+                    "crawler must be created properly with correct configuration file") from error
 
     def _create_ingester(self):
         parameters = {}
-        for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
-            if parameter_name in self.config:
-                parameters[parameter_name] = self.config[parameter_name]
-        return self.ingester(**parameters)
+        try:
+            assert self.ingester
+            for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
+                if parameter_name in self.config:
+                    parameters[parameter_name] = self.config[parameter_name]
+            return self.ingester(**parameters)
+        except (KeyError, TypeError, AttributeError, AssertionError) as error:
+            if isinstance(error, AssertionError):
+                raise HarvesterConfigurationError(
+                    "The class of ingester has not been specified properly") from error
+            else:
+                raise HarvesterConfigurationError(
+                    "ingester must be created properly with correct configuration file") from error
 
 
-class OSISAFHarvester(PODAACHarvester):
+class PODAACHarvester(WebDirectoryHarvester):
     """Harvester class for PODAAC data (NASA)"""
-    ingester = ingesters.DDXOSISAFIngester
+    ingester = ingesters.DDXIngester
+    crawler = crawlers.PODAACCrawler
+
+
+class OSISAFHarvester(WebDirectoryHarvester):
+    """Harvester class for OSISAF project"""
+    ingester = ingesters.DDXIngester
     crawler = crawlers.ThreddsCrawler
 
 

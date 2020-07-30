@@ -8,7 +8,6 @@ import os
 import os.path
 import pickle
 import signal
-import subprocess
 import sys
 import time
 from datetime import datetime
@@ -210,13 +209,11 @@ def main():
     except AssertionError:
         LOGGER.error('Invalid configuration', exc_info=True)
         sys.exit(1)
-    LOGGER.info('Executing update_vocabularies command before commencing the harvesting process in order to keep the vocabularies updated.')
-    #subprocess.run(["python", "settings.configure()"])  #subprocess.call()
-    #subprocess.run(["chmod", "+x", "manage.py"])  #subprocess.call()
+    LOGGER.info('Updating vocabularies...')
+
     update_vocabularies.Command().handle() #updating the vocabulary with this command
 
-    #subprocess.run(["python", "manage.py", "update_vocabularies"])  #subprocess.call()
-    LOGGER.info('updating the vocabularies is accomplished, now start the harvesting process')
+    LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])
     try:
         with multiprocessing.Pool(processes_number, initializer=init_worker) as pool:

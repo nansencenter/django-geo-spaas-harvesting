@@ -27,8 +27,8 @@ from geospaas.catalog.models import (Dataset, DatasetURI, GeographicLocation,
 from geospaas.utils.utils import nansat_filename
 from geospaas.vocabularies.models import (DataCenter, Instrument,
                                           ISOTopicCategory, Location, Parameter, Platform)
-from metanorm.handlers import GeospatialMetadataHandler
 from nansat import Nansat
+from metanorm.handlers import GeospatialMetadataHandler
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -51,8 +51,10 @@ class Ingester():
         self._to_ingest = queue.Queue(self.QUEUE_SIZE)
         # safety check in order to prevent harvesting process with an empty list of parameters
         if Parameter.objects.count() < 1:
-            raise RuntimeError(
-                "Parameters must be updated (with 'update_vocabularies' command of django-geospaas) before harvesting process")
+            raise RuntimeError((
+                "Parameters must be updated (with the 'update_vocabularies' command "
+                "of django-geospaas) before the harvesting process"
+            ))
 
     def __getstate__(self):
         """
@@ -317,33 +319,40 @@ class DDXIngester(MetanormIngester):
             self.LOGGER.warning('Could not find XML namespace while reading DDX metadata')
         return namespace_prefix
 
-    def _extract_global_or_specific_attributes(self, root, global_flag):
+    def _extract_attributes(self, root):
         """Extracts the global or specific attributes of a dataset or specific ones from a DDX document
-        global_flag='True' means searching for global attributes
+        global_flag=True means searching for global attributes
         OTHERWISE
-        global_flag='Grid' means searching for specific attributes"""
+        global_flag=False means searching for specific attributes"""
         self.LOGGER.debug("Getting the dataset's global attributes.")
         namespaces = {'default': self._get_xml_namespace(root)}
-        global_or_specific_attributes = {}
-        if global_flag:  # it means searching for global attributes which are known by 'NC_GLOBAL' attribute in the raw metadata
-            Xpath = f"./default:Attribute[@name='NC_GLOBAL']/default:Attribute"
-        else:
-            Xpath = f"./default:Grid/default:Attribute[@name='standard_name']"
-
-        for attribute in root.findall(Xpath, namespaces):
-            if global_flag:
-                global_or_specific_attributes[attribute.get('name')] = attribute.find(
-                    "./default:value", namespaces).text
-            else:
-                global_or_specific_attributes.update({attribute.find(
-                    "./default:value", namespaces).text: attribute.find(
-                    "./default:value", namespaces).text})
-
-        return global_or_specific_attributes
+        extracted_attributes = {}
+        x_path_global = "./default:Attribute[@name='NC_GLOBAL']/default:Attribute"
+        x_path_specific = "./default:Grid/default:Attribute[@name='standard_name']"
+        # finding the global metadata
+        for attribute in root.findall(x_path_global, namespaces):
+            extracted_attributes[attribute.get('name')] = attribute.find(
+                "./default:value", namespaces).text
+        # finding the parameters of the dataset that are declared in the online source (specific metadata)
+        # The specific ones are stored in 'raw_dataset_parameters' part of the returned dictionary("extracted_attributes")
+        extracted_attributes['raw_dataset_parameters'] = list()
+        for attribute in root.findall(x_path_specific, namespaces):
+            extracted_attributes['raw_dataset_parameters'].append(
+                attribute.find("./default:value", namespaces).text)
+        # removing the "latitude" and "longitude" from the 'raw_dataset_parameters' part of the dictionary
+        if 'latitude' in extracted_attributes['raw_dataset_parameters']:
+            extracted_attributes['raw_dataset_parameters'].remove('latitude')
+        if 'longitude' in extracted_attributes['raw_dataset_parameters']:
+            extracted_attributes['raw_dataset_parameters'].remove('longitude')
+        return extracted_attributes
 
     def prepare_url(self, url):
-        url = url if url.endswith('.ddx') else url + '.ddx'
-        return url
+        if url.endswith('.ddx'):
+            return url
+        elif url.endswith('.dods'):
+            return url[:-4]+'ddx'
+        else:
+            return url + '.ddx'
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
@@ -352,27 +361,15 @@ class DDXIngester(MetanormIngester):
         # Get the metadata from the dataset as an XML tree
         stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
         # Get all the global attributes of the Dataset into a dictionary
-        dataset_global_attributes = self._extract_global_or_specific_attributes(
-            ET.parse(stream).getroot(), True) # True is a flag for making it ready for global parameter searching
-        stream.seek(0)  # go to the starting point of the stream
-        dataset_specific_attributes = self._extract_global_or_specific_attributes(
-            ET.parse(stream).getroot(), False) # False is a flag for making it ready for dataset parameter searching
+        extracted_attributes = self._extract_attributes(
+            ET.parse(stream).getroot())
 
-        # adding the specific ones to the global ones
-        if dataset_specific_attributes.keys():
-            dataset_global_attributes['raw_dataset_parameters'] = list(
-                dataset_specific_attributes.values())
         # Get the parameters needed to create a geospaas catalog dataset from the global attributes
-        normalized_attributes = self._metadata_handler.get_parameters(dataset_global_attributes)
+        normalized_attributes = self._metadata_handler.get_parameters(extracted_attributes)
         normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
         normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
 
         return normalized_attributes
-
-
-class DDXOSISAFIngester(DDXIngester):
-    def prepare_url(self, url):
-        return url[:-4]+'ddx'  # remove the '.dods' and add '.ddx' instead
 
 
 class CopernicusODataIngester(MetanormIngester):
