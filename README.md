@@ -29,7 +29,7 @@ Example:
 ```shell
 python harvest.py -c ./harvest.yml
 ```
-### HINT for commencing the harvest process
+### Warning for commencing the harvest process
 Before commencing the harvest process, the vocabulary must be updated by ```update_vocabularies``` command of django-geo-spaas. This will be done each time the *harvest.py* is executed (before the start of harvesting process). Otherwise, without an updated vocabulary, it will not add (assign) any parameter to the harvested dataset.
 
 ## Configuration
