@@ -7,6 +7,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
+import ftplib
 import feedparser
 import requests
 
@@ -377,3 +378,77 @@ class CopernicusOpenSearchAPICrawler(Crawler):
             self._urls.append(entry['link'])
 
         return bool(entries)
+
+
+class FTPCrawler(WebDirectoryCrawler):
+    """
+    Crawler which returns the search results of an FTP, given the URL and search
+    terms
+    """
+    LOGGER = logging.getLogger(__name__ + '.FTPCrawler')
+
+    def __init__(self, root_url, username=None, password=None, fileformat=None,):
+        self.root_url = root_url
+        self.password = password
+        self.username = username
+        self.FILES_SUFFIXES = fileformat
+        self.set_initial_state()
+
+    def set_initial_state(self):
+        """
+        The `_urls` attribute contains URLs to the resources which will be returned by the crawler.
+        The `_to_process` attribute contains URLs to pages which need to be searched for resources.
+        """
+        self._urls = []
+        if not self.root_url.startswith('ftp://'):
+            raise ValueError("root url must start with 'ftp://' in the configuration file")
+        # giving the address that is declared in the config file to "_to_process" attribute
+        self._to_process = ['/'+self.root_url.split('/', 3)[3].rstrip('/')]
+        ftp_domain_name = self.root_url.split('/', 3)[2]
+        self.ftp = ftplib.FTP(ftp_domain_name, user=self.username, passwd=self.password)
+
+    def _explore_page(self, folder_url):
+        """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
+        self.LOGGER.info("Looking for FTP resources in '%s'...", folder_url)
+        try:
+            login_info = self.ftp.login(self.username, self.password)
+        except Exception as e:
+            # these two cases are in the mentioned FTP servers that deals with "login once again"
+            if e.args[0].startswith('503' or '230'):
+                pass  # no need to stop execution for the login error of more-than-one-time login
+            else:
+                raise RuntimeError(str(login_info))
+        self.ftp.cwd(folder_url)
+        current_location = self.ftp.pwd()
+        # searching through all subdirectory to check whether they are folders or files
+        for name in self.ftp.nlst():
+            try:
+                # if successfully cd into new name then add
+                # it to "self._to_process" and then come back to original address
+                self.ftp.cwd(name)
+                folder_url = f"{current_location}/{name}"
+                if folder_url not in self._to_process:
+                    self._to_process.append(folder_url)
+                self.ftp.cwd("..")
+            except ftplib.error_perm as e:
+                # if can not cd into new name then add that name to the "self._urls" in the case of
+                # having specified endings that are shown in "self.FILES_SUFFIXES"
+                if name.endswith(self.FILES_SUFFIXES):
+                    ftp_domain_name = self.root_url.split('/', 3)[2]
+                    self._urls.append('ftp://'+ftp_domain_name+f"{current_location}/{name}")
+
+        ##### CODES for downloading scenario (incomplete) #####################
+        ##
+        # folder_url = f"{current_location}/{link}"
+        # if folder_url not in self._to_process:
+        # if self._intersects_time_range(*self._folder_coverage(folder_url)):
+        # self.LOGGER.debug("Adding '%s' to the list of pages to process.", link)
+        # self._to_process.append(folder_url)
+        # elif facts['type'] == 'dir':
+        # resource_url = f"{current_location}/{link}"
+        # if resource_url not in self._urls:
+        # if self._intersects_time_range(*(self._dataset_timestamp(link),) * 2):
+        # self.LOGGER.debug("Adding downloadable form of '%s' to the list of resources.", link)
+        # resource_url = self.get_download_url(resource_url)
+        # self._urls.append(resource_url)
+        ###############################################################

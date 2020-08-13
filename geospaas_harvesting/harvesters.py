@@ -142,6 +142,22 @@ class OSISAFHarvester(WebDirectoryHarvester):
     crawler = crawlers.ThreddsCrawler
 
 
+class FTPHarvester(WebDirectoryHarvester):
+    """Harvester class for some specific FTP protecol"""
+
+    def _create_crawlers(self):
+        os.environ["REMSS_PASSWORD"] = self.config.get('username', None)
+        os.environ["JAXA_PASSWORD"] = "anonymous"
+        return [
+            crawlers.FTPCrawler(root_url=url,
+                                username=self.config.get('username', None),
+                                password=os.getenv(self.config.get('password', ''), None),
+                                fileformat=self.config.get('fileformat', None),)
+            for url in self.config['urls']
+        ]
+    ingester = ingesters.FTPIngester
+
+
 class CopernicusSentinelHarvester(Harvester):
     """Harvester class for Copernicus Sentinel data"""
 

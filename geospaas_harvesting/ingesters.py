@@ -11,7 +11,6 @@ import re
 import uuid
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
-
 import dateutil.parser
 import django.db
 import django.db.utils
@@ -432,6 +431,45 @@ class CopernicusODataIngester(MetanormIngester):
         normalized_attributes['geospaas_service_name'] = HTTP_SERVICE_NAME
 
         return normalized_attributes
+
+
+class FTPIngester(MetanormIngester):
+    """ Ingester class using FTP to read meta-data from the name of the dataset """
+    LOGGER = logging.getLogger(__name__ + '.FTPIngester')
+
+    def _get_normalized_attributes(self, url, *args, **kwargs):
+        """Gets dataset attributes using nansat"""
+        normalized_attributes = {}
+        domain_name = url.split('/', 3)[2]
+        fold_address_plus_filename = url.split('/', 3)[3]
+        raw_attributes = {'ftp_domain_name': domain_name,
+                          'ftp_add_and_file_name': fold_address_plus_filename}
+        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
+        normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
+        normalized_attributes['geospaas_service'] = LOCAL_FILE_SERVICE
+        return normalized_attributes
+
+        ################## DOWNLOADING SCENARIO ###########
+        # try:
+        # ftplib.FTP(url).login()
+        # self.ftp=ftplib.FTP(url)
+        # return None
+        # except:
+        # self.ftp.login()
+        # my_directory=tempfile.TemporaryDirectory()
+        # address_plus_filname=my_directory.name+url.split('/')[-1]
+        # localfile=open(address_plus_filname,"wb")#my_directory.name+url.split('/')[-1],"wb"
+        ###    self.ftp.retrbinary('RETR ' + url, localfile.write)
+        # localfile.close()
+        ###    command = ingest.Command()
+        ###    ds, created = command.handle(files=[address_plus_filname], nansat_option=[])
+        # retun
+        # localfile=open(url.split('/')[-1],"rb")
+        ######################################################
+        # Open file with Nansat
+        #nansat_object = Nansat(str(address_plus_filname), **nansat_options)
+
+        # return (created_dataset, created_dataset_uri)
 
 
 class NansatIngester(Ingester):
