@@ -97,34 +97,34 @@ class WebDirectoryHarvester(Harvester):
 
     def _create_crawlers(self):
         try:
-            assert self.crawler
+            hasattr(self,"crawler")
+        except (AttributeError) as error:
+            raise HarvesterConfigurationError(
+                "The class of crawler has not been specified properly") from error
+        try:
             return [
                 self.crawler(url, time_range=(self.get_time_range()))
                 for url in self.config['urls']
             ]
-        except (KeyError, TypeError, AttributeError, AssertionError) as error:
-            if isinstance(error, AssertionError):
-                raise HarvesterConfigurationError(
-                    "The class of crawler has not been specified properly") from error
-            else:
-                raise HarvesterConfigurationError(
-                    "crawler must be created properly with correct configuration file") from error
+        except (KeyError, TypeError, AttributeError,) as error:
+            raise HarvesterConfigurationError(
+                "crawler must be created properly with correct configuration file") from error
 
     def _create_ingester(self):
         parameters = {}
         try:
-            assert self.ingester
+            hasattr(self,"ingester")
+        except (AttributeError) as error:
+            raise HarvesterConfigurationError(
+                "The class of ingester has not been specified properly") from error
+        try:
             for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
                 if parameter_name in self.config:
                     parameters[parameter_name] = self.config[parameter_name]
             return self.ingester(**parameters)
-        except (KeyError, TypeError, AttributeError, AssertionError) as error:
-            if isinstance(error, AssertionError):
-                raise HarvesterConfigurationError(
-                    "The class of ingester has not been specified properly") from error
-            else:
-                raise HarvesterConfigurationError(
-                    "ingester must be created properly with correct configuration file") from error
+        except (KeyError, TypeError, AttributeError,) as error:
+            raise HarvesterConfigurationError(
+                "ingester must be created properly with correct configuration file") from error
 
 
 class PODAACHarvester(WebDirectoryHarvester):

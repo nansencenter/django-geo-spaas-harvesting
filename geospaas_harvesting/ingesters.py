@@ -320,10 +320,15 @@ class DDXIngester(MetanormIngester):
         return namespace_prefix
 
     def _extract_attributes(self, root):
-        """Extracts the global or specific attributes of a dataset or specific ones from a DDX document
-        global_flag=True means searching for global attributes
-        OTHERWISE
-        global_flag=False means searching for specific attributes"""
+        """
+        Extracts the global or specific attributes of a dataset or specific ones from a DDX document
+
+        "x_path_global" is pointing to the 'NC_GLOBAL' part of response of HTML to obtain general
+        information.
+        "x_path_specific" is adaptive part (or many parts) of response of HTML to obtain the
+        raw names of parameters for cumulative normalization by metanorm package as the core of the
+        harvesting processing.
+        """
         self.LOGGER.debug("Getting the dataset's global attributes.")
         namespaces = {'default': self._get_xml_namespace(root)}
         extracted_attributes = {}
