@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 import unittest.mock as mock
+from geospaas.vocabularies.models import Parameter
 
 import geospaas_harvesting.harvest as harvest
 import geospaas_harvesting.harvesters as harvesters
@@ -209,6 +210,9 @@ class PersistenceTestCase(TemporaryPersistenceDirTestCase):
     def setUp(self):
         super().setUp()
         mock.patch('geospaas_harvesting.harvest.Configuration').start()
+        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
+        self.mock_param_count = self.patcher_param_count.start()
+        self.mock_param_count.return_value = 2
 
     def test_get_persistence_files(self):
         """Test that the persistence files are correctly retrieved and sorted"""

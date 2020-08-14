@@ -226,6 +226,19 @@ class WebDirectoryCrawler(Crawler):
                             self._urls.append(resource_url)
 
     def get_download_url(self, resource_url):
+        """
+        This method should return the downloadable form of the crawled link. It means providing the
+        proper link so that the user in the datasetURI box is able to click on it and immediately
+        download the file conveniently.
+
+        The philosophy of this method is to turn the link that provides the metadata into the link
+        that is downloadable by the geospaas user.
+
+        This method is only used in the "_explore_page" method.
+        Thus, if any class defined its "_explore_page" method in a way that there is no need to
+        modify the link (i.e. both downloadable link and metadata provider link are the identical),
+        then there is no need to define this method.
+        """
         raise NotImplementedError('The get_download_url() method was not implemented')
 
     @classmethod
@@ -242,7 +255,7 @@ class PODAACCrawler(WebDirectoryCrawler):
     Crawler for harvesting the data of PODAAC
     """
     LOGGER = logging.getLogger(__name__ + '.PODAACCrawler')
-    FOLDERS_SUFFIXES = ('/contents.html')
+    FOLDERS_SUFFIXES = ('/contents.html',)
     FILES_SUFFIXES = ('.nc', '.nc.gz')
     EXCLUDE = ['?']
 
@@ -250,11 +263,11 @@ class PODAACCrawler(WebDirectoryCrawler):
         return resource_url
 
 
-class ThreddsCrawler(WebDirectoryCrawler):
+class OpenDAPCrawler(WebDirectoryCrawler):
     """
-    Crawler for harvesting the data which are provided by Thredds from met.no
+    Crawler for harvesting the data which are provided by OpenDAP
     """
-    LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
+    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
     FILES_SUFFIXES = ('.nc',)
     # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting provess
@@ -264,6 +277,8 @@ class ThreddsCrawler(WebDirectoryCrawler):
         links = self._get_links(self._http_get(resource_url))
         for link in links:
             if "dodsC" in link:
+                if not link.endswith(".html"):
+                    raise ValueError('The link as the result of crawler must be ended with ".html"')
                 result = "https://thredds.met.no"+link[:-4]+'dods'
         return result
 
