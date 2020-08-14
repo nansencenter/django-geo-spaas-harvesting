@@ -26,9 +26,14 @@ class IngesterTestCase(django.test.TransactionTestCase):
     """Test the base ingester class"""
 
     def setUp(self):
-        Parameter.objects.count = mock.Mock()
-        Parameter.objects.count.return_value = 2
+        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
+        self.mock_param_count = self.patcher_param_count.start()
+        self.mock_param_count.return_value = 2
         self.ingester = ingesters.Ingester()
+
+    def tearDown(self):
+        self.patcher_param_count.stop()
+
 
     def _create_dummy_dataset(self, title):
         """Create dummy dataset for testing purposes"""
@@ -176,9 +181,13 @@ class MetanormIngesterTestCase(django.test.TestCase):
     """Test the base metadata ingester class"""
 
     def setUp(self):
-        Parameter.objects.count = mock.Mock()
-        Parameter.objects.count.return_value = 2
+        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
+        self.mock_param_count = self.patcher_param_count.start()
+        self.mock_param_count.return_value = 2
         self.ingester = ingesters.MetanormIngester()
+
+    def tearDown(self):
+        self.patcher_param_count.stop()
 
     def test_get_normalized_attributes_must_be_implemented(self):
         """An error must be raised if the _get_normalized_attributes() method is not implemented"""
@@ -312,8 +321,9 @@ class DDXIngesterTestCase(django.test.TestCase):
         return response
 
     def setUp(self):
-        Parameter.objects.count = mock.Mock()
-        Parameter.objects.count.return_value = 2
+        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
+        self.mock_param_count = self.patcher_param_count.start()
+        self.mock_param_count.return_value = 2
         # Mock requests.get()
         self.patcher_requests_get = mock.patch('geospaas_harvesting.ingesters.requests.get')
         self.mock_requests_get = self.patcher_requests_get.start()
@@ -322,6 +332,7 @@ class DDXIngesterTestCase(django.test.TestCase):
 
     def tearDown(self):
         self.patcher_requests_get.stop()
+        self.patcher_param_count.stop()
         # Close any files opened during the test
         for opened_file in self.opened_files:
             opened_file.close()
@@ -490,11 +501,14 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.mock_requests_get = self.patcher_requests_get.start()
         self.mock_requests_get.side_effect = self.requests_get_side_effect
         self.opened_files = []
-        Parameter.objects.count = mock.Mock()
-        Parameter.objects.count.return_value = 2
+
+        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
+        self.mock_param_count = self.patcher_param_count.start()
+        self.mock_param_count.return_value = 2
 
     def tearDown(self):
         self.patcher_requests_get.stop()
+        self.patcher_param_count.stop()
         # Close any files opened during the test
         for opened_file in self.opened_files:
             opened_file.close()
@@ -657,6 +671,13 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
 
 class NansatIngesterTestCase(django.test.TestCase):
     """Test the NansatIngester"""
+    def setUp(self):
+        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
+        self.mock_param_count = self.patcher_param_count.start()
+        self.mock_param_count.return_value = 2
+
+    def tearDown(self):
+        self.patcher_param_count.stop()
 
     def test_normalize_netcdf_attributes_with_nansat(self):
         """Test the ingestion of a netcdf file using nansat"""

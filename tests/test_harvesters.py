@@ -8,12 +8,20 @@ from datetime import datetime
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.harvesters as harvesters
-
+from geospaas.vocabularies.models import Parameter
 from .stubs import StubHarvester, StubIngester
 
 
 class HarvesterTestCase(unittest.TestCase):
     """Test the base harvester"""
+
+    def setUp(self):
+        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
+        self.mock_param_count = self.patcher_param_count.start()
+        self.mock_param_count.return_value = 2
+
+    def tearDown(self):
+        self.patcher_param_count.stop()
 
     def test_exception_on_base_harvester_create_crawlers(self):
         """
@@ -124,6 +132,13 @@ class HarvesterTestCase(unittest.TestCase):
 
 class ChildHarvestersTestCase(unittest.TestCase):
     """Tests for the Harvesters which inherit from the base Harvester class"""
+    def setUp(self):
+        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
+        self.mock_param_count = self.patcher_param_count.start()
+        self.mock_param_count.return_value = 2
+
+    def tearDown(self):
+        self.patcher_param_count.stop()
 
     def test_podaac_harvester(self):
         """The PODAAC harvester has the correct crawler and ingester"""

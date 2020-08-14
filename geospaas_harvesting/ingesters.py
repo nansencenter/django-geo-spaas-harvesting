@@ -323,11 +323,9 @@ class DDXIngester(MetanormIngester):
         """
         Extracts the global or specific attributes of a dataset or specific ones from a DDX document
 
-        "x_path_global" is pointing to the 'NC_GLOBAL' part of response of HTML to obtain general
-        information.
-        "x_path_specific" is adaptive part (or many parts) of response of HTML to obtain the
-        raw names of parameters for cumulative normalization by metanorm package as the core of the
-        harvesting processing.
+        "x_path_global" is pointing to the 'NC_GLOBAL' part of response of the DDX document to
+        obtain general information.
+        "x_path_specific" is used to extract the dataset parameter names from the DDX document.
         """
         self.LOGGER.debug("Getting the dataset's global attributes.")
         namespaces = {'default': self._get_xml_namespace(root)}
@@ -338,13 +336,16 @@ class DDXIngester(MetanormIngester):
         for attribute in root.findall(x_path_global, namespaces):
             extracted_attributes[attribute.get('name')] = attribute.find(
                 "./default:value", namespaces).text
-        # finding the parameters of the dataset that are declared in the online source (specific metadata)
-        # The specific ones are stored in 'raw_dataset_parameters' part of the returned dictionary("extracted_attributes")
+        # finding the parameters of the dataset that are declared in
+        # the online source (specific metadata)
+        # The specific ones are stored in 'raw_dataset_parameters' part of
+        # the returned dictionary("extracted_attributes")
         extracted_attributes['raw_dataset_parameters'] = list()
         for attribute in root.findall(x_path_specific, namespaces):
             extracted_attributes['raw_dataset_parameters'].append(
                 attribute.find("./default:value", namespaces).text)
-        # removing the "latitude" and "longitude" from the 'raw_dataset_parameters' part of the dictionary
+        # removing the "latitude" and "longitude" from
+        # the 'raw_dataset_parameters' part of the dictionary
         if 'latitude' in extracted_attributes['raw_dataset_parameters']:
             extracted_attributes['raw_dataset_parameters'].remove('latitude')
         if 'longitude' in extracted_attributes['raw_dataset_parameters']:
@@ -352,6 +353,12 @@ class DDXIngester(MetanormIngester):
         return extracted_attributes
 
     def prepare_url(self, url):
+        """
+        Converts the downloadable link into the link for reading meta data. In all cases (usage of
+        any kind of crawler), regardless of class of used crawler, this
+        method results in a url that ends with '.ddx' which will be used in further steps
+        of ingestion.
+        """
         if url.endswith('.ddx'):
             return url
         elif url.endswith('.dods'):

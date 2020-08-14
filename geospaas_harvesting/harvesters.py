@@ -29,8 +29,7 @@ class Harvester():
     These values should be the crawler and ingester classes to be used in the _create_crawlers()
     and _create_ingester() methods.
     """
-    ingester = None
-    crawler = None
+
 
     def _create_crawlers(self):
         """Should return a list of crawlers. Needs to be implemented in child classes"""
@@ -94,11 +93,13 @@ class WebDirectoryHarvester(Harvester):
     """
     class for harvesting online data sources that rely on webpages (and most of the time on opendap)
     """
+    ingester = None
+    crawler = None
 
     def _create_crawlers(self):
         try:
-            hasattr(self,"crawler")
-        except (AttributeError) as error:
+            isinstance(self.crawler, crawlers.Crawler)
+        except (TypeError) as error:
             raise HarvesterConfigurationError(
                 "The class of crawler has not been specified properly") from error
         try:
@@ -113,8 +114,8 @@ class WebDirectoryHarvester(Harvester):
     def _create_ingester(self):
         parameters = {}
         try:
-            hasattr(self,"ingester")
-        except (AttributeError) as error:
+            isinstance(self.ingester, ingesters.Ingester)
+        except (TypeError) as error:
             raise HarvesterConfigurationError(
                 "The class of ingester has not been specified properly") from error
         try:
@@ -136,7 +137,7 @@ class PODAACHarvester(WebDirectoryHarvester):
 class OSISAFHarvester(WebDirectoryHarvester):
     """Harvester class for OSISAF project"""
     ingester = ingesters.DDXIngester
-    crawler = crawlers.ThreddsCrawler
+    crawler = crawlers.OpenDAPCrawler
 
 
 class CopernicusSentinelHarvester(Harvester):
