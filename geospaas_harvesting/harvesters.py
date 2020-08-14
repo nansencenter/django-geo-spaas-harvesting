@@ -146,8 +146,6 @@ class FTPHarvester(WebDirectoryHarvester):
     """Harvester class for some specific FTP protecol"""
 
     def _create_crawlers(self):
-        os.environ["REMSS_PASSWORD"] = self.config.get('username', None)
-        os.environ["JAXA_PASSWORD"] = "anonymous"
         return [
             crawlers.FTPCrawler(root_url=url,
                                 username=self.config.get('username', None),
