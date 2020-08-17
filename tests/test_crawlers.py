@@ -390,6 +390,17 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         # no upper limit and no start_time, without intersection
         self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
+class URLNavigationTestCase(unittest.TestCase):
+    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
+    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
+    def test_correct_navigation_to_download_page_for_OSISAF(self,mock_get_link,mock_http_get):
+        """Test the functionality of "get_download_url" method for OpenDAP crawler of OSISAF project """
+        mock_get_link.return_value=['/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
+        mock_http_get.return_value=mock_get_link.return_value
+        expected_urls = ['https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2019/11/catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc',]
+        request_link = crawlers.OpenDAPCrawler.get_download_url(crawlers.OpenDAPCrawler,expected_urls)
+        self.assertEqual(request_link,'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.dods')
+
 
 class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
     """Tests for the Copernicus OpenSearch API crawler"""
