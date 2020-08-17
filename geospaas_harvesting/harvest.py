@@ -13,13 +13,13 @@ import time
 from datetime import datetime
 import django
 import yaml
+# Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
 import geospaas_harvesting.harvesters as harvesters # pylint: disable=wrong-import-position
 
 from geospaas.vocabularies.management.commands import update_vocabularies
 
-# Load Django settings to be able to interact with the database
 
 LOGGER_NAME = 'geospaas_harvesting.daemon'
 LOGGER = logging.getLogger(LOGGER_NAME)
