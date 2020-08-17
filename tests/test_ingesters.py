@@ -229,7 +229,8 @@ class MetanormIngesterTestCase(django.test.TestCase):
                                           ('Location_Subregion1', 'gcmd_location_subregion1'),
                                           ('Location_Subregion2', 'gcmd_location_subregion2'),
                                           ('Location_Subregion3', 'gcmd_location_subregion3')]),
-            'dataset_parameters': [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave')]
+            'dataset_parameters': [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave'),
+                                    'latitude','longitude',]
         }
 
         datasets_count = Dataset.objects.count()

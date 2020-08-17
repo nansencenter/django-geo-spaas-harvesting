@@ -5,11 +5,13 @@ import unittest
 import unittest.mock as mock
 from datetime import datetime
 
-import geospaas_harvesting.crawlers as crawlers
-import geospaas_harvesting.ingesters as ingesters
-import geospaas_harvesting.harvesters as harvesters
-from geospaas_harvesting.harvesters import HarvesterConfigurationError
 from geospaas.vocabularies.models import Parameter
+
+import geospaas_harvesting.crawlers as crawlers
+import geospaas_harvesting.harvesters as harvesters
+import geospaas_harvesting.ingesters as ingesters
+from geospaas_harvesting.harvesters import HarvesterConfigurationError
+
 from .stubs import StubHarvester, StubIngester
 
 
@@ -163,18 +165,18 @@ class HarvesterExceptTestCase(unittest.TestCase):
         class test_class_harvester(harvesters.WebDirectoryHarvester):
             crawler = 222
         with self.assertRaises(HarvesterConfigurationError):
-            my_harvester = test_class_harvester()
+            test_class_harvester()
 
     def test_except_create_ingester(self):
         """shall return exception in the case of incorrect class of ingester"""
         class test_class_harvester(harvesters.WebDirectoryHarvester):
             ingester = 222
         with self.assertRaises(HarvesterConfigurationError):
-            my_harvester = test_class_harvester()
+            test_class_harvester()
 
     def test_except_create_without_ingester_or_crawler(self):
         """shall return exception in the case of lack of ingester or crawler """
         class test_class_harvester(harvesters.WebDirectoryHarvester):
             pass
         with self.assertRaises(HarvesterConfigurationError):
-            my_harvester = test_class_harvester()
+            test_class_harvester()
