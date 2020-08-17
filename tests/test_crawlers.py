@@ -24,8 +24,7 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
     def test_lack_of_definition_of_set_initial_state(self):
         """shall return "NotImplementedError" exception in the case of lack of definition of set_initial_state method """
         with self.assertRaises(NotImplementedError):
-            # my_harvester.get_download_url("test_text","test_text2")
-            my_harvester = crawlers.Crawler.set_initial_state(self)
+            crawlers.Crawler.set_initial_state(self)
 
 
 class BaseCrawlerTestCase(unittest.TestCase):
