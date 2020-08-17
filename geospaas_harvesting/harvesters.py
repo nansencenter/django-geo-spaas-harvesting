@@ -97,11 +97,13 @@ class WebDirectoryHarvester(Harvester):
     crawler = None
 
     def _create_crawlers(self):
-        try:
-            isinstance(self.crawler, crawlers.Crawler)
-        except (TypeError) as error:
-            raise HarvesterConfigurationError(
-                "The class of crawler has not been specified properly") from error
+        if not issubclass(self.crawler, crawlers.Crawler):
+            raise HarvesterConfigurationError("The class of crawler has not been specified properly")
+        #try:
+        #    isinstance(self.crawler, crawlers.Crawler)
+        #except (TypeError) as error:
+        #    raise HarvesterConfigurationError(
+        #        "The class of crawler has not been specified properly") from error
         try:
             return [
                 self.crawler(url, time_range=(self.get_time_range()))
@@ -113,11 +115,14 @@ class WebDirectoryHarvester(Harvester):
 
     def _create_ingester(self):
         parameters = {}
-        try:
-            isinstance(self.ingester, ingesters.Ingester)
-        except (TypeError) as error:
-            raise HarvesterConfigurationError(
-                "The class of ingester has not been specified properly") from error
+        if not issubclass(self.ingester, ingesters.Ingester):
+            raise HarvesterConfigurationError("The class of crawler has not been specified properly")
+
+        #try:
+        #    issubclass(self.ingester, ingesters.Ingester)
+        #except (TypeError) as error:
+        #    raise HarvesterConfigurationError(
+        #        "The class of ingester has not been specified properly") from error
         try:
             for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
                 if parameter_name in self.config:
