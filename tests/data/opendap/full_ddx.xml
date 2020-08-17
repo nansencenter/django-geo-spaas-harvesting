@@ -440,6 +440,104 @@
         <dimension name="nj" size="3232" />
         <dimension name="ni" size="3200" />
     </Array>
+    	<Grid  name="lat">
+		<Attribute name="long_name" type="String">
+			<value>latitude coordinate</value>
+		</Attribute>
+		<Attribute name="standard_name" type="String">
+			<value>latitude</value>
+		</Attribute>
+		<Attribute name="units" type="String">
+			<value>degrees_north</value>
+		</Attribute>
+		<Array name="lat">
+			<Float32/>
+			<dimension name="yc" size="830"/>
+			<dimension name="xc" size="790"/>
+		</Array>
+		<Map name="yc">
+			<Float64/>
+			<dimension name="yc" size="830"/>
+		</Map>
+		<Map name="xc">
+			<Float64/>
+			<dimension name="xc" size="790"/>
+		</Map>
+	</Grid>
+	<Grid  name="lon">
+		<Attribute name="long_name" type="String">
+			<value>longitude coordinate</value>
+		</Attribute>
+		<Attribute name="standard_name" type="String">
+			<value>longitude</value>
+		</Attribute>
+		<Attribute name="units" type="String">
+			<value>degrees_east</value>
+		</Attribute>
+		<Array name="lon">
+			<Float32/>
+			<dimension name="yc" size="830"/>
+			<dimension name="xc" size="790"/>
+		</Array>
+		<Map name="yc">
+			<Float64/>
+			<dimension name="yc" size="830"/>
+		</Map>
+		<Map name="xc">
+			<Float64/>
+			<dimension name="xc" size="790"/>
+		</Map>
+	</Grid>
+	<Grid  name="ice_conc">
+		<Attribute name="long_name" type="String">
+			<value>concentration of sea ice</value>
+		</Attribute>
+		<Attribute name="standard_name" type="String">
+			<value>sea_ice_area_fraction</value>
+		</Attribute>
+		<Attribute name="units" type="String">
+			<value>%</value>
+		</Attribute>
+		<Attribute name="_FillValue" type="Int16">
+			<value>-999</value>
+		</Attribute>
+		<Attribute name="valid_min" type="Int16">
+			<value>0</value>
+		</Attribute>
+		<Attribute name="valid_max" type="Int16">
+			<value>10000</value>
+		</Attribute>
+		<Attribute name="grid_mapping" type="String">
+			<value>Polar_Stereographic_Grid</value>
+		</Attribute>
+		<Attribute name="coordinates" type="String">
+			<value>lat lon</value>
+		</Attribute>
+		<Attribute name="scale_factor" type="Float32">
+			<value>0.01</value>
+		</Attribute>
+		<Attribute name="add_offset" type="Float32">
+			<value>0.0</value>
+		</Attribute>
+		<Array name="ice_conc">
+			<Int16/>
+			<dimension name="time" size="1"/>
+			<dimension name="yc" size="830"/>
+			<dimension name="xc" size="790"/>
+		</Array>
+		<Map name="time">
+			<Float64/>
+			<dimension name="time" size="1"/>
+		</Map>
+		<Map name="yc">
+			<Float64/>
+			<dimension name="yc" size="830"/>
+		</Map>
+		<Map name="xc">
+			<Float64/>
+			<dimension name="xc" size="790"/>
+		</Map>
+	</Grid>
     <Array name="l2p_flags">
         <Attribute name="long_name" type="String">
             <value>L2P flags</value>
