@@ -230,7 +230,7 @@ class MetanormIngesterTestCase(django.test.TestCase):
                                           ('Location_Subregion2', 'gcmd_location_subregion2'),
                                           ('Location_Subregion3', 'gcmd_location_subregion3')]),
             'dataset_parameters': [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave'),
-                                    'latitude','longitude',]
+                                    {'standard_name':'latitude'},{'standard_name':'longitude'},]
         }
 
         datasets_count = Dataset.objects.count()
@@ -461,6 +461,26 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         self.assertTrue(logger_cm.records[0].msg.endswith('already exists in the database.'))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
+
+    def test_function_named_prepare_url(self):
+        """ test the functionality of 'prepare_url' for a ddxingester """
+        input_url='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc'
+        output_url='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
+        ingester = ingesters.DDXIngester()
+        self.assertEqual(output_url,ingester.prepare_url(input_url))
+
+        # no change when a ddx file has been given to the function
+        input_url='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
+        output_url='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
+        ingester = ingesters.DDXIngester()
+        self.assertEqual(output_url,ingester.prepare_url(input_url))
+
+    def test_function_named_prepare_url(self):
+        """ test the functionality of 'prepare_url' for a OSISAF ingester """
+        input_url='https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.dods'
+        output_url='https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.ddx'
+        ingester = ingesters.DDXIngester()
+        self.assertEqual(output_url,ingester.prepare_url(input_url))
 
 
 class CopernicusODataIngesterTestCase(django.test.TestCase):
