@@ -12,6 +12,22 @@ import requests
 import geospaas_harvesting.crawlers as crawlers
 
 
+class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
+    """Tests for the webDirectory crawler Exceptions"""
+
+    def test_lack_of_definition_of_get_download_url(self):
+        """shall return "NotImplementedError" exception in the case of lack of definition of get_download_url method """
+        my_harvester = crawlers.WebDirectoryCrawler
+        with self.assertRaises(NotImplementedError):
+            my_harvester.get_download_url("test_text", "test_text2")
+
+    def test_lack_of_definition_of_set_initial_state(self):
+        """shall return "NotImplementedError" exception in the case of lack of definition of set_initial_state method """
+        with self.assertRaises(NotImplementedError):
+            # my_harvester.get_download_url("test_text","test_text2")
+            my_harvester = crawlers.Crawler.set_initial_state(self)
+
+
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
 
@@ -20,6 +36,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
         base_crawler = crawlers.Crawler()
         with self.assertRaises(NotImplementedError):
             _ = iter(base_crawler)
+
 
 class OpenDAPCrawlerTestCase(unittest.TestCase):
     """Tests for the OpenDAP crawler"""
@@ -115,7 +132,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_set_initial_state(self):
         """Tests that the set_initial_state() method sets the correct values"""
-        #Create a crawler and start iterating to set a non-initial state
+        # Create a crawler and start iterating to set a non-initial state
         crawler = crawlers.PODAACCrawler(self.TEST_DATA['root']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
             next(iter(crawler))
@@ -290,7 +307,6 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         crawler = crawlers.PODAACCrawler('')
         self.assertEqual(crawler._dataset_timestamp('dataset_name.nc'), None)
 
-
     def test_intersects_time_range_finite_limits(self):
         """
         Test the behavior of the `_intersects_time_range` method with a finite time range limitation
@@ -390,16 +406,20 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         # no upper limit and no start_time, without intersection
         self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
+
 class URLNavigationTestCase(unittest.TestCase):
     @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
     @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
-    def test_correct_navigation_to_download_page_for_OSISAF(self,mock_get_link,mock_http_get):
+    def test_correct_navigation_to_download_page_for_OSISAF(self, mock_get_link, mock_http_get):
         """Test the functionality of "get_download_url" method for OpenDAP crawler of OSISAF project """
-        mock_get_link.return_value=['/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
-        mock_http_get.return_value=mock_get_link.return_value
-        expected_urls = ['https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2019/11/catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc',]
-        request_link = crawlers.OpenDAPCrawler.get_download_url(crawlers.OpenDAPCrawler,expected_urls)
-        self.assertEqual(request_link,'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.dods')
+        mock_get_link.return_value = [
+            '/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
+        mock_http_get.return_value = mock_get_link.return_value
+        expected_urls = ['https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2019/11/catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc', ]
+        request_link = crawlers.OpenDAPCrawler.get_download_url(
+            crawlers.OpenDAPCrawler, expected_urls)
+        self.assertEqual(
+            request_link, 'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.dods')
 
 
 class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
@@ -530,7 +550,7 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
 
     def test_set_initial_state(self):
         """Tests that the set_initial_state() method sets the correct values"""
-        #Create a crawler and start iterating to set a non-initial state
+        # Create a crawler and start iterating to set a non-initial state
         with self.assertLogs(self.crawler.LOGGER):
             next(iter(self.crawler))
 
@@ -556,8 +576,8 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
     def test_iterating(self):
         """Tests that the correct values are returned when iterating"""
         expected_urls = [
-            "https://scihub.copernicus.eu/dhus/odata/v1/Products('d023819a-60d3-4b5e-bb81-645294d73b5b')/$value", # pylint:disable=line-too-long
-            "https://scihub.copernicus.eu/dhus/odata/v1/Products('87ddb795-dab4-4985-85f4-c390c9cdd65b')/$value", # pylint:disable=line-too-long
+            "https://scihub.copernicus.eu/dhus/odata/v1/Products('d023819a-60d3-4b5e-bb81-645294d73b5b')/$value",  # pylint:disable=line-too-long
+            "https://scihub.copernicus.eu/dhus/odata/v1/Products('87ddb795-dab4-4985-85f4-c390c9cdd65b')/$value",  # pylint:disable=line-too-long
             "https://scihub.copernicus.eu/dhus/odata/v1/Products('b54171e1-078b-4234-ae0a-7b27abb14baa')/$value",  # pylint:disable=line-too-long
             "https://scihub.copernicus.eu/dhus/odata/v1/Products('e2842bc8-8b3e-4161-a88c-84c2b43e60f9')/$value"  # pylint:disable=line-too-long
         ]
