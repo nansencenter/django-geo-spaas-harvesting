@@ -470,10 +470,10 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(output_url,ingester.prepare_url(input_url))
 
         # no change when a ddx file has been given to the function
-        input_url='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
-        output_url='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
+        input_url2='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
+        output_url2='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
         ingester = ingesters.DDXIngester()
-        self.assertEqual(output_url,ingester.prepare_url(input_url))
+        self.assertEqual(output_url2,ingester.prepare_url(input_url2))
 
     def test_function_named_prepare_url(self):
         """ test the functionality of 'prepare_url' for a OSISAF ingester """
