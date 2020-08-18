@@ -163,14 +163,14 @@ class HarvesterExceptTestCase(unittest.TestCase):
     def test_except_create_crawler(self):
         """shall return exception in the case of incorrect class of crawler"""
         class test_class_harvester(harvesters.WebDirectoryHarvester):
-            crawler = 222
+            ingester = ingesters.DDXIngester
         with self.assertRaises(HarvesterConfigurationError):
             test_class_harvester()
 
     def test_except_create_ingester(self):
         """shall return exception in the case of incorrect class of ingester"""
         class test_class_harvester2(harvesters.WebDirectoryHarvester):
-            ingester = 222
+            crawler = crawlers.OpenDAPCrawler
         with self.assertRaises(HarvesterConfigurationError):
             test_class_harvester2()
 
