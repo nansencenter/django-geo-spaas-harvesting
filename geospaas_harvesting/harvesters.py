@@ -97,7 +97,7 @@ class WebDirectoryHarvester(Harvester):
     crawler = None
 
     def _create_crawlers(self):
-        if not issubclass(self.crawler, crawlers.Crawler):
+        if self.crawler is None:#not issubclass(self.crawler, crawlers.Crawler):
             raise HarvesterConfigurationError("The class of crawler has not been specified properly")
         #try:
         #    isinstance(self.crawler, crawlers.Crawler)
