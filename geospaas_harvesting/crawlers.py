@@ -223,16 +223,16 @@ class WebDirectoryCrawler(Crawler):
                         if self._intersects_time_range(*(self._dataset_timestamp(link),) * 2):
                             self.LOGGER.debug("Adding downloadable form of '%s' to the list of resources.", link)
                             resource_url = self.get_download_url(resource_url)
-                            self._urls.append(resource_url)
+                            if resource_url is not None:
+                                self._urls.append(resource_url)
 
     def get_download_url(self, resource_url):
         """
-        This method should return the downloadable form of the crawled link. It means providing the
-        proper link so that the user in the datasetURI box is able to click on it and immediately
-        download the file conveniently.
+        This method should return the downloadable form of the crawled link. It means providing a
+        direct download link.
 
-        The philosophy of this method is to turn the link that provides the metadata into the link
-        that is downloadable by the geospaas user.
+        The philosophy of this method is to turn the link inside the "explore_pages" method into
+        the link that is downloadable by the geospaas user.
 
         This method is only used in the "_explore_page" method.
         Thus, if any class defined its "_explore_page" method in a way that there is no need to
@@ -250,11 +250,11 @@ class WebDirectoryCrawler(Crawler):
         return parser.links
 
 
-class PODAACCrawler(WebDirectoryCrawler):
+class OpenDAPCrawler(WebDirectoryCrawler):
     """
-    Crawler for harvesting the data of PODAAC
+    Crawler for harvesting the data of OpenDAP
     """
-    LOGGER = logging.getLogger(__name__ + '.PODAACCrawler')
+    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
     FOLDERS_SUFFIXES = ('/contents.html',)
     FILES_SUFFIXES = ('.nc', '.nc.gz')
     EXCLUDE = ['?']
@@ -263,24 +263,24 @@ class PODAACCrawler(WebDirectoryCrawler):
         return resource_url
 
 
-class OpenDAPCrawler(WebDirectoryCrawler):
+class ThreddsCrawler(WebDirectoryCrawler):
     """
     Crawler for harvesting the data which are provided by OpenDAP
     """
-    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
+    LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
     FILES_SUFFIXES = ('.nc',)
-    # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting provess
-    EXCLUDE = ['/thredds/', 'http', '_sh_polstere', 'ease', ]
-
+    EXCLUDE = ['/thredds/', 'http',]
     def get_download_url(self, resource_url):
         links = self._get_links(self._http_get(resource_url))
         for link in links:
             if "dodsC" in link:
                 if not link.endswith(".html"):
-                    raise ValueError('The link as the result of crawler must be ended with ".html"')
+                    self.LOGGER.warning('The link as the result of crawler for "%s" must be ended with ".html".Failed to create downloable form',resource_url)
                 result = "https://thredds.met.no"+link[:-4]+'dods'
-        return result
+                return result
+            else:
+                return None
 
 
 class CopernicusOpenSearchAPICrawler(Crawler):

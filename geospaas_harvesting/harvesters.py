@@ -24,12 +24,7 @@ class Harvester():
     It should be subclassed, and child classes should implement the following methods:
         - _create_crawlers()
         - _create_ingester()
-
-    Child classes should also assign values to the ingester and crawler class attributes.
-    These values should be the crawler and ingester classes to be used in the _create_crawlers()
-    and _create_ingester() methods.
     """
-
 
     def _create_crawlers(self):
         """Should return a list of crawlers. Needs to be implemented in child classes"""
@@ -41,7 +36,6 @@ class Harvester():
 
     def __init__(self, **config):
         self.config = config
-
         try:
             self._crawlers = self._create_crawlers()
             self._ingester = self._create_ingester()
@@ -92,18 +86,18 @@ class Harvester():
 class WebDirectoryHarvester(Harvester):
     """
     class for harvesting online data sources that rely on webpages (and most of the time on opendap)
+
+    Child classes should also assign values to the ingester and crawler class attributes.
+    These values should be the crawler and ingester classes to be used in the _create_crawlers()
+    and _create_ingester() methods.
     """
     ingester = None
     crawler = None
 
     def _create_crawlers(self):
-        if self.crawler is None:#not issubclass(self.crawler, crawlers.Crawler):
-            raise HarvesterConfigurationError("The class of crawler has not been specified properly")
-        #try:
-        #    isinstance(self.crawler, crawlers.Crawler)
-        #except (TypeError) as error:
-        #    raise HarvesterConfigurationError(
-        #        "The class of crawler has not been specified properly") from error
+        if self.crawler is None:
+            raise HarvesterConfigurationError(
+                "The class of crawler has not been specified properly")
         try:
             return [
                 self.crawler(url, time_range=(self.get_time_range()))
@@ -115,14 +109,8 @@ class WebDirectoryHarvester(Harvester):
 
     def _create_ingester(self):
         parameters = {}
-        if not issubclass(self.ingester, ingesters.Ingester):
-            raise HarvesterConfigurationError("The class of crawler has not been specified properly")
-
-        #try:
-        #    issubclass(self.ingester, ingesters.Ingester)
-        #except (TypeError) as error:
-        #    raise HarvesterConfigurationError(
-        #        "The class of ingester has not been specified properly") from error
+        if self.ingester is None:
+            raise HarvesterConfigurationError("The class of ingester has not been specified properly")
         try:
             for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
                 if parameter_name in self.config:
@@ -136,14 +124,19 @@ class WebDirectoryHarvester(Harvester):
 class PODAACHarvester(WebDirectoryHarvester):
     """Harvester class for PODAAC data (NASA)"""
     ingester = ingesters.DDXIngester
-    crawler = crawlers.PODAACCrawler
+    crawler = crawlers.OpenDAPCrawler
 
 
 class OSISAFHarvester(WebDirectoryHarvester):
     """Harvester class for OSISAF project"""
     ingester = ingesters.DDXIngester
-    crawler = crawlers.OpenDAPCrawler
-
+    crawler = crawlers.ThreddsCrawler
+    def __init__(self, **config):
+        super().__init__(**config)
+        if type(config['excludes']) != list:
+            raise HarvesterConfigurationError(
+                "'excludes' field must be fed with a list of excluded names ")
+        self.crawler.EXCLUDE.extend(config['excludes'])
 
 class CopernicusSentinelHarvester(Harvester):
     """Harvester class for Copernicus Sentinel data"""

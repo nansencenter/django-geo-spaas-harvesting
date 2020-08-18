@@ -10,8 +10,12 @@ import tempfile
 import unittest
 import unittest.mock as mock
 from geospaas.vocabularies.models import Parameter
+<<<<<<< HEAD
 
 import geospaas_harvesting.harvest as harvest
+=======
+import django
+>>>>>>> This is a combination of 12 commits for #16 and added more tests
 import geospaas_harvesting.harvesters as harvesters
 import tests.stubs as stubs
 
@@ -189,7 +193,8 @@ class MainTestCase(TemporaryPersistenceDirTestCase):
     @mock.patch.object(sys, 'argv', ['harvest.py'])
     @mock.patch.object(
         harvest.Configuration, 'DEFAULT_CONFIGURATION_PATH', CONFIGURATION_FILES['ok'])
-    def test_main_ends_on_workers_exceptions(self):
+    @mock.patch('geospaas.vocabularies.management.commands.update_vocabularies.Command')
+    def test_main_ends_on_workers_exceptions(self,mock_update_vocab):
         """The main process must end if all workers finished with exceptions"""
         setattr(harvesters, 'TestHarvester', stubs.StubExceptionHarvester)
         with self.assertLogs(harvest.LOGGER_NAME, level=logging.ERROR) as daemon_logs_cm:
@@ -208,12 +213,34 @@ class PersistenceTestCase(TemporaryPersistenceDirTestCase):
     # testable form
 
     def setUp(self):
+<<<<<<< HEAD
         super().setUp()
         mock.patch('geospaas_harvesting.harvest.Configuration').start()
+=======
+        try:
+            os.mkdir(harvest.PERSISTENCE_DIR)
+        except FileExistsError:
+            pass
+
+        self.conf_patcher = mock.patch('geospaas_harvesting.harvest.Configuration')
+        self.conf_mock = self.conf_patcher.start()
+>>>>>>> This is a combination of 12 commits for #16 and added more tests
         self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
         self.mock_param_count = self.patcher_param_count.start()
         self.mock_param_count.return_value = 2
 
+<<<<<<< HEAD
+=======
+    def tearDown(self):
+        self.patcher_param_count.stop()
+        self.conf_patcher.stop()
+        try:
+            for file_to_remove in glob.glob(f"{harvest.PERSISTENCE_DIR}/*"):
+                os.remove(file_to_remove)
+        except FileNotFoundError:
+            pass
+
+>>>>>>> This is a combination of 12 commits for #16 and added more tests
     def test_get_persistence_files(self):
         """Test that the persistence files are correctly retrieved and sorted"""
         with mock.patch('os.listdir') as mock_listdir:
