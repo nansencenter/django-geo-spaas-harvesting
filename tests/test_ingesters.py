@@ -469,13 +469,14 @@ class DDXIngesterTestCase(django.test.TestCase):
         ingester = ingesters.DDXIngester()
         self.assertEqual(output_url,ingester.prepare_url(input_url))
 
-        # no change when a ddx file has been given to the function
+    def test_function_named_prepare_url2(self):
+        """ no change when a ddx file has been given to the function """
         input_url2='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
         output_url2='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
         ingester = ingesters.DDXIngester()
         self.assertEqual(output_url2,ingester.prepare_url(input_url2))
 
-    def test_function_named_prepare_url(self):
+    def test_function_named_prepare_url3(self):
         """ test the functionality of 'prepare_url' for a OSISAF ingester """
         input_url='https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.dods'
         output_url='https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.ddx'

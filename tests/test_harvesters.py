@@ -46,6 +46,19 @@ class HarvesterTestCase(unittest.TestCase):
             with self.assertRaises(NotImplementedError):
                 base_harvester._create_ingester()
 
+    def test_exception_on_incorrect_ingester_creation(self):
+        """
+        An exception is raised if an attempt is made to call the _create_ingester() method of the
+        base Harvester class with incorrect configuration.
+        In this test 'max_fetcher_threads' is misspelled with 'max_fetcher_thread'
+        """
+        with mock.patch.object(harvesters.Harvester, '__init__', return_value=None):
+            self.config = {'max_db_threads':1,'max_fetcher_thread':2}
+
+            base_harvester = harvesters.WebDirectoryHarvester()
+            with self.assertRaises(HarvesterConfigurationError):
+                base_harvester._create_ingester()
+
     def test_correct_conf_loading(self):
         """Test that a correct configuration file is used the proper way"""
         urls = ['https://random1.url', 'https://random2.url']
@@ -168,14 +181,14 @@ class HarvesterExceptTestCase(unittest.TestCase):
             test_class_harvester()
 
     def test_except_create_ingester(self):
-        """shall return exception in the case of incorrect class of ingester"""
+        """ shall return exception in the case of incorrect class of ingester """
         class test_class_harvester2(harvesters.WebDirectoryHarvester):
             crawler = crawlers.OpenDAPCrawler
         with self.assertRaises(HarvesterConfigurationError):
             test_class_harvester2()
 
     def test_except_create_without_ingester_or_crawler(self):
-        """shall return exception in the case of lack of ingester or crawler """
+        """ shall return exception in the case of lack of ingester or crawler """
         class test_class_harvester3(harvesters.WebDirectoryHarvester):
             pass
         with self.assertRaises(HarvesterConfigurationError):

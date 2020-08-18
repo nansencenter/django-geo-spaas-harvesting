@@ -26,6 +26,16 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             crawlers.Crawler.set_initial_state(self)
 
+    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
+    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
+    def test_lack_of_correct_url_for_download_page_for_OSISAF(self, mock_get_link, mock_http_get):
+        """Test the functionality of "get_download_url" method for OpenDAP crawler with incorrect url
+            URL must be ended with '.html' """
+        mock_get_link.return_value = [
+            '/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc']
+        mock_http_get.return_value = mock_get_link.return_value
+        with self.assertRaises(ValueError):
+            crawlers.OpenDAPCrawler.get_download_url(crawlers.OpenDAPCrawler, "dummy")
 
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
