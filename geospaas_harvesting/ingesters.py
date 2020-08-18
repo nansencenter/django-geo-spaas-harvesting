@@ -351,12 +351,11 @@ class DDXIngester(MetanormIngester):
         if 'longitude' in extracted_attributes['raw_dataset_parameters']:
             extracted_attributes['raw_dataset_parameters'].remove('longitude')
         return extracted_attributes
-
-    def prepare_url(self, url):
+    @staticmethod
+    def prepare_url(url):
         """
-        Converts the downloadable link into the link for reading meta data. In all cases (usage of
-        any kind of crawler), regardless of class of used crawler, this
-        method results in a url that ends with '.ddx' which will be used in further steps
+        Converts the downloadable link into the link for reading meta data. In all cases,
+        this method results in a url that ends with '.ddx' which will be used in further steps
         of ingestion.
         """
         if url.endswith('.ddx'):

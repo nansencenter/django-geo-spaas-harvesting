@@ -53,9 +53,9 @@ class HarvesterTestCase(unittest.TestCase):
         In this test 'max_fetcher_threads' is misspelled with 'max_fetcher_thread'
         """
         with mock.patch.object(harvesters.Harvester, '__init__', return_value=None):
-            self.config = {'max_db_threads':1,'max_fetcher_thread':2}
-
+            self.config = {'max_db_threads': 1, 'max_fetcher_thread': 2}
             base_harvester = harvesters.WebDirectoryHarvester()
+            base_harvester.ingester = ingesters.DDXIngester
             with self.assertRaises(HarvesterConfigurationError):
                 base_harvester._create_ingester()
 
@@ -160,7 +160,7 @@ class ChildHarvestersTestCase(unittest.TestCase):
     def test_podaac_harvester(self):
         """The PODAAC harvester has the correct crawler and ingester"""
         harvester = harvesters.PODAACHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertIsInstance(harvester._current_crawler, crawlers.PODAACCrawler)
+        self.assertIsInstance(harvester._current_crawler, crawlers.OpenDAPCrawler)
         self.assertIsInstance(harvester._ingester, ingesters.DDXIngester)
 
     def test_copernicus_sentinel_harvester(self):
@@ -171,8 +171,21 @@ class ChildHarvestersTestCase(unittest.TestCase):
         self.assertIsInstance(harvester._current_crawler, crawlers.CopernicusOpenSearchAPICrawler)
         self.assertIsInstance(harvester._ingester, ingesters.CopernicusODataIngester)
 
+    def test_OSISAF_harvester_exrtra_excludes(self):
+        """ extra excludes should have passed by the excludes as a list in configuration file.
+        Otherwise, accossiated error must be raised """
+        harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
+                                               excludes=['ease', '_sh_polstere', ])
+        self.assertTrue(harvester.crawler.EXCLUDE, ['/thredds/', 'http', 'ease', '_sh_polstere'])
+        with self.assertRaises(HarvesterConfigurationError):
+            harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
+                                                   excludes='ease')
+
 
 class HarvesterExceptTestCase(unittest.TestCase):
+    def tearDown(self):
+        mock.patch.stopall()
+
     def test_except_create_crawler(self):
         """shall return exception in the case of incorrect class of crawler"""
         class test_class_harvester(harvesters.WebDirectoryHarvester):
@@ -180,12 +193,22 @@ class HarvesterExceptTestCase(unittest.TestCase):
         with self.assertRaises(HarvesterConfigurationError):
             test_class_harvester()
 
-    def test_except_create_ingester(self):
+    def test_except_create_crawler2(self):
         """ shall return exception in the case of incorrect class of ingester """
-        class test_class_harvester2(harvesters.WebDirectoryHarvester):
+        class test_class_harvester4(harvesters.WebDirectoryHarvester):
             crawler = crawlers.OpenDAPCrawler
         with self.assertRaises(HarvesterConfigurationError):
+            test_class_harvester4()
+
+    @mock.patch("geospaas_harvesting.harvesters.WebDirectoryHarvester._create_crawlers")
+    def test_except_create_ingester(self,mock_create_crawlers):
+        """ shall return exception in the case of incorrect class of ingester """
+        class test_class_harvester2(harvesters.WebDirectoryHarvester):
+            crawler = crawlers.OpenDAPCrawler('', time_range=(None, datetime(2019, 2, 20)))
+        with self.assertRaises(HarvesterConfigurationError):
             test_class_harvester2()
+        mock_create_crawlers.stop()
+        self.addCleanup(mock_create_crawlers.stop)
 
     def test_except_create_without_ingester_or_crawler(self):
         """ shall return exception in the case of lack of ingester or crawler """

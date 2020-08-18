@@ -6,6 +6,7 @@ import os
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
+import geospaas_harvesting.harvest as harvest
 
 import requests
 
@@ -26,16 +27,15 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             crawlers.Crawler.set_initial_state(self)
 
-    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
     @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
+    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
     def test_lack_of_correct_url_for_download_page_for_OSISAF(self, mock_get_link, mock_http_get):
-        """Test the functionality of "get_download_url" method for OpenDAP crawler with incorrect url
-            URL must be ended with '.html' """
-        mock_get_link.return_value = [
-            '/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc']
-        mock_http_get.return_value = mock_get_link.return_value
-        with self.assertRaises(ValueError):
-            crawlers.OpenDAPCrawler.get_download_url(crawlers.OpenDAPCrawler, "dummy")
+        """Test the functionality of "get_download_url" method for OpenDAP crawler with incorrect
+        url. URL must be ended with '.html' """
+        mock_get_link.return_value = ['/thredds/dodsC/osisaf/met.no/ice_conc201911301200.nc']
+        with self.assertLogs(crawlers.OpenDAPCrawler.LOGGER):#self.assertRaises(ValueError):
+            crawlers.ThreddsCrawler.get_download_url(crawlers.OpenDAPCrawler, "dummy")
+
 
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
@@ -132,7 +132,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_instantiation(self):
         """Test the correct instantiation of an Opendap crawler"""
-        crawler = crawlers.PODAACCrawler(self.TEST_DATA['root']['urls'][0])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
         self.assertIsInstance(crawler, crawlers.Crawler)
         self.assertEqual(crawler.root_url, self.TEST_DATA['root']['urls'][0])
         self.assertEqual(crawler.time_range, (None, None))
@@ -142,7 +142,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
     def test_set_initial_state(self):
         """Tests that the set_initial_state() method sets the correct values"""
         # Create a crawler and start iterating to set a non-initial state
-        crawler = crawlers.PODAACCrawler(self.TEST_DATA['root']['urls'][0])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
             next(iter(crawler))
 
@@ -156,14 +156,14 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         html = data_file.read()
         data_file.close()
 
-        html_from_method = crawlers.PODAACCrawler._http_get(self.TEST_DATA['root']['urls'][0])
+        html_from_method = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['root']['urls'][0])
 
         self.assertEqual(html, html_from_method)
 
     @mock.patch('logging.Logger.error')
     def test_get_html_logs_error_on_http_status(self, mock_error_logger):
         """Test that an exception is raised in case of HTTP error code"""
-        _ = crawlers.PODAACCrawler._http_get(self.TEST_DATA['inexistent']['urls'][0])
+        _ = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['inexistent']['urls'][0])
         mock_error_logger.assert_called_once()
 
     def test_get_right_number_of_links(self):
@@ -175,7 +175,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
                 self.TEST_DATA[sample]['file_path']))
             html = data_file.read()
             data_file.close()
-            links[sample] = crawlers.PODAACCrawler._get_links(html)
+            links[sample] = crawlers.OpenDAPCrawler._get_links(html)
 
         self.assertEqual(len(links['root']), 4)
         self.assertEqual(len(links['empty']), 0)
@@ -191,7 +191,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         Explore root page and make sure the _url and _to_process attributes of the crawler have the
         right values
         """
-        crawler = crawlers.PODAACCrawler(self.TEST_DATA['root']['urls'][0])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
             crawler._explore_page(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][0]])
@@ -199,7 +199,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_explore_page_with_duplicates(self):
         """If the same URL is present twice in the page, it should only be processed once"""
-        crawler = crawlers.PODAACCrawler(self.TEST_DATA['root_duplicates']['urls'][0])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
             crawler._explore_page(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][1]])
@@ -210,7 +210,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         Explore a page and make sure the _url and _to_process attributes of the crawler have the
         right values according to a time restriction
         """
-        crawler = crawlers.PODAACCrawler(
+        crawler = crawlers.OpenDAPCrawler(
             self.TEST_DATA['folder_day_of_year']['urls'][0],
             time_range=(datetime(2019, 2, 15, 11, 0, 0), datetime(2019, 2, 15, 13, 0, 0)))
         with self.assertLogs(crawler.LOGGER):
@@ -224,7 +224,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         Explore a page and make sure the _url and _to_process attributes of the crawler have the
         right values according to a time restriction
         """
-        crawler = crawlers.PODAACCrawler(
+        crawler = crawlers.OpenDAPCrawler(
             self.TEST_DATA['folder_day_of_year']['urls'][0],
             time_range=(datetime(2019, 2, 11, 11, 0, 0), datetime(2019, 2, 11, 13, 0, 0)))
         with self.assertLogs(crawler.LOGGER):
@@ -234,7 +234,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_iterating(self):
         """Test the call to the __iter__ method"""
-        crawler = crawlers.PODAACCrawler(
+        crawler = crawlers.OpenDAPCrawler(
             self.TEST_DATA['root']['urls'][0],
             time_range=(datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 9, 0, 0)))
         crawler_iterator = iter(crawler)
@@ -253,7 +253,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_get_year_folder_coverage(self):
         """Get the correct time range from a year folder"""
-        crawler = crawlers.PODAACCrawler('')
+        crawler = crawlers.OpenDAPCrawler('')
         self.assertEqual(
             crawler._folder_coverage('https://test-opendap.com/folder/2019/contents.html'),
             (datetime(2019, 1, 1, 0, 0, 0), datetime(2019, 12, 31, 23, 59, 59))
@@ -261,7 +261,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_get_month_folder_coverage(self):
         """Get the correct time range from a month folder"""
-        crawler = crawlers.PODAACCrawler('')
+        crawler = crawlers.OpenDAPCrawler('')
         self.assertEqual(
             crawler._folder_coverage('https://test-opendap.com/folder/2019/02/contents.html'),
             (datetime(2019, 2, 1, 0, 0, 0), datetime(2019, 2, 28, 23, 59, 59))
@@ -269,7 +269,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_get_day_of_month_folder_coverage(self):
         """Get the correct time range from a day of month folder"""
-        crawler = crawlers.PODAACCrawler('')
+        crawler = crawlers.OpenDAPCrawler('')
         self.assertEqual(
             crawler._folder_coverage('https://test-opendap.com/folder/2019/02/14/contents.html'),
             (datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 23, 59, 59))
@@ -277,7 +277,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_get_day_of_year_folder_coverage(self):
         """Get the correct time range from a day of year folder"""
-        crawler = crawlers.PODAACCrawler('')
+        crawler = crawlers.OpenDAPCrawler('')
         self.assertEqual(
             crawler._folder_coverage('https://test-opendap.com/folder/2019/046/contents.html'),
             (datetime(2019, 2, 15, 0, 0, 0), datetime(2019, 2, 15, 23, 59, 59))
@@ -288,7 +288,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         The `_folder_coverage` method should return `None` if no time range is inferred from the
         folder's path
         """
-        crawler = crawlers.PODAACCrawler('')
+        crawler = crawlers.OpenDAPCrawler('')
         self.assertEqual(
             crawler._folder_coverage('https://test-opendap.com/folder/contents.html'), (None, None))
         self.assertEqual(
@@ -302,7 +302,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_get_dataset_timestamp(self):
         """Get the correct date from a dataset prefixed by a timestamp"""
-        crawler = crawlers.PODAACCrawler('')
+        crawler = crawlers.OpenDAPCrawler('')
         self.assertEqual(
             crawler._dataset_timestamp('20190214090812_dataset_name.nc'),
             datetime(2019, 2, 14, 9, 8, 12),
@@ -313,7 +313,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         The `_dataset_timestamp` method should return `None` if no timestamp is found in the
         dataset's name
         """
-        crawler = crawlers.PODAACCrawler('')
+        crawler = crawlers.OpenDAPCrawler('')
         self.assertEqual(crawler._dataset_timestamp('dataset_name.nc'), None)
 
     def test_intersects_time_range_finite_limits(self):
@@ -323,7 +323,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.PODAACCrawler(
+        crawler = crawlers.OpenDAPCrawler(
             '', time_range=(datetime(2019, 2, 14), datetime(2019, 2, 20)))
 
         # start_time < time_range[0] < stop_time < time_range[1]
@@ -371,7 +371,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.PODAACCrawler('', time_range=(None, datetime(2019, 2, 20)))
+        crawler = crawlers.OpenDAPCrawler('', time_range=(None, datetime(2019, 2, 20)))
 
         # no lower limit < time_range[1] < start_time < stop_time
         self.assertFalse(crawler._intersects_time_range(
@@ -397,7 +397,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.PODAACCrawler('', time_range=(datetime(2019, 2, 20), None))
+        crawler = crawlers.OpenDAPCrawler('', time_range=(datetime(2019, 2, 20), None))
 
         # start_time < stop_time < time_range[0] < no upper limit
         self.assertFalse(crawler._intersects_time_range(
@@ -415,21 +415,30 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         # no upper limit and no start_time, without intersection
         self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
-
-class URLNavigationTestCase(unittest.TestCase):
-    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
     @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
+    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
     def test_correct_navigation_to_download_page_for_OSISAF(self, mock_get_link, mock_http_get):
         """Test the functionality of "get_download_url" method for OpenDAP crawler of OSISAF project """
         mock_get_link.return_value = [
             '/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
-        mock_http_get.return_value = mock_get_link.return_value
         expected_urls = ['https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2019/11/catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc', ]
-        request_link = crawlers.OpenDAPCrawler.get_download_url(
+        request_link = crawlers.ThreddsCrawler.get_download_url(
             crawlers.OpenDAPCrawler, expected_urls)
         self.assertEqual(
             request_link, 'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.dods')
 
+    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
+    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
+    def test_correct_navigation_to_download_page_for_OSISAF_with_none(self, mock_get_link, mock_http_get):
+        """Test the functionality of "get_download_url" method for OpenDAP crawler of OSISAF
+        project to return None in the case of incorrect link (lack of dodsC in link)"""
+        mock_get_link.return_value = [
+            '/thredds/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
+        expected_urls = ['testurl', ]
+        request_link = crawlers.ThreddsCrawler.get_download_url(
+            crawlers.OpenDAPCrawler, expected_urls)
+        self.assertEqual(
+            request_link, None)
 
 class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
     """Tests for the Copernicus OpenSearch API crawler"""
