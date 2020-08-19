@@ -272,6 +272,7 @@ class ThreddsCrawler(WebDirectoryCrawler):
     FILES_SUFFIXES = ('.nc',)
     EXCLUDE = ['/thredds/', 'http',]
     def get_download_url(self, resource_url):
+        result = None
         links = self._get_links(self._http_get(resource_url))
         for link in links:
             if "dodsC" in link:
@@ -280,7 +281,7 @@ class ThreddsCrawler(WebDirectoryCrawler):
                 result = "https://thredds.met.no"+link[:-4]+'dods'
                 return result
             else:
-                return None
+                return result
 
 
 class CopernicusOpenSearchAPICrawler(Crawler):
