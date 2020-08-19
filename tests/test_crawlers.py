@@ -33,7 +33,7 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
         """Test the functionality of "get_download_url" method for OpenDAP crawler with incorrect
         url. URL must be ended with '.html' """
         mock_get_link.return_value = ['/thredds/dodsC/osisaf/met.no/ice_conc201911301200.nc']
-        with self.assertLogs(crawlers.OpenDAPCrawler.LOGGER):#self.assertRaises(ValueError):
+        with self.assertLogs(crawlers.OpenDAPCrawler.LOGGER):
             crawlers.ThreddsCrawler.get_download_url(crawlers.OpenDAPCrawler, "dummy")
 
 
