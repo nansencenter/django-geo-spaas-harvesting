@@ -5,15 +5,18 @@ harvesters:
   OSISAF:
     class: 'OSISAFHarvester'
     max_fetcher_threads: 30
+    # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting process
+    excludes: ['ease', '_sh_polstere',]
     max_db_threads: 1
     urls:
-      - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
       - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
+      - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
   podaac:
     class: 'PODAACHarvester'
-    max_fetcher_threads: 30
+    max_fetcher_threads: 1
     max_db_threads: 1
     urls:
+      - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/contents.html'
       - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
       - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
       - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
