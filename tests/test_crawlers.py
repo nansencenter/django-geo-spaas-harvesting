@@ -421,7 +421,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         """Test the functionality of "get_download_url" method for OpenDAP crawler of OSISAF project """
         mock_get_link.return_value = [
             '/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
-        expected_urls = ['https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2019/11/catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc', ]
+        expected_urls = 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2019/11/catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc'
         request_link = crawlers.ThreddsCrawler.get_download_url(
             crawlers.OpenDAPCrawler, expected_urls)
         self.assertEqual(
@@ -434,7 +434,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         project to return None in the case of incorrect link (lack of dodsC in link)"""
         mock_get_link.return_value = [
             '/thredds/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
-        expected_urls = ['testurl', ]
+        expected_urls = ['', ]
         request_link = crawlers.ThreddsCrawler.get_download_url(
             crawlers.OpenDAPCrawler, expected_urls)
         self.assertEqual(
