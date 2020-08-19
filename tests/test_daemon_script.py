@@ -1,20 +1,18 @@
 """Tests for the daemon script"""
 #pylint: disable=protected-access
 
-import glob
 import logging
 import os
 import os.path
 import signal
 import sys
+import tempfile
 import unittest
 import unittest.mock as mock
 
+import geospaas_harvesting.harvest as harvest
 import geospaas_harvesting.harvesters as harvesters
 import tests.stubs as stubs
-
-os.environ.setdefault('GEOSPAAS_PERSISTENCE_DIR', os.path.join('/', 'tmp', 'harvesting_tests'))
-import geospaas_harvesting.harvest as harvest
 
 CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'data', 'configuration_files')
 CONFIGURATION_FILES = {
@@ -144,22 +142,25 @@ class ConfigurationTestCase(unittest.TestCase):
         with self.assertRaises(StopIteration):
             next(config_iterator)
 
-class MainTestCase(unittest.TestCase):
-    """Test the main() function in the daemon script"""
 
+class TemporaryPersistenceDirTestCase(unittest.TestCase):
+    """
+    Base class for test cases which need to put persistence files in a temporary directory.
+    Child classes should use super().setUp() and/or super().tearDown()
+    if they need extra pre/post processing.
+    """
     def setUp(self):
-        try:
-            os.mkdir(harvest.PERSISTENCE_DIR)
-        except FileExistsError:
-            pass
+        self.temp_directory = tempfile.TemporaryDirectory()
+        mock.patch('geospaas_harvesting.harvest.PERSISTENCE_DIR',
+                   self.temp_directory.name).start()
+        self.addCleanup(mock.patch.stopall)
 
     def tearDown(self):
-        try:
-            for file_to_remove in glob.glob(f"{harvest.PERSISTENCE_DIR}/*"):
-                os.remove(file_to_remove)
-        except FileNotFoundError:
-            pass
+        self.temp_directory.cleanup()
 
+
+class MainTestCase(TemporaryPersistenceDirTestCase):
+    """Test the main() function in the daemon script"""
     @mock.patch.object(sys, 'argv', ['harvest.py'])
     @mock.patch.object(
         harvest.Configuration, 'DEFAULT_CONFIGURATION_PATH', CONFIGURATION_FILES['empty'])
@@ -200,27 +201,14 @@ class MainTestCase(unittest.TestCase):
     #     """Main process terminates workers and exits on interruption"""
 
 
-class PersistenceTestCase(unittest.TestCase):
+class PersistenceTestCase(TemporaryPersistenceDirTestCase):
     """Test the persistence of the harvesters"""
     # These tests are inelegant, it might be necessary to rewrite the daemon script in a more easily
     # testable form
 
     def setUp(self):
-        try:
-            os.mkdir(harvest.PERSISTENCE_DIR)
-        except FileExistsError:
-            pass
-
-        self.conf_patcher = mock.patch('geospaas_harvesting.harvest.Configuration')
-        self.conf_mock = self.conf_patcher.start()
-
-    def tearDown(self):
-        self.conf_patcher.stop()
-        try:
-            for file_to_remove in glob.glob(f"{harvest.PERSISTENCE_DIR}/*"):
-                os.remove(file_to_remove)
-        except FileNotFoundError:
-            pass
+        super().setUp()
+        mock.patch('geospaas_harvesting.harvest.Configuration').start()
 
     def test_get_persistence_files(self):
         """Test that the persistence files are correctly retrieved and sorted"""
@@ -302,7 +290,6 @@ class PersistenceTestCase(unittest.TestCase):
         self.assertEqual(len(created_persistence_files), 1)
         created_file_path = os.path.join(harvest.PERSISTENCE_DIR, created_persistence_files[0])
         self.assertTrue(os.path.getsize(created_file_path) > 0)
-
 
     def test_dump_on_exception(self):
         """The harvesters state is dumped when any other exception is raised"""
