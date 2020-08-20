@@ -94,13 +94,21 @@ class WebDirectoryHarvester(Harvester):
     ingester = None
     crawler = None
 
+    def __init__(self, **config):
+        super().__init__(**config)
+        if 'excludes' in config:
+            if not isinstance(config['excludes'], list):
+                raise HarvesterConfigurationError(
+                    "'excludes' field must be fed with a python list of excluded names ")
+
     def _create_crawlers(self):
         if self.crawler is None:
             raise HarvesterConfigurationError(
                 "The class of crawler has not been specified properly")
         try:
             return [
-                self.crawler(url, time_range=(self.get_time_range()))
+                self.crawler(url, time_range=(self.get_time_range()),
+                             excludes=self.config.get('excludes', None))
                 for url in self.config['urls']
             ]
         except (KeyError, TypeError, AttributeError,) as error:
@@ -110,13 +118,14 @@ class WebDirectoryHarvester(Harvester):
     def _create_ingester(self):
         parameters = {}
         if self.ingester is None:
-            raise HarvesterConfigurationError("The class of ingester has not been specified properly")
+            raise HarvesterConfigurationError(
+                "The class of ingester has not been specified properly")
         try:
             for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
                 if parameter_name in self.config:
                     parameters[parameter_name] = self.config[parameter_name]
             return self.ingester(**parameters)
-        except (KeyError, TypeError, AttributeError,) as error:
+        except (TypeError, ) as error:
             raise HarvesterConfigurationError(
                 "ingester must be created properly with correct configuration file") from error
 
@@ -131,12 +140,7 @@ class OSISAFHarvester(WebDirectoryHarvester):
     """Harvester class for OSISAF project"""
     ingester = ingesters.DDXIngester
     crawler = crawlers.ThreddsCrawler
-    def __init__(self, **config):
-        super().__init__(**config)
-        if type(config['excludes']) != list:
-            raise HarvesterConfigurationError(
-                "'excludes' field must be fed with a list of excluded names ")
-        self.crawler.EXCLUDE.extend(config['excludes'])
+
 
 class CopernicusSentinelHarvester(Harvester):
     """Harvester class for Copernicus Sentinel data"""

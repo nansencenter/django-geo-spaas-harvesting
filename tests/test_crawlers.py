@@ -1,12 +1,11 @@
 """Test suite for crawlers"""
-#pylint: disable=protected-access
 
 import logging
 import os
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
-import geospaas_harvesting.harvest as harvest
+#import geospaas_harvesting.harvest as harvest
 
 import requests
 
@@ -27,14 +26,14 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             crawlers.Crawler.set_initial_state(self)
 
-    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
-    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
-    def test_lack_of_correct_url_for_download_page_for_OSISAF(self, mock_get_link, mock_http_get):
+    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._http_get")
+    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._get_links")
+    def test_lack_of_correct_url_for_download_page_for_osisaf(self, mock_get_link, mock_http_get):
         """Test the functionality of "get_download_url" method for OpenDAP crawler with incorrect
         url. URL must be ended with '.html' """
         mock_get_link.return_value = ['/thredds/dodsC/osisaf/met.no/ice_conc201911301200.nc']
-        with self.assertLogs(crawlers.OpenDAPCrawler.LOGGER):
-            crawlers.ThreddsCrawler.get_download_url(crawlers.OpenDAPCrawler, "dummy")
+        with self.assertLogs(crawlers.ThreddsCrawler.LOGGER):
+            crawlers.ThreddsCrawler('').get_download_url("dummy")
 
 
 class BaseCrawlerTestCase(unittest.TestCase):
@@ -415,28 +414,27 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         # no upper limit and no start_time, without intersection
         self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
-    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
-    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
-    def test_correct_navigation_to_download_page_for_OSISAF(self, mock_get_link, mock_http_get):
+    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._http_get")
+    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._get_links")
+    def test_correct_navigation_to_download_page_for_osisaf(self, mock_get_link, mock_http_get):
         """Test the functionality of "get_download_url" method for OpenDAP crawler of OSISAF project """
         mock_get_link.return_value = [
             '/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
-        expected_urls = 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2019/11/catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc'
-        request_link = crawlers.ThreddsCrawler.get_download_url(
-            crawlers.OpenDAPCrawler, expected_urls)
+        # The value of this variable is not used in this test, it is here for reference
+        catalog_url = 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/2019/11/catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc'
+        request_link = crawlers.ThreddsCrawler('').get_download_url(catalog_url)
         self.assertEqual(
             request_link, 'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.dods')
 
-    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._http_get")
-    @mock.patch("geospaas_harvesting.crawlers.OpenDAPCrawler._get_links")
-    def test_correct_navigation_to_download_page_for_OSISAF_with_none(self, mock_get_link, mock_http_get):
+    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._http_get")
+    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._get_links")
+    def test_correct_navigation_to_download_page_for_osisaf_with_none(self, mock_get_link, mock_http_get):
         """Test the functionality of "get_download_url" method for OpenDAP crawler of OSISAF
         project to return None in the case of incorrect link (lack of dodsC in link)"""
         mock_get_link.return_value = [
             '/thredds/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
         expected_urls = ['', ]
-        request_link = crawlers.ThreddsCrawler.get_download_url(
-            crawlers.OpenDAPCrawler, expected_urls)
+        request_link = crawlers.ThreddsCrawler('').get_download_url(expected_urls)
         self.assertEqual(
             request_link, None)
 

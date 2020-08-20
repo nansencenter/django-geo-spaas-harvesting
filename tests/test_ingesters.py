@@ -1,5 +1,4 @@
 """Test suite for ingesters"""
-#pylint: disable=protected-access
 
 import json
 import logging
@@ -33,7 +32,6 @@ class IngesterTestCase(django.test.TransactionTestCase):
 
     def tearDown(self):
         self.patcher_param_count.stop()
-
 
     def _create_dummy_dataset(self, title):
         """Create dummy dataset for testing purposes"""
@@ -230,7 +228,7 @@ class MetanormIngesterTestCase(django.test.TestCase):
                                           ('Location_Subregion2', 'gcmd_location_subregion2'),
                                           ('Location_Subregion3', 'gcmd_location_subregion3')]),
             'dataset_parameters': [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave'),
-                                    {'standard_name':'latitude'},{'standard_name':'longitude'},]
+                                   {'standard_name': 'latitude'}, {'standard_name': 'longitude'}, ]
         }
 
         datasets_count = Dataset.objects.count()
@@ -299,7 +297,7 @@ class DDXIngesterTestCase(django.test.TestCase):
             'file_path': "data/opendap/ddx_no_ns.xml"},
     }
 
-    def requests_get_side_effect(self, url, **kwargs):  # pylint: disable=unused-argument
+    def requests_get_side_effect(self, url, **kwargs):
         """Side effect function used to mock calls to requests.get().text"""
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
@@ -464,24 +462,24 @@ class DDXIngesterTestCase(django.test.TestCase):
 
     def test_function_named_prepare_url(self):
         """ test the functionality of 'prepare_url' for a ddxingester """
-        input_url='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc'
-        output_url='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
+        input_url = 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc'
+        output_url = 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
         ingester = ingesters.DDXIngester()
-        self.assertEqual(output_url,ingester.prepare_url(input_url))
+        self.assertEqual(output_url, ingester.prepare_url(input_url))
 
     def test_function_named_prepare_url2(self):
         """ no change when a ddx file has been given to the function """
-        input_url2='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
-        output_url2='https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
+        input_url2 = 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
+        output_url2 = 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/20140105235906-NAVO-L2P_GHRSST-SST1m-VIIRS_NPP-v02.0-fv01.0.nc.ddx'
         ingester = ingesters.DDXIngester()
-        self.assertEqual(output_url2,ingester.prepare_url(input_url2))
+        self.assertEqual(output_url2, ingester.prepare_url(input_url2))
 
     def test_function_named_prepare_url3(self):
         """ test the functionality of 'prepare_url' for a OSISAF ingester """
-        input_url='https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.dods'
-        output_url='https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.ddx'
+        input_url = 'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.dods'
+        output_url = 'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.ddx'
         ingester = ingesters.DDXIngester()
-        self.assertEqual(output_url,ingester.prepare_url(input_url))
+        self.assertEqual(output_url, ingester.prepare_url(input_url))
 
 
 class CopernicusODataIngesterTestCase(django.test.TestCase):
@@ -627,7 +625,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['gcmd_location']['Location_Subregion2'], '')
         self.assertEqual(normalized_parameters['gcmd_location']['Location_Subregion3'], '')
 
-    def test_parameter_assigment_for_attributes(self):
+    def test_parameter_assignment_for_attributes(self):
         """Shall assign the correct parameter to dataset
         from Sentinel-SAFE JSON metadata (only one time execution)"""
 
@@ -693,6 +691,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
 
 class NansatIngesterTestCase(django.test.TestCase):
     """Test the NansatIngester"""
+
     def setUp(self):
         self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
         self.mock_param_count = self.patcher_param_count.start()

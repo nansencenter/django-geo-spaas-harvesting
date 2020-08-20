@@ -7,7 +7,6 @@ import logging
 import re
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
-
 import feedparser
 import requests
 
@@ -87,7 +86,7 @@ class WebDirectoryCrawler(Crawler):
     LOGGER = None
     FOLDERS_SUFFIXES = None
     FILES_SUFFIXES = None
-    EXCLUDE = None
+    CLASS_EXCLUDE = None
 
     YEAR_PATTERN = r'(\d{4})'
     MONTH_PATTERN = r'(1[0-2]|0[1-9]|[1-9])'
@@ -104,7 +103,7 @@ class WebDirectoryCrawler(Crawler):
         r'(\d{4})(1[0-2]|0[1-9]|[1-9])(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9])'
         r'(2[0-3]|[0-1]\d|\d)([0-5]\d|\d)(6[0-1]|[0-5]\d|\d)'))
 
-    def __init__(self, root_url, time_range=(None, None)):
+    def __init__(self, root_url, time_range=(None, None), excludes=None):
         """
         `root_url` is the URL of the data repository to explore.
         `time_range` is a tuple of datetime.datetime objects defining the time range of the datasets
@@ -112,6 +111,9 @@ class WebDirectoryCrawler(Crawler):
         """
         self.root_url = root_url
         self.time_range = time_range
+        class_excludes = self.CLASS_EXCLUDE or []
+        excludes = excludes or []
+        self.excludes = class_excludes + excludes
         self.set_initial_state()
 
     def set_initial_state(self):
@@ -209,8 +211,8 @@ class WebDirectoryCrawler(Crawler):
         current_location = re.sub(r'/\w+\.\w+$', '', folder_url)
         links = self._get_links(self._http_get(folder_url))
         for link in links:
-            # Select links which do not contain any of the self.EXCLUDE strings
-            if all(map(lambda s, l=link: s not in l, self.EXCLUDE)):
+            # Select links which do not contain any of the self.CLASS_EXCLUDE strings
+            if all(map(lambda s, l=link: s not in l, self.excludes)):
                 if link.endswith(self.FOLDERS_SUFFIXES):
                     folder_url = f"{current_location}/{link}"
                     if folder_url not in self._to_process:
@@ -221,7 +223,8 @@ class WebDirectoryCrawler(Crawler):
                     resource_url = f"{current_location}/{link}"
                     if resource_url not in self._urls:
                         if self._intersects_time_range(*(self._dataset_timestamp(link),) * 2):
-                            self.LOGGER.debug("Adding downloadable form of '%s' to the list of resources.", link)
+                            self.LOGGER.debug(
+                                "Adding downloadable form of '%s' to the list of resources.", link)
                             resource_url = self.get_download_url(resource_url)
                             if resource_url is not None:
                                 self._urls.append(resource_url)
@@ -257,7 +260,7 @@ class OpenDAPCrawler(WebDirectoryCrawler):
     LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
     FOLDERS_SUFFIXES = ('/contents.html',)
     FILES_SUFFIXES = ('.nc', '.nc.gz')
-    EXCLUDE = ['?']
+    CLASS_EXCLUDE = ['?']
 
     def get_download_url(self, resource_url):
         return resource_url
@@ -270,14 +273,16 @@ class ThreddsCrawler(WebDirectoryCrawler):
     LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
     FILES_SUFFIXES = ('.nc',)
-    EXCLUDE = ['/thredds/', 'http',]
+    CLASS_EXCLUDE = ['/thredds/', 'http', ]
+
     def get_download_url(self, resource_url):
         result = None
         links = self._get_links(self._http_get(resource_url))
         for link in links:
             if "dodsC" in link:
                 if not link.endswith(".html"):
-                    self.LOGGER.warning('The link as the result of crawler for "%s" must be ended with ".html".Failed to create downloable form',resource_url)
+                    self.LOGGER.warning(
+                        'The link as the result of crawler for "%s" must be ended with ".html".Failed to create downloadable form', resource_url)
                 result = "https://thredds.met.no"+link[:-4]+'dods'
                 return result
             else:
