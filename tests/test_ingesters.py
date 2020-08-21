@@ -33,6 +33,12 @@ class IngesterTestCase(django.test.TransactionTestCase):
     def tearDown(self):
         self.patcher_param_count.stop()
 
+    def test_safety_exception(self):
+        """ Raise the safety exception in the case of an empty parameters in the vocabulary  """
+        self.mock_param_count.return_value = 0 #No parameter in the vocabulary
+        with self.assertRaises(RuntimeError):
+            ingesters.Ingester()
+
     def _create_dummy_dataset(self, title):
         """Create dummy dataset for testing purposes"""
 

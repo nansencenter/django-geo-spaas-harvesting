@@ -194,7 +194,7 @@ class ChildHarvestersTestCase(unittest.TestCase):
     def test_extra_excludes_with_no_CLASS_EXCLUDE(self):
         """ shall return the excludes from the config file """
         class TestCrawler(crawlers.WebDirectoryCrawler):
-            CLASS_EXCLUDE = None
+            EXCLUDE = None
 
         class TestHarvester(harvesters.WebDirectoryHarvester):
             ingester = ingesters.DDXIngester
