@@ -433,8 +433,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         project to return None in the case of incorrect link (lack of dodsC in link)"""
         mock_get_link.return_value = [
             '/thredds/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
-        expected_urls = ['', ]
-        request_link = crawlers.ThreddsCrawler('').get_download_url(expected_urls)
+        request_link = crawlers.ThreddsCrawler('').get_download_url('')
         self.assertEqual(request_link, None)
 
 class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):

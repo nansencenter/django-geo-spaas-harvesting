@@ -270,7 +270,7 @@ class OpenDAPCrawler(WebDirectoryCrawler):
 
 class ThreddsCrawler(WebDirectoryCrawler):
     """
-    Crawler for harvesting the data which are provided by OpenDAP
+    Crawler for harvesting the data which are provided by Thredds
     """
     LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
@@ -282,13 +282,14 @@ class ThreddsCrawler(WebDirectoryCrawler):
         links = self._get_links(self._http_get(resource_url))
         for link in links:
             if "dodsC" in link:
-                if not link.endswith(".html"):
+                if link.endswith(".html"):
+                    result = "https://thredds.met.no" + link[:-4] + 'dods'
+                    break
+                else:
                     self.LOGGER.warning(
-                        'The link as the result of crawler for "%s" must be ended with ".html".Failed to create downloadable form', resource_url)
-                result = "https://thredds.met.no"+link[:-4]+'dods'
-                return result
-            else:
-                return result
+                        'The link as the result of crawler for "%s" must be ended with ".html". ' +
+                        'Failed to create downloadable form', resource_url)
+        return result
 
 
 class CopernicusOpenSearchAPICrawler(Crawler):
