@@ -203,7 +203,7 @@ class ChildHarvestersTestCase(unittest.TestCase):
                                   excludes=['ease', '_sh_polstere', ])
         self.assertListEqual(harvester._current_crawler.excludes, ['ease', '_sh_polstere'])
         harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,)
-        self.assertEqual(list(harvester._current_crawler.excludes), [])
+        self.assertEqual(harvester._current_crawler.excludes, [])
 
 
 class HarvesterExceptTestCase(unittest.TestCase):
