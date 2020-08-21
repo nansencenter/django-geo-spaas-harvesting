@@ -46,14 +46,10 @@ class Ingester():
     QUEUE_SIZE = 500
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
-        if type(max_fetcher_threads) == int:
-            self.max_fetcher_threads = max_fetcher_threads
-        else:
+        if not (isinstance(max_fetcher_threads, int) and isinstance(max_db_threads, int)):
             raise TypeError
-        if type(max_db_threads) == int:
-            self.max_db_threads = max_db_threads
-        else:
-            raise TypeError
+        self.max_fetcher_threads = max_fetcher_threads
+        self.max_db_threads = max_db_threads
         self._to_ingest = queue.Queue(self.QUEUE_SIZE)
         # safety check in order to prevent harvesting process with an empty list of parameters
         if Parameter.objects.count() < 1:
