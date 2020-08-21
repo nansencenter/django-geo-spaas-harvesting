@@ -111,7 +111,7 @@ class WebDirectoryHarvester(Harvester):
                              excludes=self.config.get('excludes', None))
                 for url in self.config['urls']
             ]
-        except (KeyError, TypeError, AttributeError,) as error:
+        except TypeError as error:
             raise HarvesterConfigurationError(
                 "crawler must be created properly with correct configuration file") from error
 
@@ -125,7 +125,7 @@ class WebDirectoryHarvester(Harvester):
                 if parameter_name in self.config:
                     parameters[parameter_name] = self.config[parameter_name]
             return self.ingester(**parameters)
-        except (TypeError, ) as error:
+        except TypeError as error:
             raise HarvesterConfigurationError(
                 "ingester must be created properly with correct configuration file") from error
 
