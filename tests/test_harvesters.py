@@ -182,10 +182,10 @@ class ChildHarvestersTestCase(unittest.TestCase):
         Otherwise, accossiated error must be raised """
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
                                                excludes=['ease', '_sh_polstere', ])
-        self.assertListEqual(list(harvester._current_crawler.excludes),
+        self.assertListEqual(harvester._current_crawler.excludes,
                              ['/thredds/', 'http', 'ease', '_sh_polstere'])
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertListEqual(list(harvester._current_crawler.excludes), ['/thredds/', 'http', ])
+        self.assertListEqual(harvester._current_crawler.excludes, ['/thredds/', 'http', ])
 
         with self.assertRaises(HarvesterConfigurationError):
             harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
@@ -201,7 +201,7 @@ class ChildHarvestersTestCase(unittest.TestCase):
             crawler = TestCrawler
         harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
                                   excludes=['ease', '_sh_polstere', ])
-        self.assertListEqual(list(harvester._current_crawler.excludes), ['ease', '_sh_polstere'])
+        self.assertListEqual(harvester._current_crawler.excludes, ['ease', '_sh_polstere'])
         harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,)
         self.assertEqual(list(harvester._current_crawler.excludes), [])
 

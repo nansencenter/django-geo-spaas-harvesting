@@ -86,7 +86,7 @@ class WebDirectoryCrawler(Crawler):
     LOGGER = None
     FOLDERS_SUFFIXES = None
     FILES_SUFFIXES = None
-    CLASS_EXCLUDE = None
+    EXCLUDE = None
 
     YEAR_PATTERN = r'(\d{4})'
     MONTH_PATTERN = r'(1[0-2]|0[1-9]|[1-9])'
@@ -108,10 +108,12 @@ class WebDirectoryCrawler(Crawler):
         `root_url` is the URL of the data repository to explore.
         `time_range` is a tuple of datetime.datetime objects defining the time range of the datasets
         returned the crawler.
+        `excludes` is the list of string that are the associated url is ignored during
+        the harvesting process if these strings are found in the crawled url.
         """
         self.root_url = root_url
         self.time_range = time_range
-        class_excludes = self.CLASS_EXCLUDE or []
+        class_excludes = self.EXCLUDE or []
         excludes = excludes or []
         self.excludes = class_excludes + excludes
         self.set_initial_state()
@@ -211,7 +213,7 @@ class WebDirectoryCrawler(Crawler):
         current_location = re.sub(r'/\w+\.\w+$', '', folder_url)
         links = self._get_links(self._http_get(folder_url))
         for link in links:
-            # Select links which do not contain any of the self.CLASS_EXCLUDE strings
+            # Select links which do not contain any of the self.excludes strings
             if all(map(lambda s, l=link: s not in l, self.excludes)):
                 if link.endswith(self.FOLDERS_SUFFIXES):
                     folder_url = f"{current_location}/{link}"
@@ -260,7 +262,7 @@ class OpenDAPCrawler(WebDirectoryCrawler):
     LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
     FOLDERS_SUFFIXES = ('/contents.html',)
     FILES_SUFFIXES = ('.nc', '.nc.gz')
-    CLASS_EXCLUDE = ['?']
+    EXCLUDE = ['?']
 
     def get_download_url(self, resource_url):
         return resource_url
@@ -273,7 +275,7 @@ class ThreddsCrawler(WebDirectoryCrawler):
     LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
     FILES_SUFFIXES = ('.nc',)
-    CLASS_EXCLUDE = ['/thredds/', 'http', ]
+    EXCLUDE = ['/thredds/', 'http', ]
 
     def get_download_url(self, resource_url):
         result = None

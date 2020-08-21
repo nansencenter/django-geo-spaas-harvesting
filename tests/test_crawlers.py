@@ -17,9 +17,8 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
 
     def test_lack_of_definition_of_get_download_url(self):
         """shall return "NotImplementedError" exception in the case of lack of definition of get_download_url method """
-        my_harvester = crawlers.WebDirectoryCrawler
         with self.assertRaises(NotImplementedError):
-            my_harvester.get_download_url("test_text", "test_text2")
+            crawlers.WebDirectoryCrawler.get_download_url("test_text", "test_text2")
 
     def test_lack_of_definition_of_set_initial_state(self):
         """shall return "NotImplementedError" exception in the case of lack of definition of set_initial_state method """
@@ -435,8 +434,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             '/thredds/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911301200.nc.html']
         expected_urls = ['', ]
         request_link = crawlers.ThreddsCrawler('').get_download_url(expected_urls)
-        self.assertEqual(
-            request_link, None)
+        self.assertEqual(request_link, None)
 
 class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
     """Tests for the Copernicus OpenSearch API crawler"""
