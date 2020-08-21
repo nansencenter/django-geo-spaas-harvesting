@@ -5,7 +5,6 @@ import os
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
-#import geospaas_harvesting.harvest as harvest
 
 import requests
 
@@ -17,13 +16,9 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
 
     def test_lack_of_definition_of_get_download_url(self):
         """shall return "NotImplementedError" exception in the case of lack of definition of get_download_url method """
+        crawler = crawlers.WebDirectoryCrawler('')
         with self.assertRaises(NotImplementedError):
-            crawlers.WebDirectoryCrawler.get_download_url("test_text", "test_text2")
-
-    def test_lack_of_definition_of_set_initial_state(self):
-        """shall return "NotImplementedError" exception in the case of lack of definition of set_initial_state method """
-        with self.assertRaises(NotImplementedError):
-            crawlers.Crawler.set_initial_state(self)
+            crawler.get_download_url("")
 
     @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._http_get")
     @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._get_links")
@@ -37,6 +32,12 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
 
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
+
+    def test_lack_of_definition_of_set_initial_state(self):
+        """shall return "NotImplementedError" exception in the case of lack of definition of set_initial_state method """
+        crawler = crawlers.Crawler()
+        with self.assertRaises(NotImplementedError):
+            crawler.set_initial_state()
 
     def test_exception_on_iter(self):
         """An exception must be raised if the __iter__ method is not overloaded"""
