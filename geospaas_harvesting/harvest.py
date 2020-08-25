@@ -32,7 +32,7 @@ class Configuration(collections.abc.Mapping):
     """Manages harvesting configuration"""
 
     DEFAULT_CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'harvest.yml')
-    TOP_LEVEL_KEYS = set(['harvesters', 'poll_interval', 'endless'])
+    TOP_LEVEL_KEYS = set(['harvesters', 'poll_interval', 'endless', 'dump_on_interruption'])
     HARVESTER_CLASS_KEY = 'class'
 
     def __init__(self, config_path=None):
@@ -148,7 +148,7 @@ def get_harvester_file_name(harvester_name):
 
 def load_last_dumped_harvester(harvester_name):
     """
-    Returns a harvester unpickled from a persistence file, based on `run_id` and `harvester_name`.
+    Returns a harvester unpickled from a persistence file, based on `harvester_name`.
     """
     harvester = None
     harvester_file_name = get_harvester_file_name(harvester_name)
@@ -160,36 +160,47 @@ def load_last_dumped_harvester(harvester_name):
     return harvester
 
 
-def load_or_create_harvester(harvester_name, harvester_config):
+def create_harvester(harvester_config):
+    """Instantiate a harvester"""
+    harvester_class = getattr(harvesters, harvester_config['class'])
+    return (harvester_class(**{
+        key: value
+        for (key, value) in harvester_config.items() if key != 'class'
+    }))
+
+
+def load_or_create_harvester(harvester_name, harvester_config, load_dumped=True):
     """
     Try to load the last dumped harvester. If no havester was found, instantiate one using the
     configuration
     """
-    LOGGER.info('Trying to load last dumped harvester')
-    harvester = load_last_dumped_harvester(harvester_name)
+    if load_dumped:
+        LOGGER.info('Trying to load last dumped harvester')
+        harvester = load_last_dumped_harvester(harvester_name)
+    else:
+        harvester = None
 
     if not harvester:
-        LOGGER.info('No dumped harvester found, instantiating a new one')
-        harvester_class = getattr(harvesters, harvester_config['class'])
-        harvester = (harvester_class(**{
-            key: value
-            for (key, value) in harvester_config.items() if key != 'class'
-        }))
+        LOGGER.info('Instantiating a new harvester')
+        harvester = create_harvester(harvester_config)
+
     return harvester
 
 
-def launch_harvest(harvester_name, harvester_config):
+def launch_harvest(harvester_name, harvester_config, dump_on_interruption=True):
     """Launch the harvest operation and process errors. Meant to be run in a separate process"""
     try:
-        harvester = load_or_create_harvester(harvester_name, harvester_config)
+        harvester = load_or_create_harvester(harvester_name, harvester_config, dump_on_interruption)
         harvester.harvest()
     except KeyboardInterrupt:
         LOGGER.error("The process was killed", exc_info=True)
-        dump_with_timestamp(harvester, f"{harvester_name}")
+        if dump_on_interruption:
+            dump_with_timestamp(harvester, f"{harvester_name}")
         sys.exit(1)
     except Exception:  # pylint: disable=broad-except
         LOGGER.error("An unexpected error occurred", exc_info=True)
-        dump_with_timestamp(harvester, f"{harvester_name}")
+        if dump_on_interruption:
+            dump_with_timestamp(harvester, f"{harvester_name}")
         raise
     LOGGER.info("%s finished harvesting", harvester_name)
 
@@ -231,7 +242,12 @@ def main():
                             or not previous_result):
                         #Start a new process
                         results[harvester_name] = pool.apply_async(
-                            launch_harvest, (harvester_name, harvester_config))
+                            launch_harvest, (
+                                harvester_name,
+                                harvester_config,
+                                config.get('dump_on_interruption', True)
+                            )
+                        )
                 if not config.get('endless', False):
                     break
                 time.sleep(config.get('poll_interval', 600))

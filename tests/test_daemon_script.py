@@ -212,7 +212,7 @@ class PersistenceTestCase(TemporaryPersistenceDirTestCase):
 
     def setUp(self):
         super().setUp()
-        mock.patch('geospaas_harvesting.harvest.Configuration').start()
+        self.config_mock = mock.patch('geospaas_harvesting.harvest.Configuration').start()
         self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
         self.mock_param_count = self.patcher_param_count.start()
         self.mock_param_count.return_value = 2
@@ -314,6 +314,57 @@ class PersistenceTestCase(TemporaryPersistenceDirTestCase):
         self.assertEqual(len(created_persistence_files), 1)
         created_file_path = os.path.join(harvest.PERSISTENCE_DIR, created_persistence_files[0])
         self.assertTrue(os.path.getsize(created_file_path) > 0)
+
+    def test_no_dump_on_keyboard_interrupt_if_disabled(self):
+        """
+        The harvesters state should not be dumped when a KeyboardInterrupt exception is raised
+        if "dump_on_interruption" is set to False in the configuration file
+        """
+        self.config_mock.return_value._data = {
+            'dump_on_interruption': False
+        }
+
+        setattr(harvesters, 'StubInterruptHarvester', stubs.StubInterruptHarvester)
+        assert_daemon_logs = self.assertLogs(harvest.LOGGER)
+        assert_ingester_logs = self.assertLogs(stubs.StubExceptionIngester.LOGGER)
+
+        with self.assertRaises(SystemExit), assert_daemon_logs, assert_ingester_logs:
+            with mock.patch('geospaas_harvesting.harvest.dump_with_timestamp') as mock_dump:
+                harvest.launch_harvest('stub_interrupt_harvester', {
+                    'class': 'StubInterruptHarvester',
+                    'urls': ['https://random1.url']
+                })
+            mock_dump.assert_not_called()
+
+    def test_no_dump_on_exception_if_disabled(self):
+        """
+        The harvesters state should not be dumped when an unexpected exception is raised
+        if "dump_on_interruption" is set to False in the configuration file
+        """
+        self.config_mock.return_value._data = {
+            'dump_on_interruption': False
+        }
+
+        setattr(harvesters, 'StubExceptionHarvester', stubs.StubExceptionHarvester)
+        assert_daemon_logs = self.assertLogs(harvest.LOGGER_NAME)
+        assert_ingester_logs = self.assertLogs(stubs.StubExceptionIngester.LOGGER)
+
+        with self.assertRaises(ZeroDivisionError), assert_daemon_logs, assert_ingester_logs:
+            with mock.patch('geospaas_harvesting.harvest.dump_with_timestamp') as mock_dump:
+                harvest.launch_harvest('stub_exception_harvester', {
+                    'class': 'StubExceptionHarvester',
+                    'urls': ['https://random1.url']
+                })
+            mock_dump.assert_not_called()
+
+    def test_no_loading_if_persistence_disabled(self):
+        """load_or_create_harvester() should not try to load if the load_dumped argument is False"""
+        with mock.patch('geospaas_harvesting.harvest.create_harvester') as mock_create:
+            with mock.patch('geospaas_harvesting.harvest.load_last_dumped_harvester') as mock_load:
+                with self.assertLogs(harvest.LOGGER, logging.INFO):
+                    harvest.load_or_create_harvester('Harvester', {}, False)
+        mock_load.assert_not_called()
+        mock_create.assert_called_with({})
 
     def test_load_last_dumped_harvester(self):
         """Test that the last dumped harvester is correctly loaded"""

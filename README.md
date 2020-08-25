@@ -43,6 +43,9 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
 
 - **endless** (default: False): boolean controlling the endless harvesting mode. If True, the
   harvesters will be indefinitely re-run after they finish harvesting.
+- **dump_on_interruption** (default: True): boolean controlling the persistence behavior. If True, 
+  the harvesters are dumped on disk in case of unexpected error or interruption. The harvesting 
+  process can then be resumed where it stopped.
 - **poll_interval** (default: 600): the interval in seconds at which the main process checks if the
   running harvester processes have finished executing.
 - **harvesters**: dictionary mapping the harvesters names to a dictionary containing their
