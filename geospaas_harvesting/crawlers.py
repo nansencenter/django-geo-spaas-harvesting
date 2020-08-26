@@ -414,10 +414,10 @@ class FTPCrawler(WebDirectoryCrawler):
             login_info = self.ftp.login(self.username, self.password)
         except Exception as e:
             # these two cases are in the mentioned FTP servers that deals with "login once again"
-            if e.args[0].startswith('503' or '230'):
+            if e.args[0].startswith('503') or e.args[0].startswith('230'):
                 pass  # no need to stop execution for the login error of more-than-one-time login
             else:
-                raise RuntimeError(str(login_info))
+                raise RuntimeError(str(e.args[0]))
         self.ftp.cwd(folder_url)
         current_location = self.ftp.pwd()
         # searching through all subdirectory to check whether they are folders or files
