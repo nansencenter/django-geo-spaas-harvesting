@@ -419,7 +419,10 @@ class FTPCrawler(WebDirectoryCrawler):
             else:
                 raise RuntimeError(str(e.args[0]))
         self.ftp.cwd(folder_url)
-        current_location = self.ftp.pwd()
+        # for some ftp, pwd is not working properly(returns '')!!! then it has to be set manually
+        # for the first time with the help of python 'or'
+        current_location = self.ftp.pwd() or self.ftp.pwd()+folder_url
+
         # searching through all subdirectory to check whether they are folders or files
         for name in self.ftp.nlst():
             try:

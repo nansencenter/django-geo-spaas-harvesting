@@ -630,7 +630,8 @@ class FTPCrawlerTestCase(unittest.TestCase):
         test_crawler = crawlers.FTPCrawler('ftp:///', fileformat='.gz')
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
         test_crawler.ftp.cwd = self.cwd_fake_function_of_ftp
-        test_crawler._explore_page('')
+        with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
+            test_crawler._explore_page('')
         # '.gz' files must be in the "_urls" list
         self.assertTrue(any([url_name.endswith('file1.gz') for url_name in test_crawler._urls]))
         self.assertTrue(any([url_name.endswith('file2.gz') for url_name in test_crawler._urls]))
@@ -648,16 +649,18 @@ class FTPCrawlerTestCase(unittest.TestCase):
         test_crawler = crawlers.FTPCrawler('ftp:///', username="d", password="d", fileformat='.gz')
         mock_ftp.side_effect = self.the_503_fake_ftp_exception
         with self.assertRaises(AttributeError):
-            test_crawler._explore_page('')
+            with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
+                test_crawler._explore_page('')
         mock_ftp.side_effect = self.the_230_fake_ftp_exception
         with self.assertRaises(AttributeError):
-            test_crawler._explore_page('')
-
+            with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
+                test_crawler._explore_page('')
     def test_ftp_incorrect_login(self):
         """ Shall return 'RuntimeError' when there is an unsuccessfull login attempt(s) """
         test_crawler = crawlers.FTPCrawler('ftp:///', username="", password="", fileformat='.gz')
         with self.assertRaises(RuntimeError):
-            test_crawler._explore_page('')
+            with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
+                test_crawler._explore_page('')
 
     def test_ftp_incorrect_entry(self):
         """Shall return 'ValueError' when there is an incorrect entry in ftp address of
