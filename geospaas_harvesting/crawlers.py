@@ -10,6 +10,7 @@ from html.parser import HTMLParser
 import ftplib
 import feedparser
 import requests
+from urllib.parse import urlparse
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -403,8 +404,8 @@ class FTPCrawler(WebDirectoryCrawler):
         if not self.root_url.startswith('ftp://'):
             raise ValueError("root url must start with 'ftp://' in the configuration file")
         # giving the address that is declared in the config file to "_to_process" attribute
-        self._to_process = ['/'+self.root_url.split('/', 3)[3].rstrip('/')]
-        ftp_domain_name = self.root_url.split('/', 3)[2]
+        self._to_process = [urlparse(self.root_url).path]
+        ftp_domain_name = urlparse(self.root_url).netloc
         self.ftp = ftplib.FTP(ftp_domain_name, user=self.username, passwd=self.password)
 
     def _explore_page(self, folder_url):
@@ -437,8 +438,8 @@ class FTPCrawler(WebDirectoryCrawler):
                 # if can not cd into new name then add that name to the "self._urls" in the case of
                 # having specified endings that are shown in "self.FILES_SUFFIXES"
                 if name.endswith(self.FILES_SUFFIXES):
-                    ftp_domain_name = self.root_url.split('/', 3)[2]
-                    self._urls.append('ftp://'+ftp_domain_name+f"{current_location}/{name}")
+                    ftp_domain_name = urlparse(self.root_url).netloc
+                    self._urls.append('ftp://'+ftp_domain_name+'/'+f"{current_location.strip('/')}/{name}")
 
         ##### CODES for downloading scenario (incomplete) #####################
         ##
