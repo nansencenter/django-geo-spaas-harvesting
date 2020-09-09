@@ -99,8 +99,13 @@ class Ingester():
             data_center, _ = DataCenter.objects.get_or_create(
                 normalized_attributes.pop('provider'))
 
-            geographic_location, _ = GeographicLocation.objects.get_or_create(
-                geometry=normalized_attributes.pop('location_geometry'))
+            location_geometry = normalized_attributes.pop('location_geometry')
+            if isinstance(location_geometry, GEOSGeometry):
+                # backward compatibility. can be removed later
+                geometry = location_geometry
+            else:
+                geometry = GEOSGeometry(location_geometry)
+            geographic_location, _ = GeographicLocation.objects.get_or_create(geometry=geometry)
 
             location, _ = Location.objects.get_or_create(normalized_attributes.pop('gcmd_location'))
 
