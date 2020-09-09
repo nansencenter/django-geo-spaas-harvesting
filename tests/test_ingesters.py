@@ -284,6 +284,51 @@ class MetanormIngesterTestCase(django.test.TestCase):
         self.assertEqual(inserted_dataset.gcmd_location.subregion2, 'gcmd_location_subregion2')
         self.assertEqual(inserted_dataset.gcmd_location.subregion3, 'gcmd_location_subregion3')
 
+    def test_ingest_from_metadata_string_geometry(self):
+        """Test that a dataset is created with the correct values from metadata"""
+
+        value_for_testing = {
+            'entry_title': 'title_value',
+            'summary': 'summary_value',
+            'time_coverage_start': datetime(
+                year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()),
+            'time_coverage_end': datetime(
+                year=2020, month=1, day=1, hour=0, minute=5, second=59, tzinfo=tzutc()),
+            'platform': OrderedDict([
+                ('Category', 'platform_category'),
+                ('Series_Entity', 'platform_series_entity'),
+                ('Short_Name', 'platform_short_name'),
+                ('Long_Name', 'platform_long_name')]),
+            'instrument': OrderedDict([('Category', 'instrument_category'),
+                                       ('Class', 'instrument_class'),
+                                       ('Type', 'instrument_type'),
+                                       ('Subtype', 'instrument_subtype'),
+                                       ('Short_Name', 'instrument_short_name'),
+                                       ('Long_Name', 'instrument_long_name')]),
+            'location_geometry': 'POLYGON((1 1, 1 2, 2 2, 2 1, 1 1))',
+            'provider': OrderedDict([('Bucket_Level0', 'provider_bucket_level0'),
+                                     ('Bucket_Level1', 'provider_bucket_level1'),
+                                     ('Bucket_Level2', 'provider_bucket_level2'),
+                                     ('Bucket_Level3', 'provider_bucket_level3'),
+                                     ('Short_Name', 'provider_short_name'),
+                                     ('Long_Name', 'provider_long_name'),
+                                     ('Data_Center_URL', 'provider_data_center_url')]),
+            'iso_topic_category': OrderedDict([('iso_topic_category', 'category_value')]),
+            'gcmd_location': OrderedDict([('Location_Category', 'gcmd_location_category'),
+                                          ('Location_Type', 'gcmd_location_type'),
+                                          ('Location_Subregion1', 'gcmd_location_subregion1'),
+                                          ('Location_Subregion2', 'gcmd_location_subregion2'),
+                                          ('Location_Subregion3', 'gcmd_location_subregion3')]),
+            'dataset_parameters': [pti.get_wkv_variable('surface_backwards_scattering_coefficient_of_radar_wave'),
+                                   {'standard_name': 'latitude'}, {'standard_name': 'longitude'}, ]
+        }
+
+
+        # Create a dataset from these values
+        self.ingester._ingest_dataset('http://test.uri/dataset', value_for_testing)
+        inserted_dataset = Dataset.objects.latest('id')
+        self.assertEqual(inserted_dataset.geographic_location.geometry,
+                         GEOSGeometry(('POLYGON((1 1, 1 2, 2 2, 2 1, 1 1))'), srid=4326))
 
 class DDXIngesterTestCase(django.test.TestCase):
     """Test the DDXIngester"""
