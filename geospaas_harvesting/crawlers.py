@@ -410,7 +410,7 @@ class FTPCrawler(WebDirectoryCrawler):
 
     def _explore_page(self, folder_url):
         """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
-        self.LOGGER.info("Looking for FTP resources in '%s'...", folder_url)
+        self.LOGGER.info("Looking for FTP resources in '%s'...", self.ftp.host+folder_url)
         try:
             login_info = self.ftp.login(self.username, self.password)
         except Exception as e:
@@ -423,24 +423,24 @@ class FTPCrawler(WebDirectoryCrawler):
         # for some ftp, pwd is not working properly(returns '')!!! then it has to be set manually
         # for the first time with the help of python 'or'
         current_location = self.ftp.pwd() or self.ftp.pwd()+folder_url
-
         # searching through all subdirectory to check whether they are folders or files
         for name in self.ftp.nlst():
             try:
-                # if successfully cd into new name then add
-                # it to "self._to_process" and then come back to original address
                 self.ftp.cwd(name)
-                folder_url = f"{current_location}/{name}"
-                if folder_url not in self._to_process:
-                    self._to_process.append(folder_url)
-                self.ftp.cwd("..")
             except ftplib.error_perm as e:
                 # if can not cd into new name then add that name to the "self._urls" in the case of
                 # having specified endings that are shown in "self.FILES_SUFFIXES"
                 if name.endswith(self.FILES_SUFFIXES):
-                    ftp_domain_name = urlparse(self.root_url).netloc
-                    self._urls.append('ftp://'+ftp_domain_name+'/'+f"{current_location.strip('/')}/{name}")
-
+                    ftp_domain_name =self.ftp.host
+                    self._urls.append('ftp://'+ftp_domain_name+'/' +
+                                      f"{current_location.strip('/')}/{name}")
+            else:
+                # if successfully cd into new name then add
+                # it to "self._to_process" and then come back to original address
+                folder_url = f"{current_location}/{name}"
+                if folder_url not in self._to_process:
+                    self._to_process.append(folder_url)
+                self.ftp.cwd("..")
         ##### CODES for downloading scenario (incomplete) #####################
         ##
         # folder_url = f"{current_location}/{link}"

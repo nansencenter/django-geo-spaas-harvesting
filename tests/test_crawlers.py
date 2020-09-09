@@ -630,6 +630,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
         test_crawler = crawlers.FTPCrawler('ftp:///', fileformat='.gz')
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
         test_crawler.ftp.cwd = self.cwd_fake_function_of_ftp
+        test_crawler.ftp.host = ''
         with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
             test_crawler._explore_page('')
         # '.gz' files must be in the "_urls" list

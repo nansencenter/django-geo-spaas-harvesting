@@ -438,13 +438,14 @@ class FTPIngester(MetanormIngester):
     LOGGER = logging.getLogger(__name__ + '.FTPIngester')
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
-        """Gets dataset attributes using nansat"""
+        """Gets dataset attributes using ftp"""
         normalized_attributes = {}
         raw_attributes={}
         self.add_url(url, raw_attributes)
         normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
         normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
         normalized_attributes['geospaas_service'] = LOCAL_FILE_SERVICE
+        #Temporary solution
         normalized_attributes['entry_id'] = urlparse(url).path.split('/')[-1]#'entry_id'is file name
         return normalized_attributes
 
