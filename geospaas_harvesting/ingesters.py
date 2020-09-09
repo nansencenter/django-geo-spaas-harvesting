@@ -449,28 +449,6 @@ class FTPIngester(MetanormIngester):
         normalized_attributes['entry_id'] = urlparse(url).path.split('/')[-1]#'entry_id'is file name
         return normalized_attributes
 
-        ################## DOWNLOADING SCENARIO ###########
-        # try:
-        # ftplib.FTP(url).login()
-        # self.ftp=ftplib.FTP(url)
-        # return None
-        # except:
-        # self.ftp.login()
-        # my_directory=tempfile.TemporaryDirectory()
-        # address_plus_filname=my_directory.name+url.split('/')[-1]
-        # localfile=open(address_plus_filname,"wb")#my_directory.name+url.split('/')[-1],"wb"
-        ###    self.ftp.retrbinary('RETR ' + url, localfile.write)
-        # localfile.close()
-        ###    command = ingest.Command()
-        ###    ds, created = command.handle(files=[address_plus_filname], nansat_option=[])
-        # retun
-        # localfile=open(url.split('/')[-1],"rb")
-        ######################################################
-        # Open file with Nansat
-        #nansat_object = Nansat(str(address_plus_filname), **nansat_options)
-
-        # return (created_dataset, created_dataset_uri)
-
 
 class NansatIngester(Ingester):
     """Ingester class using Nansat to open files or streams"""

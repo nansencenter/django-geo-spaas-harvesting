@@ -413,12 +413,10 @@ class FTPCrawler(WebDirectoryCrawler):
         self.LOGGER.info("Looking for FTP resources in '%s'...", self.ftp.host+folder_url)
         try:
             login_info = self.ftp.login(self.username, self.password)
-        except Exception as e:
+        except ftplib.error_perm as e:
             # these two cases are in the mentioned FTP servers that deals with "login once again"
-            if e.args[0].startswith('503') or e.args[0].startswith('230'):
-                pass  # no need to stop execution for the login error of more-than-one-time login
-            else:
-                raise RuntimeError(str(e.args[0]))
+            if not (e.args[0].startswith('503') or e.args[0].startswith('230')):
+                raise
         self.ftp.cwd(folder_url)
         # for some ftp, pwd is not working properly(returns '')!!! then it has to be set manually
         # for the first time with the help of python 'or'
@@ -441,18 +439,3 @@ class FTPCrawler(WebDirectoryCrawler):
                 if folder_url not in self._to_process:
                     self._to_process.append(folder_url)
                 self.ftp.cwd("..")
-        ##### CODES for downloading scenario (incomplete) #####################
-        ##
-        # folder_url = f"{current_location}/{link}"
-        # if folder_url not in self._to_process:
-        # if self._intersects_time_range(*self._folder_coverage(folder_url)):
-        # self.LOGGER.debug("Adding '%s' to the list of pages to process.", link)
-        # self._to_process.append(folder_url)
-        # elif facts['type'] == 'dir':
-        # resource_url = f"{current_location}/{link}"
-        # if resource_url not in self._urls:
-        # if self._intersects_time_range(*(self._dataset_timestamp(link),) * 2):
-        # self.LOGGER.debug("Adding downloadable form of '%s' to the list of resources.", link)
-        # resource_url = self.get_download_url(resource_url)
-        # self._urls.append(resource_url)
-        ###############################################################

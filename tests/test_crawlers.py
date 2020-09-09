@@ -1,13 +1,12 @@
 """Test suite for crawlers"""
 
+import ftplib
 import logging
 import os
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
-#import geospaas_harvesting.harvest as harvest
-import ftplib
-
+from ftplib import socket
 import requests
 
 import geospaas_harvesting.crawlers as crawlers
@@ -607,20 +606,26 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
 class FTPCrawlerTestCase(unittest.TestCase):
     """Tests for the FTP crawler"""
 
-    def the_503_fake_ftp_exception(self, *args):
+    def raise_exception_503(self, *args):
         """Helper function for providing the correct ftp exception """
-        raise Exception("503")
+        raise ftplib.error_perm("503")
 
-    def the_230_fake_ftp_exception(self, *args):
+    def raise_exception_230(self, *args):
         """Helper function for providing the correct ftp exception """
-        raise Exception("230")
+        raise ftplib.error_perm("230")
 
-    def cwd_fake_function_of_ftp(self, name):
+    def raise_exception_999(self, *args):
+        """Helper function for providing the correct ftp exception """
+        raise ftplib.error_perm("999")
+
+    def raise_exception_reach_cwd_after_login(self, *args):
+        """Helper function for providing the correct ftp exception """
+        raise ConnectionError
+
+    def emulate_cwd_of_ftp(self, name):
         """passes in the case of "", ".." or "folder_name" in order to resemble the behavior of cwd
         of ftplib. Otherwise (encountering a filename) raise the proper exception """
-        if (name == "..") or (name == "folder_name") or (name == ""):
-            pass
-        else:
+        if name not in ["..", "folder_name", ""]:
             raise ftplib.error_perm
 
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP', autospec=True)
@@ -629,7 +634,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
         revealed in the configuration file) as well as folder(s) inside the ftp resource """
         test_crawler = crawlers.FTPCrawler('ftp:///', fileformat='.gz')
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
-        test_crawler.ftp.cwd = self.cwd_fake_function_of_ftp
+        test_crawler.ftp.cwd = self.emulate_cwd_of_ftp
         test_crawler.ftp.host = ''
         with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
             test_crawler._explore_page('')
@@ -642,24 +647,26 @@ class FTPCrawlerTestCase(unittest.TestCase):
         self.assertTrue(any([url_name.endswith('folder_name')
                              for url_name in test_crawler._to_process]))
 
+    # @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.socket')
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.login')
-    def test_ftp_correct_exception(self, mock_ftp):
-        """ shall return 'AttributeError' instead of 'RuntimeError' in order to continuing
-        the harvesting process in the case of redundant or repetitive login attempt(s) after
-        the first login attempt """
+    @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.cwd')
+    def test_ftp_correct_exception(self, mock_cwd, mock_ftp):
+        """ shall return the costume 'ConnectionError'
+        (defined in raise_exception_reach_cwd_after_login) instead of 'ftplib.error_perm' in order
+        to continue the harvesting process in the case of redundant or repetitive login attempt(s)
+        after the first login attempt """
         test_crawler = crawlers.FTPCrawler('ftp:///', username="d", password="d", fileformat='.gz')
-        mock_ftp.side_effect = self.the_503_fake_ftp_exception
-        with self.assertRaises(AttributeError):
+        mock_cwd.side_effect = self.raise_exception_reach_cwd_after_login
+        mock_ftp.side_effect = self.raise_exception_503
+        with self.assertRaises(ConnectionError):
             with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
                 test_crawler._explore_page('')
-        mock_ftp.side_effect = self.the_230_fake_ftp_exception
-        with self.assertRaises(AttributeError):
+        mock_ftp.side_effect = self.raise_exception_230
+        with self.assertRaises(ConnectionError):
             with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
                 test_crawler._explore_page('')
-    def test_ftp_incorrect_login(self):
-        """ Shall return 'RuntimeError' when there is an unsuccessfull login attempt(s) """
-        test_crawler = crawlers.FTPCrawler('ftp:///', username="", password="", fileformat='.gz')
-        with self.assertRaises(RuntimeError):
+        mock_ftp.side_effect = self.raise_exception_999
+        with self.assertRaises(ftplib.error_perm):
             with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
                 test_crawler._explore_page('')
 

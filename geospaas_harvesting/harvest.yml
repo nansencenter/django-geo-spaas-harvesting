@@ -1,6 +1,6 @@
 ---
   endless: False
-  dump_on_interruption: True
+  dump_on_interruption: False
   poll_interval: 600
   harvesters:
     OSISAF:
