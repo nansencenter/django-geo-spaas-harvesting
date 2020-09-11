@@ -222,7 +222,7 @@ def main():
         sys.exit(1)
     LOGGER.info('Updating vocabularies...')
 
-    update_vocabularies.Command().handle() #updating the vocabulary with this command
+    #update_vocabularies.Command().handle() #updating the vocabulary with this command
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])

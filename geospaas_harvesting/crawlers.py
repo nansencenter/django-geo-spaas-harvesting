@@ -3,14 +3,15 @@ A set of crawlers used to explore data provider interfaces and get resources URL
 should inherit from the Crawler class and implement the abstract methods defined in Crawler.
 """
 import calendar
+import ftplib
 import logging
 import re
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
-import ftplib
+from urllib.parse import urlparse
+
 import feedparser
 import requests
-from urllib.parse import urlparse
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -388,7 +389,7 @@ class FTPCrawler(WebDirectoryCrawler):
     """
     LOGGER = logging.getLogger(__name__ + '.FTPCrawler')
 
-    def __init__(self, root_url, username=None, password=None, fileformat=None,):
+    def __init__(self, root_url, username='anonymous', password='anonymous', fileformat=''):
         if not root_url.startswith('ftp://'):
             raise ValueError("root url must start with 'ftp://' in the configuration file")
         self.root_url = root_url
@@ -411,29 +412,24 @@ class FTPCrawler(WebDirectoryCrawler):
         """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
         self.LOGGER.info("Looking for FTP resources in '%s'...", self.ftp.host+folder_url)
         try:
-            login_info = self.ftp.login(self.username, self.password)
-        except ftplib.error_perm as e:
+            self.ftp.login(self.username, self.password)
+        except ftplib.error_perm as err_content:
             # these two cases are in the mentioned FTP servers that deals with "login once again"
-            if not (e.args[0].startswith('503') or e.args[0].startswith('230')):
+            if not (err_content.args[0].startswith('503') or err_content.args[0].startswith('230')):
                 raise
-        self.ftp.cwd(folder_url)
-        # for some ftp, pwd is not working properly(returns '')!!! then it has to be set manually
-        # for the first time with the help of python 'or'
-        current_location = self.ftp.pwd() or self.ftp.pwd()+folder_url
         # searching through all subdirectory to check whether they are folders or files
-        for name in self.ftp.nlst():
+        for name in self.ftp.nlst(folder_url):
             try:
                 self.ftp.cwd(name)
             except ftplib.error_perm:
                 # if can not cd into new name then add that name to the "self._urls" in the case of
                 # having specified endings that are shown in "self.FILES_SUFFIXES"
                 if name.endswith(self.FILES_SUFFIXES):
-                    self._urls.append('ftp://'+self.ftp.host+'/' +
-                                      f"{current_location.strip('/')}/{name}")
+                    ftp_domain_name = self.ftp.host
+                    self._urls.append(f"ftp://{ftp_domain_name}{name}")
             else:
                 # if successfully cd into new name then add
                 # it to "self._to_process" and then come back to original address
-                folder_url = f"{current_location}/{name}"
-                if folder_url not in self._to_process:
-                    self._to_process.append(folder_url)
+                if name not in self._to_process:
+                    self._to_process.append(name)
                 self.ftp.cwd("..")

@@ -625,20 +625,20 @@ class FTPCrawlerTestCase(unittest.TestCase):
             test_crawler._explore_page('')
         # '.gz' files must be in the "_urls" list
         # Other type of files should not be in the "_urls" list
-        self.assertCountEqual(['ftp:////file1.gz', 'ftp:////file2.gz'], test_crawler._urls)
+        self.assertCountEqual(['ftp://file1.gz', 'ftp://file2.gz'], test_crawler._urls)
         # folder with 'folder_name' must be in the "_to_process" list
-        self.assertCountEqual(['/', '/folder_name'], test_crawler._to_process)
+        self.assertCountEqual(['/', 'folder_name'], test_crawler._to_process)
 
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.login')
-    @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.cwd')
-    def test_ftp_correct_exception(self, mock_cwd, mock_ftp):
+    @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.nlst')
+    def test_ftp_correct_exception(self, mock_nlst, mock_ftp):
         """ shall return the costume 'ConnectionError'
          instead of 'ftplib.error_perm' in order to continue the harvesting process in the case of
          redundant or repetitive login attempt(s)
-         after the first login attempt. "cwd" is placed after "login" in source code. So reach "cwd"
+         after the first login attempt. "nlst" is placed after "login" in source code. So reach "nlst"
          means passing the login code. """
-        test_crawler = crawlers.FTPCrawler('ftp:///', username="d", password="d", fileformat='.gz')
-        mock_cwd.side_effect = ConnectionError
+        test_crawler = crawlers.FTPCrawler('ftp://', username="d", password="d", fileformat='.gz')
+        mock_nlst.side_effect = ConnectionError
         mock_ftp.side_effect = ftplib.error_perm("503")
         with self.assertRaises(ConnectionError):
             with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
