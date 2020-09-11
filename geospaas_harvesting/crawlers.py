@@ -389,6 +389,8 @@ class FTPCrawler(WebDirectoryCrawler):
     LOGGER = logging.getLogger(__name__ + '.FTPCrawler')
 
     def __init__(self, root_url, username=None, password=None, fileformat=None,):
+        if not root_url.startswith('ftp://'):
+            raise ValueError("root url must start with 'ftp://' in the configuration file")
         self.root_url = root_url
         self.password = password
         self.username = username
@@ -401,12 +403,9 @@ class FTPCrawler(WebDirectoryCrawler):
         The `_to_process` attribute contains URLs to pages which need to be searched for resources.
         """
         self._urls = []
-        if not self.root_url.startswith('ftp://'):
-            raise ValueError("root url must start with 'ftp://' in the configuration file")
         # giving the address that is declared in the config file to "_to_process" attribute
         self._to_process = [urlparse(self.root_url).path]
-        ftp_domain_name = urlparse(self.root_url).netloc
-        self.ftp = ftplib.FTP(ftp_domain_name, user=self.username, passwd=self.password)
+        self.ftp = ftplib.FTP(urlparse(self.root_url).netloc, user=self.username, passwd=self.password)
 
     def _explore_page(self, folder_url):
         """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
@@ -425,12 +424,11 @@ class FTPCrawler(WebDirectoryCrawler):
         for name in self.ftp.nlst():
             try:
                 self.ftp.cwd(name)
-            except ftplib.error_perm as e:
+            except ftplib.error_perm:
                 # if can not cd into new name then add that name to the "self._urls" in the case of
                 # having specified endings that are shown in "self.FILES_SUFFIXES"
                 if name.endswith(self.FILES_SUFFIXES):
-                    ftp_domain_name =self.ftp.host
-                    self._urls.append('ftp://'+ftp_domain_name+'/' +
+                    self._urls.append('ftp://'+self.ftp.host+'/' +
                                       f"{current_location.strip('/')}/{name}")
             else:
                 # if successfully cd into new name then add

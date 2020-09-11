@@ -606,22 +606,6 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
 class FTPCrawlerTestCase(unittest.TestCase):
     """Tests for the FTP crawler"""
 
-    def raise_exception_503(self, *args):
-        """Helper function for providing the correct ftp exception """
-        raise ftplib.error_perm("503")
-
-    def raise_exception_230(self, *args):
-        """Helper function for providing the correct ftp exception """
-        raise ftplib.error_perm("230")
-
-    def raise_exception_999(self, *args):
-        """Helper function for providing the correct ftp exception """
-        raise ftplib.error_perm("999")
-
-    def raise_exception_reach_cwd_after_login(self, *args):
-        """Helper function for providing the correct ftp exception """
-        raise ConnectionError
-
     def emulate_cwd_of_ftp(self, name):
         """passes in the case of "", ".." or "folder_name" in order to resemble the behavior of cwd
         of ftplib. Otherwise (encountering a filename) raise the proper exception """
@@ -636,36 +620,34 @@ class FTPCrawlerTestCase(unittest.TestCase):
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
         test_crawler.ftp.cwd = self.emulate_cwd_of_ftp
         test_crawler.ftp.host = ''
+        test_crawler.ftp.pwd.return_value = ''
         with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
             test_crawler._explore_page('')
         # '.gz' files must be in the "_urls" list
-        self.assertTrue(any([url_name.endswith('file1.gz') for url_name in test_crawler._urls]))
-        self.assertTrue(any([url_name.endswith('file2.gz') for url_name in test_crawler._urls]))
         # Other type of files should not be in the "_urls" list
-        self.assertFalse(any([url_name.endswith('file3.bb') for url_name in test_crawler._urls]))
+        self.assertCountEqual(['ftp:////file1.gz', 'ftp:////file2.gz'], test_crawler._urls)
         # folder with 'folder_name' must be in the "_to_process" list
-        self.assertTrue(any([url_name.endswith('folder_name')
-                             for url_name in test_crawler._to_process]))
+        self.assertCountEqual(['/', '/folder_name'], test_crawler._to_process)
 
-    # @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.socket')
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.login')
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.cwd')
     def test_ftp_correct_exception(self, mock_cwd, mock_ftp):
         """ shall return the costume 'ConnectionError'
-        (defined in raise_exception_reach_cwd_after_login) instead of 'ftplib.error_perm' in order
-        to continue the harvesting process in the case of redundant or repetitive login attempt(s)
-        after the first login attempt """
+         instead of 'ftplib.error_perm' in order to continue the harvesting process in the case of
+         redundant or repetitive login attempt(s)
+         after the first login attempt. "cwd" is placed after "login" in source code. So reach "cwd"
+         means passing the login code. """
         test_crawler = crawlers.FTPCrawler('ftp:///', username="d", password="d", fileformat='.gz')
-        mock_cwd.side_effect = self.raise_exception_reach_cwd_after_login
-        mock_ftp.side_effect = self.raise_exception_503
+        mock_cwd.side_effect = ConnectionError
+        mock_ftp.side_effect = ftplib.error_perm("503")
         with self.assertRaises(ConnectionError):
             with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
                 test_crawler._explore_page('')
-        mock_ftp.side_effect = self.raise_exception_230
+        mock_ftp.side_effect = ftplib.error_perm("230")
         with self.assertRaises(ConnectionError):
             with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
                 test_crawler._explore_page('')
-        mock_ftp.side_effect = self.raise_exception_999
+        mock_ftp.side_effect = ftplib.error_perm("999")
         with self.assertRaises(ftplib.error_perm):
             with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
                 test_crawler._explore_page('')
@@ -674,4 +656,4 @@ class FTPCrawlerTestCase(unittest.TestCase):
         """Shall return 'ValueError' when there is an incorrect entry in ftp address of
         the configuration file """
         with self.assertRaises(ValueError):
-            crawlers.FTPCrawler('ft:///',)
+            crawlers.FTPCrawler('ft:///')

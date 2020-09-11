@@ -700,36 +700,39 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(created_dataset_uri, False)
 
 
-class FTPIngesterTestCase(django.test.TestCase):
-    """Test the FTPIngester"""
+class URLNameIngesterTestCase(django.test.TestCase):
+    """Test the URLNameIngester"""
 
     def setUp(self):
         self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
         self.mock_param_count = self.patcher_param_count.start()
         self.mock_param_count.return_value = 2
 
+    def tearDown(self):
+        self.patcher_param_count.stop()
+
     def test_function_get_normalized_attributes_ceda(self):
-        """ test the functionality of '_get_normalized_attributes' for a FTPIngester.
+        """ test the functionality of '_get_normalized_attributes' for a URLNameIngester.
         Keys must be equal to DATASET_CUMULATIVE_PARAMETER_NAMES plus DATASET_PARAMETER_NAMES plus
         two additional new keys.
         Also a "None" value should not be in the resulted normalized attributes. """
         input_url = 'ftp://anon-ftp.ceda.ac.uk/neodc/esacci/sst/data/CDR_v2/Climatology/L4/v2.1/D365-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc'
 
-        ingester = ingesters.FTPIngester()
+        ingester = ingesters.URLNameIngester()
         normalized_attributes = ingester._get_normalized_attributes(input_url)
         self.assertCountEqual(list(normalized_attributes.keys()),
                               ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
                               ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name']+['geospaas_service']+['entry_id'])
+                              ['geospaas_service_name', 'geospaas_service', 'entry_id'])
         self.assertNotIn(None, normalized_attributes.values())
 
     def test_function_get_normalized_attributes_remss(self):
-        """ test the functionality of '_get_normalized_attributes' for a FTPIngester.
+        """ test the functionality of '_get_normalized_attributes' for a URLNameIngester.
         Keys must be equal to DATASET_CUMULATIVE_PARAMETER_NAMES plus DATASET_PARAMETER_NAMES plus
         two additional new keys.
         Also a "None" value should not be in the resulted normalized attributes. """
         input_url = 'ftp://ftp.remss.com/gmi/bmaps_v08.2/y2014/m06/f35_201406v8.2.gz'
-        ingester = ingesters.FTPIngester()
+        ingester = ingesters.URLNameIngester()
         normalized_attributes = ingester._get_normalized_attributes(input_url)
         self.assertCountEqual(list(normalized_attributes.keys()),
                               ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
@@ -738,12 +741,12 @@ class FTPIngesterTestCase(django.test.TestCase):
         self.assertNotIn(None, normalized_attributes.values())
 
     def test_function_get_normalized_attributes_jaxa(self):
-        """ test the functionality of '_get_normalized_attributes' for a FTPIngester.
+        """ test the functionality of '_get_normalized_attributes' for a URLNameIngester.
         Keys must be equal to DATASET_CUMULATIVE_PARAMETER_NAMES plus DATASET_PARAMETER_NAMES plus
         two additional new keys.
         Also a "None" value should not be in the resulted normalized attributes. """
         input_url = 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2015/04/GW1AM2_20150401_01D_EQOD_L3SGSSTLB3300300.h5'
-        ingester = ingesters.FTPIngester()
+        ingester = ingesters.URLNameIngester()
         normalized_attributes = ingester._get_normalized_attributes(input_url)
         self.assertCountEqual(list(normalized_attributes.keys()),
                               ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +

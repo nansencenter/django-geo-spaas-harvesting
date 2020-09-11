@@ -433,18 +433,19 @@ class CopernicusODataIngester(MetanormIngester):
         return normalized_attributes
 
 
-class FTPIngester(MetanormIngester):
+class URLNameIngester(MetanormIngester):
     """ Ingester class using FTP to read meta-data from the name of the dataset """
     LOGGER = logging.getLogger(__name__ + '.FTPIngester')
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Gets dataset attributes using ftp"""
-        normalized_attributes = {}
-        raw_attributes={}
+        raw_attributes = {}
+        FTP_SERVICE_NAME = 'ftp'
+        FTP_SERVCE = 'ftp'
         self.add_url(url, raw_attributes)
         normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-        normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
-        normalized_attributes['geospaas_service'] = LOCAL_FILE_SERVICE
+        normalized_attributes['geospaas_service_name'] = FTP_SERVICE_NAME
+        normalized_attributes['geospaas_service'] = FTP_SERVCE
         #Temporary solution
         normalized_attributes['entry_id'] = urlparse(url).path.split('/')[-1]#'entry_id'is file name
         return normalized_attributes
