@@ -11,7 +11,6 @@ import re
 import uuid
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
-
 import dateutil.parser
 import django.db
 import django.db.utils
@@ -431,6 +430,23 @@ class CopernicusODataIngester(MetanormIngester):
         normalized_attributes['geospaas_service'] = HTTP_SERVICE
         normalized_attributes['geospaas_service_name'] = HTTP_SERVICE_NAME
 
+        return normalized_attributes
+
+
+class URLNameIngester(MetanormIngester):
+    """ Ingester class using FTP to read meta-data from the name of the dataset """
+    LOGGER = logging.getLogger(__name__ + '.FTPIngester')
+
+    def _get_normalized_attributes(self, url, *args, **kwargs):
+        """Gets dataset attributes using ftp"""
+        raw_attributes = {}
+        self.add_url(url, raw_attributes)
+        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
+        # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
+        normalized_attributes['geospaas_service_name'] = 'ftp'
+        normalized_attributes['geospaas_service'] = 'ftp'
+        #Temporary solution
+        normalized_attributes['entry_id'] = urlparse(url).path.split('/')[-1]#'entry_id'is file name
         return normalized_attributes
 
 

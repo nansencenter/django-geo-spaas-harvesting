@@ -3,10 +3,13 @@ A set of crawlers used to explore data provider interfaces and get resources URL
 should inherit from the Crawler class and implement the abstract methods defined in Crawler.
 """
 import calendar
+import ftplib
 import logging
 import re
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
+from urllib.parse import urlparse
+
 import feedparser
 import requests
 
@@ -377,3 +380,56 @@ class CopernicusOpenSearchAPICrawler(Crawler):
             self._urls.append(entry['link'])
 
         return bool(entries)
+
+
+class FTPCrawler(WebDirectoryCrawler):
+    """
+    Crawler which returns the search results of an FTP, given the URL and search
+    terms
+    """
+    LOGGER = logging.getLogger(__name__ + '.FTPCrawler')
+
+    def __init__(self, root_url, username='anonymous', password='anonymous', fileformat=''):
+        if not root_url.startswith('ftp://'):
+            raise ValueError("root url must start with 'ftp://' in the configuration file")
+        self.root_url = root_url
+        self.password = password
+        self.username = username
+        self.FILES_SUFFIXES = fileformat
+        self.set_initial_state()
+
+    def set_initial_state(self):
+        """
+        The `_urls` attribute contains URLs to the resources which will be returned by the crawler.
+        The `_to_process` attribute contains URLs to pages which need to be searched for resources.
+        """
+        self._urls = []
+        # giving the address that is declared in the config file to "_to_process" attribute
+        self._to_process = [urlparse(self.root_url).path]
+        self.ftp = ftplib.FTP(urlparse(self.root_url).netloc, user=self.username, passwd=self.password)
+
+    def _explore_page(self, folder_url):
+        """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
+        self.LOGGER.info("Looking for FTP resources in '%s'...", self.ftp.host+folder_url)
+        try:
+            self.ftp.login(self.username, self.password)
+        except ftplib.error_perm as err_content:
+            # these two cases are in the mentioned FTP servers that deals with "login once again"
+            if not (err_content.args[0].startswith('503') or err_content.args[0].startswith('230')):
+                raise
+        # searching through all subdirectory to check whether they are folders or files
+        for name in self.ftp.nlst(folder_url):
+            try:
+                self.ftp.cwd(name)
+            except ftplib.error_perm:
+                # if can not cd into new name then add that name to the "self._urls" in the case of
+                # having specified endings that are shown in "self.FILES_SUFFIXES"
+                if name.endswith(self.FILES_SUFFIXES):
+                    ftp_domain_name = self.ftp.host
+                    self._urls.append(f"ftp://{ftp_domain_name}{name}")
+            else:
+                # if successfully cd into new name then add
+                # it to "self._to_process" and then come back to original address
+                if name not in self._to_process:
+                    self._to_process.append(name)
+                self.ftp.cwd("..")
