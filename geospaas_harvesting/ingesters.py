@@ -440,12 +440,11 @@ class URLNameIngester(MetanormIngester):
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Gets dataset attributes using ftp"""
         raw_attributes = {}
-        FTP_SERVICE_NAME = 'ftp'
-        FTP_SERVCE = 'ftp'
         self.add_url(url, raw_attributes)
         normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-        normalized_attributes['geospaas_service_name'] = FTP_SERVICE_NAME
-        normalized_attributes['geospaas_service'] = FTP_SERVCE
+        # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
+        normalized_attributes['geospaas_service_name'] = 'ftp'
+        normalized_attributes['geospaas_service'] = 'ftp'
         #Temporary solution
         normalized_attributes['entry_id'] = urlparse(url).path.split('/')[-1]#'entry_id'is file name
         return normalized_attributes
