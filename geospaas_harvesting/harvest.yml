@@ -1,63 +1,45 @@
 ---
-  endless: False
-  dump_on_interruption: False
-  poll_interval: 600
-  harvesters:
-    #OSISAF:
-    #  class: 'OSISAFHarvester'
-    #  max_fetcher_threads: 30
-    #  # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting process
-    #  excludes: ['ease', '_sh_polstere',]
-    #  max_db_threads: 1
-    #  urls:
-      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
-      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
-    #podaac:
-    #  class: 'PODAACHarvester'
-    #  max_fetcher_threads: 30
-    #  max_db_threads: 1
-    #  urls:
-    #    #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/contents.html'
-    #    #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
-    #    #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
-    #    - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
-    #copernicus_sentinel:
-    #  class: 'CopernicusSentinelHarvester'
-    #  max_fetcher_threads: 30
-    #  max_db_threads: 1
-    #  url: 'https://scihub.copernicus.eu/apihub/search'
-    #  search_terms:
-    #    - 'platformname:Sentinel-1 AND NOT L0'
-    #    - 'platformname:Sentinel-2 AND NOT L0'
-    #    - 'platformname:Sentinel-3 AND NOT L0'
-    #  username: 'username'
-    #  # Environment variable name
-    #  password: 'COPERNICUS_OPEN_HUB_PASSWORD' #'COPERNICUS_OPEN_HUB_PASSWORD' is an env. variable
-    #FTP_remss:
-    #  class: 'FTPHarvester'
-    #  max_fetcher_threads: 30
-    #  max_db_threads: 1
-    #  username:  username
-    #  password: 'REMSS_PASSWORD' # 'REMSS_PASSWORD' is an environmental variable
-    #  fileformat: '.gz'
-    #  urls:
-    #    - 'ftp://ftp.remss.com/gmi/bmaps_v08.2/y2014/m06/'
-    #FTP_jaxa:
-    #  class: 'FTPHarvester'
-    #  max_fetcher_threads: 30
-    #  max_db_threads: 1
-    #  username: username
-    #  password: JAXA_PASSWORD # 'JAXA_PASSWORD' is an environmental variable
-    #  fileformat: '.h5'
-    #  urls:
-    #    - 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2012/07/'
-    #FTP_ceda:
-    #  class: 'FTPHarvester'
-    #  max_fetcher_threads: 30
-    #  max_db_threads: 1
-    #  username: anonymous
-    #  password: anonymous
-    #  fileformat: '.nc'
-    #  urls:
-    #    - 'ftp://anon-ftp.ceda.ac.uk/neodc/esacci/sst/data/CDR_v2/Climatology/L4/v2.1/'
+#  endless: False
+#  dump_on_interruption: False
+#  poll_interval: 600
+#  harvesters:
+#    OSISAF:
+#      class: 'OSISAFHarvester'
+#      max_fetcher_threads: 30
+#      # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting process
+#      excludes: ['ease', '_sh_polstere',]
+#      max_db_threads: 1
+#      urls:
+#      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
+#      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
+#    podaac:
+#      class: 'PODAACHarvester'
+#      max_fetcher_threads: 30
+#      max_db_threads: 1
+#      urls:
+#        #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/contents.html'
+#        #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
+#        #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
+#        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
+#    copernicus_sentinel:
+#      class: 'CopernicusSentinelHarvester'
+#      max_fetcher_threads: 30
+#      max_db_threads: 1
+#      url: 'https://scihub.copernicus.eu/apihub/search'
+#      search_terms:
+#        - 'platformname:Sentinel-1 AND NOT L0'
+#        - 'platformname:Sentinel-2 AND NOT L0'
+#        - 'platformname:Sentinel-3 AND NOT L0'
+#      username: 'username'
+#      # Environment variable name
+#      password: 'COPERNICUS_OPEN_HUB_PASSWORD' #'COPERNICUS_OPEN_HUB_PASSWORD' is an env. variable
+#    FTP_jaxa:
+#      class: 'FTPHarvester'
+#      max_fetcher_threads: 30
+#      max_db_threads: 1
+#      username: username
+#      password: JAXA_PASSWORD # 'JAXA_PASSWORD' is an environmental variable
+#      fileformat: '.h5'
+#      urls:
+#        - 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2012/07/'
 ...
