@@ -432,14 +432,13 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['platform']['Series_Entity'],
                          'Joint Polar Satellite System (JPSS)')
 
-        self.assertEqual(normalized_parameters['location_geometry'], GEOSGeometry(
-            'POLYGON((' +
-            '-175.084000 -15.3505001,' +
-            '-142.755005 -15.3505001,' +
-            '-142.755005 9.47472000,' +
-            '-175.084000 9.47472000,' +
-            '-175.084000 -15.3505001))',
-            srid=4326
+        self.assertEqual(normalized_parameters['location_geometry'], (
+            'POLYGON(('
+            '-175.084000 -15.3505001,'
+            '-142.755005 -15.3505001,'
+            '-142.755005 9.47472000,'
+            '-175.084000 9.47472000,'
+            '-175.084000 -15.3505001))'
         ))
 
         self.assertEqual(normalized_parameters['provider']['Short_Name'],
