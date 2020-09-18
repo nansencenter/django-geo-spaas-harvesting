@@ -380,7 +380,7 @@ class DDXIngester(MetanormIngester):
         # Get all the global attributes of the Dataset into a dictionary
         extracted_attributes = self._extract_attributes(
             ET.parse(stream).getroot())
-        self.add_url(original_url, extracted_attributes)
+        self.add_url(url, extracted_attributes)
         # Get the parameters needed to create a geospaas catalog dataset from the global attributes
         normalized_attributes = self._metadata_handler.get_parameters(extracted_attributes)
         normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
