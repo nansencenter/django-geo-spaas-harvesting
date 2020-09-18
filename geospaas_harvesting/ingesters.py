@@ -446,7 +446,6 @@ class URLNameIngester(MetanormIngester):
         normalized_attributes['geospaas_service_name'] = 'ftp'
         normalized_attributes['geospaas_service'] = 'ftp'
         #Temporary solution
-        #normalized_attributes['entry_id'] = urlparse(url).path.split('/')[-1]#'entry_id'is file name
         return normalized_attributes
 
 
