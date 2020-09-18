@@ -374,7 +374,6 @@ class DDXIngester(MetanormIngester):
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
-        original_url = url
         prepared_url = self.prepare_url(url)
         # Get the metadata from the dataset as an XML tree
         stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
