@@ -14,7 +14,10 @@ def main():
     """ Verifies the datasets based on their dataseturi. If the download link does not provide a
     download availability and returns a text or html response, then the dataset uri is removed. If
     there is no other "dataseturi" remains for the dataset, then the dataset is also removed in
-    order to be harvested again in the future with a correct and healthy "dataseturi". """
+    order to be harvested again in the future with a correct and healthy "dataseturi".
+    Since the number of datasets in the database might be enormous, the datasets are retrieved
+    into with a variable named retrieved_dataset_uris with an specific length number
+    for memory management. """
     corrupted_url_set = set()
     id_range = range(DatasetURI.objects.earliest('id').id,
                      DatasetURI.objects.latest('id').id, 1000)# <=number for the length of retrieved
