@@ -1,7 +1,9 @@
 """ Test the verification code """
 import unittest.mock as mock
+
 import django
 from geospaas.catalog.models import Dataset, DatasetURI
+
 import geospaas_harvesting.verify as verify
 from tests.test_ingesters import IngesterTestCase as itc
 
