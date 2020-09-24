@@ -13,8 +13,8 @@ from geospaas.catalog.models import DatasetURI
 
 def main(filename):
     """ Verifies the datasets based on their dataseturi. If the download link does not provide a
-    download availability and returns a text or html response, then the dataset uri is written into
-    a file named "filename"."""
+    download availability and returns a response that does not start with '2' in its status code,
+    then the dataset uri is written into a file named "filename"."""
     if filename=='':
         filename=f"unverified_dataset_at_{datetime.now().strftime('%Y-%m-%d___%H_%M_%S')}"
     with open(filename+".txt", 'w') as f:
