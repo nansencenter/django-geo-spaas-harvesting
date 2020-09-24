@@ -19,11 +19,7 @@ def main(filename):
         filename=f"unverified_dataset_at_{datetime.now().strftime('%Y-%m-%d___%H_%M_%S')}"
     with open(filename+".txt", 'w') as f:
         for dsuri in DatasetURI.objects.iterator():
-            if requests.head(dsuri.uri, allow_redirects=True).status_code==200:
-                content_type = requests.head(dsuri.uri, allow_redirects=True).headers.get('content-type')
-                if 'html' in content_type.lower() or 'text' in content_type.lower():
-                    f.write(dsuri.uri + os.linesep)
-            else:
+            if not str(requests.head(dsuri.uri, allow_redirects=True).status_code).startswith('2'):
                 f.write(dsuri.uri + os.linesep)
 
 
