@@ -13,12 +13,8 @@ from geospaas.catalog.models import DatasetURI
 
 def main(filename):
     """ Verifies the datasets based on their dataseturi. If the download link does not provide a
-    download availability and returns a text or html response, then the dataset uri is removed. If
-    there is no other "dataseturi" remains for the dataset, then the dataset is also removed in
-    order to be harvested again in the future with a correct and healthy "dataseturi".
-    Since the number of datasets in the database might be enormous, the datasets are retrieved
-    into with a variable named retrieved_dataset_uris with an specific length number
-    for memory management. """
+    download availability and returns a text or html response, then the dataset uri is written into
+    a file named "filename"."""
     if filename=='':
         filename=f"unverified_dataset_at_{datetime.now().strftime('%Y-%m-%d___%H_%M_%S')}"
     with open(filename+".txt", 'w') as f:
