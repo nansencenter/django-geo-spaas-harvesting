@@ -19,22 +19,17 @@ def main(filename):
     Since the number of datasets in the database might be enormous, the datasets are retrieved
     into with a variable named retrieved_dataset_uris with an specific length number
     for memory management. """
-    init_index = 0
-    interval = 1000
+    if filename=='':
+        filename=f"unverified_dataset_at_{datetime.now().strftime('%Y-%m-%d___%H_%M_%S')}"
     with open(filename+".txt", 'w') as f:
-        while init_index < DatasetURI.objects.count():
-            try:
-                retrieved_dataset_uris = DatasetURI.objects.all()[init_index:init_index+interval]
-            except IndexError:
-                retrieved_dataset_uris = DatasetURI.objects.all()[init_index:]
-            init_index += interval
-            for dsuri in retrieved_dataset_uris:
-                content_type = requests.head(
-                    dsuri.uri, allow_redirects=True).headers.get('content-type')
+        for dsuri in DatasetURI.objects.iterator(chunk_size=1000).__iter__():
+            if requests.head(dsuri.uri, allow_redirects=True).status_code==200:
+                content_type = requests.head(dsuri.uri, allow_redirects=True).headers.get('content-type')
                 if 'html' in content_type.lower() or 'text' in content_type.lower():
                     f.write(dsuri.uri + os.linesep)
+            else:
+                f.write(dsuri.uri + os.linesep)
 
 
 if __name__ == '__main__':
-    main(filename=sys.argv[1] if len(sys.argv) == 2 else \
-            f"unverified_dataset_at_{datetime.now().strftime('%Y-%m-%d___%H_%M_%S')}")
+    main(filename=sys.argv[1] if len(sys.argv) == 2 else '')
