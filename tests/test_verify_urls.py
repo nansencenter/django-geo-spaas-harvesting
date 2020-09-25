@@ -4,7 +4,7 @@ import tempfile
 import unittest.mock as mock
 
 import django
-from geospaas_harvesting import verify
+from geospaas_harvesting import verify_urls
 
 from tests.test_ingesters import IngesterTestCase
 
@@ -23,7 +23,7 @@ class VerifierTestCase(django.test.TransactionTestCase):
             IngesterTestCase, 'http://anotherhost/dataset', dataset)
         with tempfile.TemporaryDirectory() as tmpdirname:
             os.chdir(tmpdirname)
-            verify.main()
+            verify_urls.main()
             file_content = open(os.listdir()[0], "r").read()
             self.assertEqual('', file_content)
         os.chdir('..')
@@ -39,7 +39,7 @@ class VerifierTestCase(django.test.TransactionTestCase):
             IngesterTestCase, 'http://anotherhost/dataset', dataset)
         with tempfile.TemporaryDirectory() as tmpdirname:
             os.chdir(tmpdirname)
-            verify.main()
+            verify_urls.main()
             file_content = open(os.listdir()[0], "r").read()
             self.assertIn('http://test.uri/dataset', file_content)
             self.assertIn('http://anotherhost/dataset', file_content)
