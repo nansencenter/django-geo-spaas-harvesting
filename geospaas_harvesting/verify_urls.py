@@ -21,7 +21,7 @@ def main():
         filename = f"unverified_datasets_at_{datetime.now().strftime('%Y-%m-%d___%H_%M_%S')}"
     with open(filename + ".txt", 'w') as f:
         for dsuri in DatasetURI.objects.iterator():
-            response = requests.head(dsuri.uri, allow_redirects = True)
+            response = requests.head(dsuri.uri, allow_redirects=True)
             if response.status_code < 200 or response.status_code > 299:
                 f.write(dsuri.uri + os.linesep)
 
