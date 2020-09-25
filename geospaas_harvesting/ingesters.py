@@ -75,7 +75,7 @@ class Ingester():
     @staticmethod
     def _uri_exists(uri):
         """Checks if the given URI already exists in the database"""
-        return bool(DatasetURI.objects.filter(uri=uri))
+        return DatasetURI.objects.filter(uri=uri).exists()
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """
