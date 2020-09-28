@@ -16,10 +16,9 @@ import yaml
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
-import geospaas_harvesting.harvesters as harvesters # pylint: disable=wrong-import-position
 
 from geospaas.vocabularies.management.commands import update_vocabularies
-
+import geospaas_harvesting.harvesters as harvesters  # pylint: disable=wrong-import-position
 
 LOGGER_NAME = 'geospaas_harvesting.daemon'
 LOGGER = logging.getLogger(LOGGER_NAME)
@@ -60,9 +59,13 @@ class Configuration(collections.abc.Mapping):
             assert self.HARVESTER_CLASS_KEY in config.keys(), (
                 "Harvester configuration must contain the following keys: " +
                 ', '.join(self.HARVESTER_CLASS_KEY))
-
             assert isinstance(config['class'], str), (
                 f"In '{name}' section: 'class' must be a string")
+            if 'password' in config:
+                assert os.getenv(config['password'], None) != None, \
+                    'There must an environmental variable that has been previousely set identical to\
+                     the name in front of "password" configuration of this harvester'
+                config['password'] = os.getenv(config['password'])
 
     def _get_cli_arguments(self):
         """Parse CLI arguments"""
@@ -103,7 +106,7 @@ def dump(obj, path):
             pickle.dump(obj, persistence_file_handler)
     except (FileNotFoundError, IsADirectoryError):
         LOGGER.error("Could not dump %s to %s", str(obj), path, exc_info=True)
-    except Exception: # pylint: disable=broad-except
+    except Exception:  # pylint: disable=broad-except
         LOGGER.error("An unexpected error occurred while dumping %s to %s",
                      str(obj), path, exc_info=True)
 
@@ -235,12 +238,12 @@ def main():
                     results and all([r.ready() and not r.successful() for r in results.values()])):
                 # Loop over the harvesters defined in the configuration file
                 for harvester_name, harvester_config in config['harvesters'].items():
-                    #If the harvester has not been launched yet or has finished executing, launch it
+                    # If the harvester has not been launched yet or has finished executing, launch it
                     # (again). Otherwise it is executing, so do nothing
                     previous_result = results.get(harvester_name, None)
                     if (previous_result and previous_result.ready() and previous_result.successful()
                             or not previous_result):
-                        #Start a new process
+                        # Start a new process
                         results[harvester_name] = pool.apply_async(
                             launch_harvest, (
                                 harvester_name,
