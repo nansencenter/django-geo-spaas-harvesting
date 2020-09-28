@@ -688,12 +688,12 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         created_dataset, created_dataset_uri = self.ingester._ingest_dataset(
             'https://scihub.copernicus.eu/full/$value', value_for_testing)
         self.assertEqual(Dataset.objects.count(), 1)
-        self.assertEqual(Dataset.objects.first().datasetparameter_set.count(), 1)
+        self.assertEqual(Dataset.objects.first().parameters.count(), 1)
         # the parameter that has added (by above variable of "value_for_testing") to the dataset
         # should be equal to the first object of parameter table
         # which is created by fixtures inside the database
         self.assertEqual(
-            Dataset.objects.first().datasetparameter_set.first().parameter, Parameter.objects.first())
+            Dataset.objects.first().parameters.first(), Parameter.objects.first())
         self.assertEqual(created_dataset, True)
         self.assertEqual(created_dataset_uri, True)
 
@@ -703,9 +703,9 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
             'https://scihub.copernicus.eu/full/$value', duplicate_value_for_testing)
 
         self.assertEqual(Dataset.objects.count(), 1)
-        self.assertEqual(Dataset.objects.first().datasetparameter_set.count(), 1)
+        self.assertEqual(Dataset.objects.first().parameters.count(), 1)
         self.assertEqual(
-            Dataset.objects.first().datasetparameter_set.first().parameter, Parameter.objects.first())
+            Dataset.objects.first().parameters.first(), Parameter.objects.first())
         self.assertEqual(created_dataset, False)
         self.assertEqual(created_dataset_uri, False)
 
