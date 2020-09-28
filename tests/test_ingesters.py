@@ -409,7 +409,7 @@ class DDXIngesterTestCase(django.test.TestCase):
         """Test that the correct attributes are extracted from a DDX file"""
         ingester = ingesters.DDXIngester()
         normalized_parameters = ingester._get_normalized_attributes(
-            "https://opendap.jpl.nasa.gov/opendap/Afull_dataset.nc")
+            "https://opendap.jpl.nasa.gov/opendap/full_dataset.nc")
 
         self.assertEqual(normalized_parameters['entry_title'],
                          'VIIRS L2P Sea Surface Skin Temperature')
@@ -464,7 +464,7 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['gcmd_location']
                          ['Location_Category'], 'VERTICAL LOCATION')
         self.assertEqual(normalized_parameters['gcmd_location']['Location_Type'], 'SEA SURFACE')
-        self.assertEqual(normalized_parameters['entry_id'], 'Afull_dataset')
+        self.assertEqual(normalized_parameters['entry_id'], 'full_dataset')
 
     def test_ingest_dataset_twice_different_urls(self):
         """The same dataset must not be ingested twice in the case of second time execution of
@@ -472,11 +472,11 @@ class DDXIngesterTestCase(django.test.TestCase):
         initial_datasets_count = Dataset.objects.count()
         ingester = ingesters.DDXIngester()
         with self.assertLogs(ingester.LOGGER):
-            ingester.ingest(["https://opendap.jpl.nasa.gov/opendap/Afull_dataset.nc"])
+            ingester.ingest(["https://opendap.jpl.nasa.gov/opendap/full_dataset.nc"])
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
         with self.assertLogs(ingester.LOGGER, level=logging.INFO) as logger_cm:
-            ingester.ingest(["https://opendap.jpl.nasa.gov/opendap/Afull_dataset.nc"])
+            ingester.ingest(["https://opendap.jpl.nasa.gov/opendap/full_dataset.nc"])
 
         self.assertTrue(logger_cm.records[0].msg.endswith('already present in the database'))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
