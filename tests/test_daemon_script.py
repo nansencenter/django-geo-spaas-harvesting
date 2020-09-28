@@ -20,6 +20,7 @@ from geospaas.vocabularies.models import Parameter
 CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'data', 'configuration_files')
 CONFIGURATION_FILES = {
     'ok': os.path.join(CONFIGURATION_PATH, 'harvest_ok.yml'),
+    'ok_pass': os.path.join(CONFIGURATION_PATH, 'harvest_ok_password.yml'),
     'empty': os.path.join(CONFIGURATION_PATH, 'harvest_empty.yml'),
     'no_harvesters_section': os.path.join(CONFIGURATION_PATH,
                                           'harvest_no_harvesters_section.yml'),
@@ -43,6 +44,25 @@ class ConfigurationTestCase(unittest.TestCase):
                     'test': {
                         'class': 'TestHarvester',
                         'urls': ['https://random1.url', 'https://random2.url']
+                    }
+                },
+                'poll_interval': 0.1
+            }
+        )
+
+    def test_loading_valid_conf_with_password(self):
+        """Correct configuration file parsing with changing the 'password name' into 'password value' """
+        os.environ["test_password"]="password_value"
+        with self.assertLogs(harvest.LOGGER):
+            configuration = harvest.Configuration(CONFIGURATION_FILES['ok_pass'])
+        self.assertDictEqual(
+            configuration._data,
+            {
+                'harvesters': {
+                    'test': {
+                        'class': 'TestHarvester',
+                        'urls': ['https://random1.url', 'https://random2.url'],
+                        'password': 'password_value'
                     }
                 },
                 'poll_interval': 0.1
