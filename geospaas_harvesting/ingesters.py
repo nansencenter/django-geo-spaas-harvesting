@@ -445,7 +445,6 @@ class URLNameIngester(MetanormIngester):
         # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
         normalized_attributes['geospaas_service_name'] = 'ftp'
         normalized_attributes['geospaas_service'] = 'ftp'
-        #Temporary solution
         return normalized_attributes
 
 
