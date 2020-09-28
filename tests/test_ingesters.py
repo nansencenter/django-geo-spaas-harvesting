@@ -296,7 +296,7 @@ class DDXIngesterTestCase(django.test.TestCase):
 
     TEST_DATA = {
         'full_ddx': {
-            'url': "https://opendap.jpl.nasa.gov/opendap/Afull_dataset.nc.ddx",
+            'url': "https://opendap.jpl.nasa.gov/opendap/full_dataset.nc.ddx",
             'file_path': "data/opendap/full_ddx.xml"},
         'short_ddx': {
             'url': "https://test-opendap.com/short_dataset.nc.ddx",
