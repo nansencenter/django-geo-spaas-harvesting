@@ -1,7 +1,6 @@
 """Harvesters which use crawlers and ingesters to get data from providers' websites"""
 
 import logging
-import os
 
 import dateutil.parser
 
@@ -149,7 +148,7 @@ class FTPHarvester(WebDirectoryHarvester):
         return [
             crawlers.FTPCrawler(root_url=url,
                                 username=self.config.get('username', None),
-                                password=os.getenv(self.config.get('password', ''), None),
+                                password=self.config.get('password'),
                                 fileformat=self.config.get('fileformat', None),)
             for url in self.config['urls']
         ]
@@ -164,7 +163,7 @@ class CopernicusSentinelHarvester(Harvester):
                 url=self.config['url'],
                 search_terms=search,
                 username=self.config.get('username', None),
-                password=os.getenv(self.config.get('password', ''), None),
+                password=self.config.get('password'),
                 time_range=(self.get_time_range()))
             for search in self.config['search_terms']
         ]
@@ -175,5 +174,5 @@ class CopernicusSentinelHarvester(Harvester):
             if parameter_name in self.config:
                 parameters[parameter_name] = self.config[parameter_name]
         if 'password' in self.config:
-            parameters['password'] = os.getenv(self.config['password'])
+            parameters['password'] = self.config.get('password')
         return ingesters.CopernicusODataIngester(**parameters)
