@@ -143,7 +143,7 @@ class Ingester():
                 standard_name = dataset_parameter_info.get('standard_name', None)
                 short_name = dataset_parameter_info.get('short_name', None)
                 units = dataset_parameter_info.get('units', None)
-                if standard_name in ['latitude', 'longitude', None]:
+                if standard_name in ('latitude', 'longitude', None):
                     continue
                 params = Parameter.objects.filter(standard_name=standard_name)
                 if params.count() > 1 and short_name is not None:
@@ -277,7 +277,7 @@ class MetanormIngester(Ingester):
 
     LOGGER = logging.getLogger(__name__ + '.MetanormIngester')
 
-    DATASET_PARAMETER_NAMES = [
+    DATASET_PARAMETER_NAMES = {
         'entry_title',
         'summary',
         'time_coverage_start',
@@ -288,10 +288,10 @@ class MetanormIngester(Ingester):
         'provider',
         'iso_topic_category',
         'gcmd_location',
-    ]
-    DATASET_CUMULATIVE_PARAMETER_NAMES = [
+    }
+    DATASET_CUMULATIVE_PARAMETER_NAMES = {
         'dataset_parameters',
-    ]
+    }
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
         super().__init__(max_fetcher_threads, max_db_threads)

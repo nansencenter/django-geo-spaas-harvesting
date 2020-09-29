@@ -106,11 +106,11 @@ class WebDirectoryHarvester(Harvester):
             raise HarvesterConfigurationError(
                 "The class of crawler has not been specified properly")
         try:
-            return [
+            return {
                 self.crawler(url, time_range=(self.get_time_range()),
                              excludes=self.config.get('excludes', None))
                 for url in self.config['urls']
-            ]
+            }
         except TypeError as error:
             raise HarvesterConfigurationError(
                 "crawler must be created properly with correct configuration file") from error
@@ -121,7 +121,7 @@ class WebDirectoryHarvester(Harvester):
             raise HarvesterConfigurationError(
                 "The class of ingester has not been specified properly")
         try:
-            for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
+            for parameter_name in ('max_fetcher_threads', 'max_db_threads'):
                 if parameter_name in self.config:
                     parameters[parameter_name] = self.config[parameter_name]
             return self.ingester(**parameters)
@@ -146,20 +146,20 @@ class FTPHarvester(WebDirectoryHarvester):
     """Harvester class for some specific FTP protecol"""
     ingester = ingesters.URLNameIngester
     def _create_crawlers(self):
-        return [
+        return {
             crawlers.FTPCrawler(root_url=url,
                                 username=self.config.get('username', None),
                                 password=os.getenv(self.config.get('password', ''), None),
                                 fileformat=self.config.get('fileformat', None),)
             for url in self.config['urls']
-        ]
+        }
 
 
 class CopernicusSentinelHarvester(Harvester):
     """Harvester class for Copernicus Sentinel data"""
 
     def _create_crawlers(self):
-        return [
+        return {
             crawlers.CopernicusOpenSearchAPICrawler(
                 url=self.config['url'],
                 search_terms=search,
@@ -167,11 +167,11 @@ class CopernicusSentinelHarvester(Harvester):
                 password=os.getenv(self.config.get('password', ''), None),
                 time_range=(self.get_time_range()))
             for search in self.config['search_terms']
-        ]
+        }
 
     def _create_ingester(self):
         parameters = {}
-        for parameter_name in ['username', 'max_fetcher_threads', 'max_db_threads']:
+        for parameter_name in ('username', 'max_fetcher_threads', 'max_db_threads'):
             if parameter_name in self.config:
                 parameters[parameter_name] = self.config[parameter_name]
         if 'password' in self.config:
