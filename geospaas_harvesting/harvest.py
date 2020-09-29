@@ -63,8 +63,8 @@ class Configuration(collections.abc.Mapping):
                 f"In '{name}' section: 'class' must be a string")
             if 'password' in config:
                 assert os.getenv(config['password'], None) != None, \
-                    'There must an environmental variable that has been previousely set identical to\
-                     the name in front of "password" configuration of this harvester'
+                    'An environmental variable is needed that has been previousely set with\
+                     the same name in front of "password" configuration of this harvester'
                 config['password'] = os.getenv(config['password'])
 
     def _get_cli_arguments(self):
