@@ -720,9 +720,9 @@ class URLNameIngesterTestCase(django.test.TestCase):
         ingester = ingesters.URLNameIngester()
         normalized_attributes = ingester._get_normalized_attributes(input_url)
         self.assertCountEqual(list(normalized_attributes.keys()),
-                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
-                              ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service', 'entry_id'])
+                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES.union(
+                              ingester.DATASET_PARAMETER_NAMES).union(
+                              {'geospaas_service_name', 'geospaas_service', 'entry_id'}))
         self.assertNotIn(None, normalized_attributes.values())
 
     def test_function_get_normalized_attributes_remss(self):
@@ -734,9 +734,9 @@ class URLNameIngesterTestCase(django.test.TestCase):
         ingester = ingesters.URLNameIngester()
         normalized_attributes = ingester._get_normalized_attributes(input_url)
         self.assertCountEqual(list(normalized_attributes.keys()),
-                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
-                              ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service', 'entry_id'])
+                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES.union(
+                              ingester.DATASET_PARAMETER_NAMES).union(
+                              {'geospaas_service_name', 'geospaas_service', 'entry_id'}))
         self.assertNotIn(None, normalized_attributes.values())
 
     def test_function_get_normalized_attributes_jaxa(self):
@@ -748,9 +748,9 @@ class URLNameIngesterTestCase(django.test.TestCase):
         ingester = ingesters.URLNameIngester()
         normalized_attributes = ingester._get_normalized_attributes(input_url)
         self.assertCountEqual(list(normalized_attributes.keys()),
-                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
-                              ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service', 'entry_id'])
+                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES.union(
+                              ingester.DATASET_PARAMETER_NAMES).union(
+                              {'geospaas_service_name', 'geospaas_service', 'entry_id'}))
         self.assertNotIn(None, normalized_attributes.values())
 
 

@@ -609,7 +609,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
     def emulate_cwd_of_ftp(self, name):
         """passes in the case of "", ".." or "folder_name" in order to resemble the behavior of cwd
         of ftplib. Otherwise (encountering a filename) raise the proper exception """
-        if name not in ["..", "folder_name", ""]:
+        if name not in ("..", "folder_name", ""):
             raise ftplib.error_perm
 
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP', autospec=True)
