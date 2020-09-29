@@ -70,9 +70,6 @@ class Configuration(collections.abc.Mapping):
         """class for reading the tags of yml file for finding the value of environmental variables"""
         yaml_tag = u'!ENV'
 
-        def __init__(self, env_var):
-            self.env_var = env_var
-
         @classmethod
         def from_yaml(cls, loader, node):
             return os.getenv(node.value)
