@@ -53,6 +53,7 @@ class ConfigurationTestCase(unittest.TestCase):
     def test_loading_valid_conf_with_password(self):
         """Correct configuration file parsing with changing the 'password name' into 'password value' """
         os.environ["test_password"]="password_value"
+        os.environ["test_sth_like_password"]="sth_like_password_value"
         with self.assertLogs(harvest.LOGGER):
             configuration = harvest.Configuration(CONFIGURATION_FILES['ok_pass'])
         self.assertDictEqual(
@@ -62,8 +63,9 @@ class ConfigurationTestCase(unittest.TestCase):
                     'test': {
                         'class': 'TestHarvester',
                         'urls': ['https://random1.url', 'https://random2.url'],
-                        'password': 'password_value'
-                    }
+                        'password': 'password_value',
+                        'sth_like_password': 'sth_like_password_value'
+                    },
                 },
                 'poll_interval': 0.1
             }
