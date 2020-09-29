@@ -16,9 +16,9 @@ import yaml
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
-
 from geospaas.vocabularies.management.commands import update_vocabularies
 import geospaas_harvesting.harvesters as harvesters  # pylint: disable=wrong-import-position
+
 
 LOGGER_NAME = 'geospaas_harvesting.daemon'
 LOGGER = logging.getLogger(LOGGER_NAME)
@@ -62,10 +62,20 @@ class Configuration(collections.abc.Mapping):
             assert isinstance(config['class'], str), (
                 f"In '{name}' section: 'class' must be a string")
             if 'password' in config:
-                assert os.getenv(config['password'], None) != None, \
-                    'An environmental variable is needed that has been previousely set with\
-                     the same name in front of "password" configuration of this harvester'
-                config['password'] = os.getenv(config['password'])
+                assert config['password'] != None, "An environmental variable (not a None) is needed\
+                that has been previousely set with the same name in front of 'password' section of \
+                    configuration of this harvester"
+
+    class EnvTag(yaml.YAMLObject):
+        """class for reading the tags of yml file for finding the value of environmental variables"""
+        yaml_tag = u'!ENV'
+
+        def __init__(self, env_var):
+            self.env_var = env_var
+
+        @classmethod
+        def from_yaml(cls, loader, node):
+            return os.getenv(node.value)
 
     def _get_cli_arguments(self):
         """Parse CLI arguments"""
@@ -87,6 +97,7 @@ class Configuration(collections.abc.Mapping):
     def _load_configuration(self):
         """Loads the harvesting configuration from a file"""
         LOGGER.info("Loading configuration from '%s'", self._path)
+        yaml.SafeLoader.add_constructor('!ENV', self.EnvTag.from_yaml)
         try:
             with open(self._path, 'rb') as config_stream:
                 self._data = yaml.safe_load(config_stream)
@@ -225,7 +236,7 @@ def main():
         sys.exit(1)
     LOGGER.info('Updating vocabularies...')
 
-    update_vocabularies.Command().handle() #updating the vocabulary with this command
+    update_vocabularies.Command().handle()  # updating the vocabulary with this command
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])
