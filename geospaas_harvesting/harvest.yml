@@ -10,16 +10,16 @@
 #      excludes: ['ease', '_sh_polstere',]
 #      max_db_threads: 1
 #      urls:
-#      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
-#      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
+#        - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
+#        - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
 #    podaac:
 #      class: 'PODAACHarvester'
 #      max_fetcher_threads: 30
 #      max_db_threads: 1
 #      urls:
-#        #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/contents.html'
-#        #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
-#        #- 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
+#        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/contents.html'
+#        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
+#        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
 #        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
 #    copernicus_sentinel:
 #      class: 'CopernicusSentinelHarvester'
@@ -32,13 +32,13 @@
 #        - 'platformname:Sentinel-3 AND NOT L0'
 #      username: 'username'
 #      # Environment variable name
-#      password: 'COPERNICUS_OPEN_HUB_PASSWORD' #'COPERNICUS_OPEN_HUB_PASSWORD' is an env. variable
+#      password: !ENV 'COPERNICUS_OPEN_HUB_PASSWORD'
 #    FTP_jaxa:
 #      class: 'FTPHarvester'
 #      max_fetcher_threads: 30
 #      max_db_threads: 1
 #      username: username
-#      password: JAXA_PASSWORD # 'JAXA_PASSWORD' is an environmental variable
+#      password: !ENV 'JAXA_PASSWORD'
 #      fileformat: '.h5'
 #      urls:
 #        - 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2012/07/'
