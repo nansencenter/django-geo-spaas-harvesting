@@ -50,7 +50,7 @@ class ConfigurationTestCase(unittest.TestCase):
             }
         )
 
-    def test_loading_valid_conf_with_password(self):
+    def test_loading_valid_conf_with_env_var_inside_it(self):
         """Correct configuration file parsing with changing the 'password name' into 'password value' """
         os.environ["test_password"]="password_value"
         os.environ["test_sth_like_password"]="sth_like_password_value"

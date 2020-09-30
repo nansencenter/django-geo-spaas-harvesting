@@ -62,12 +62,12 @@ class Configuration(collections.abc.Mapping):
             assert isinstance(config['class'], str), (
                 f"In '{name}' section: 'class' must be a string")
             if 'password' in config:
-                assert config['password'] != None, "An environmental variable (not a None) is needed\
-                that has been previousely set with the same name in front of 'password' section of \
-                    configuration of this harvester"
+                assert config['password'] != None, """An environment variable (not a None) is needed
+                 that has been previousely set with the same name in front of 'password' section of
+                 configuration of this harvester"""
 
     class EnvTag(yaml.YAMLObject):
-        """class for reading the tags of yml file for finding the value of environmental variables"""
+        """class for reading the tags of yml file for finding the value of environment variables"""
         yaml_tag = u'!ENV'
 
         @classmethod
