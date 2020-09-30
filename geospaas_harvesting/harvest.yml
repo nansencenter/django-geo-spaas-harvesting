@@ -1,17 +1,17 @@
 ---
-  endless: False
-  dump_on_interruption: False
-  poll_interval: 600
-  harvesters:
-    OSISAF:
-      class: 'OSISAFHarvester'
-      max_fetcher_threads: 30
-      # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting process
-      excludes: ['ease', '_sh_polstere',]
-      max_db_threads: 1
-      urls:
-          - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
-      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
+#  endless: False
+#  dump_on_interruption: False
+#  poll_interval: 600
+#  harvesters:
+#    OSISAF:
+#      class: 'OSISAFHarvester'
+#      max_fetcher_threads: 30
+#      # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting process
+#      excludes: ['ease', '_sh_polstere',]
+#      max_db_threads: 1
+#      urls:
+#      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
+#      #    - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
 #    podaac:
 #      class: 'PODAACHarvester'
 #      max_fetcher_threads: 30
