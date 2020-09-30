@@ -16,9 +16,8 @@ import yaml
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
-import geospaas_harvesting.harvesters as harvesters # pylint: disable=wrong-import-position
-
 from geospaas.vocabularies.management.commands import update_vocabularies
+import geospaas_harvesting.harvesters as harvesters  # pylint: disable=wrong-import-position
 
 
 LOGGER_NAME = 'geospaas_harvesting.daemon'
@@ -60,9 +59,16 @@ class Configuration(collections.abc.Mapping):
             assert self.HARVESTER_CLASS_KEY in config.keys(), (
                 "Harvester configuration must contain the following keys: " +
                 ', '.join(self.HARVESTER_CLASS_KEY))
-
             assert isinstance(config['class'], str), (
                 f"In '{name}' section: 'class' must be a string")
+
+    class EnvTag(yaml.YAMLObject):
+        """class for reading the tags of yml file for finding the value of environment variables"""
+        yaml_tag = u'!ENV'
+
+        @classmethod
+        def from_yaml(cls, loader, node):
+            return os.getenv(node.value)
 
     def _get_cli_arguments(self):
         """Parse CLI arguments"""
@@ -84,6 +90,7 @@ class Configuration(collections.abc.Mapping):
     def _load_configuration(self):
         """Loads the harvesting configuration from a file"""
         LOGGER.info("Loading configuration from '%s'", self._path)
+        yaml.SafeLoader.add_constructor('!ENV', self.EnvTag.from_yaml)
         try:
             with open(self._path, 'rb') as config_stream:
                 self._data = yaml.safe_load(config_stream)
@@ -103,7 +110,7 @@ def dump(obj, path):
             pickle.dump(obj, persistence_file_handler)
     except (FileNotFoundError, IsADirectoryError):
         LOGGER.error("Could not dump %s to %s", str(obj), path, exc_info=True)
-    except Exception: # pylint: disable=broad-except
+    except Exception:  # pylint: disable=broad-except
         LOGGER.error("An unexpected error occurred while dumping %s to %s",
                      str(obj), path, exc_info=True)
 
@@ -222,7 +229,7 @@ def main():
         sys.exit(1)
     LOGGER.info('Updating vocabularies...')
 
-    update_vocabularies.Command().handle() #updating the vocabulary with this command
+    update_vocabularies.Command().handle()  # updating the vocabulary with this command
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])
@@ -235,12 +242,12 @@ def main():
                     results and all([r.ready() and not r.successful() for r in results.values()])):
                 # Loop over the harvesters defined in the configuration file
                 for harvester_name, harvester_config in config['harvesters'].items():
-                    #If the harvester has not been launched yet or has finished executing, launch it
+                    # If the harvester has not been launched yet or has finished executing, launch it
                     # (again). Otherwise it is executing, so do nothing
                     previous_result = results.get(harvester_name, None)
                     if (previous_result and previous_result.ready() and previous_result.successful()
                             or not previous_result):
-                        #Start a new process
+                        # Start a new process
                         results[harvester_name] = pool.apply_async(
                             launch_harvest, (
                                 harvester_name,
