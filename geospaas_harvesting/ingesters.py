@@ -279,6 +279,7 @@ class MetanormIngester(Ingester):
 
     DATASET_PARAMETER_NAMES = [
         'entry_title',
+        'entry_id',
         'summary',
         'time_coverage_start',
         'time_coverage_end',
@@ -373,14 +374,13 @@ class DDXIngester(MetanormIngester):
 
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
-
         prepared_url = self.prepare_url(url)
         # Get the metadata from the dataset as an XML tree
         stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
         # Get all the global attributes of the Dataset into a dictionary
         extracted_attributes = self._extract_attributes(
             ET.parse(stream).getroot())
-
+        self.add_url(url, extracted_attributes)
         # Get the parameters needed to create a geospaas catalog dataset from the global attributes
         normalized_attributes = self._metadata_handler.get_parameters(extracted_attributes)
         normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
@@ -445,8 +445,6 @@ class URLNameIngester(MetanormIngester):
         # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
         normalized_attributes['geospaas_service_name'] = 'ftp'
         normalized_attributes['geospaas_service'] = 'ftp'
-        #Temporary solution
-        normalized_attributes['entry_id'] = urlparse(url).path.split('/')[-1]#'entry_id'is file name
         return normalized_attributes
 
 

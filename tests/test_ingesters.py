@@ -290,15 +290,13 @@ class MetanormIngesterTestCase(django.test.TestCase):
         self.assertEqual(inserted_dataset.geographic_location.geometry,
                          GEOSGeometry(('POLYGON((1 1, 1 2, 2 2, 2 1, 1 1))'), srid=4326))
 
+
 class DDXIngesterTestCase(django.test.TestCase):
     """Test the DDXIngester"""
 
     TEST_DATA = {
         'full_ddx': {
-            'url': "https://test-opendap.com/full_dataset.nc.ddx",
-            'file_path': "data/opendap/full_ddx.xml"},
-        'full_ddx_2': {
-            'url': "https://test-opendap2.com/full_dataset.nc.ddx",
+            'url': "https://opendap.jpl.nasa.gov/opendap/full_dataset.nc.ddx",
             'file_path': "data/opendap/full_ddx.xml"},
         'short_ddx': {
             'url': "https://test-opendap.com/short_dataset.nc.ddx",
@@ -360,6 +358,18 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         self.assertEqual(ingester._get_xml_namespace(root), 'http://xml.opendap.org/ns/DAP/3.2#')
 
+    @mock.patch('xml.etree.ElementTree.parse')
+    @mock.patch('geospaas_harvesting.ingesters.DDXIngester._extract_attributes')
+    @mock.patch('metanorm.handlers.MetadataHandler.get_parameters')
+    def test_exsistence_url_in_raw_attributes(self, mock_get_parameters, mock_extatt, mock_etree):
+        """the 'url' field in the "get_parameters" call of function must be present as an
+        input argument. This is a strict need of metanorm for creating the 'entry_id' based
+        on this 'url' field for this ingester."""
+        mock_extatt.return_value = {}
+        ingester = ingesters.DDXIngester()
+        ingester._get_normalized_attributes('test_url')
+        self.assertIn(({'url': 'test_url'},), mock_get_parameters.call_args)
+
     def test_logging_if_no_namespace(self):
         """A warning must be logged if no namespace has been found, and an empty string returned"""
         test_file_path = os.path.join(
@@ -399,7 +409,7 @@ class DDXIngesterTestCase(django.test.TestCase):
         """Test that the correct attributes are extracted from a DDX file"""
         ingester = ingesters.DDXIngester()
         normalized_parameters = ingester._get_normalized_attributes(
-            self.TEST_DATA['full_ddx']['url'])
+            "https://opendap.jpl.nasa.gov/opendap/full_dataset.nc")
 
         self.assertEqual(normalized_parameters['entry_title'],
                          'VIIRS L2P Sea Surface Skin Temperature')
@@ -454,20 +464,21 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['gcmd_location']
                          ['Location_Category'], 'VERTICAL LOCATION')
         self.assertEqual(normalized_parameters['gcmd_location']['Location_Type'], 'SEA SURFACE')
+        self.assertEqual(normalized_parameters['entry_id'], 'full_dataset')
 
     def test_ingest_dataset_twice_different_urls(self):
-        """The same dataset must not be ingested twice even if it is present at different URLs"""
+        """The same dataset must not be ingested twice in the case of second time execution of
+        'ingest' command with the same url. """
         initial_datasets_count = Dataset.objects.count()
-
         ingester = ingesters.DDXIngester()
         with self.assertLogs(ingester.LOGGER):
-            ingester.ingest([self.TEST_DATA['full_ddx']['url']])
+            ingester.ingest(["https://opendap.jpl.nasa.gov/opendap/full_dataset.nc"])
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
         with self.assertLogs(ingester.LOGGER, level=logging.INFO) as logger_cm:
-            ingester.ingest([self.TEST_DATA['full_ddx_2']['url']])
+            ingester.ingest(["https://opendap.jpl.nasa.gov/opendap/full_dataset.nc"])
 
-        self.assertTrue(logger_cm.records[0].msg.endswith('already exists in the database.'))
+        self.assertTrue(logger_cm.records[0].msg.endswith('already present in the database'))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
     def test_function_named_prepare_url(self):
@@ -722,7 +733,7 @@ class URLNameIngesterTestCase(django.test.TestCase):
         self.assertCountEqual(list(normalized_attributes.keys()),
                               ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
                               ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service', 'entry_id'])
+                              ['geospaas_service_name', 'geospaas_service'])
         self.assertNotIn(None, normalized_attributes.values())
 
     def test_function_get_normalized_attributes_remss(self):
@@ -736,7 +747,7 @@ class URLNameIngesterTestCase(django.test.TestCase):
         self.assertCountEqual(list(normalized_attributes.keys()),
                               ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
                               ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service', 'entry_id'])
+                              ['geospaas_service_name', 'geospaas_service'])
         self.assertNotIn(None, normalized_attributes.values())
 
     def test_function_get_normalized_attributes_jaxa(self):
@@ -750,7 +761,7 @@ class URLNameIngesterTestCase(django.test.TestCase):
         self.assertCountEqual(list(normalized_attributes.keys()),
                               ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
                               ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service', 'entry_id'])
+                              ['geospaas_service_name', 'geospaas_service'])
         self.assertNotIn(None, normalized_attributes.values())
 
 
