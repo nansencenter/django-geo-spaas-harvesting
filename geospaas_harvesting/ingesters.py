@@ -22,7 +22,7 @@ from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
                                        HTTP_SERVICE, HTTP_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
 from geospaas.catalog.models import (Dataset, DatasetURI, GeographicLocation,
-                                     Source, DatasetParameter)
+                                     Source)
 from geospaas.utils.utils import nansat_filename
 from geospaas.vocabularies.models import (DataCenter, Instrument,
                                           ISOTopicCategory, Location, Parameter, Platform)
@@ -151,8 +151,6 @@ class Ingester():
                 if params.count() > 1 and units is not None:
                     params = params.filter(units=units)
                 if params.count() >= 1:
-                    DatasetParameter.objects.get_or_create(
-                        dataset=dataset, parameter=params[0])
                     dataset.parameters.add(params[0])
 
         except django.db.utils.OperationalError:
