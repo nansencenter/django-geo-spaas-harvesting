@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=nansencenter/geospaas
+ARG BASE_IMAGE=nansencenter/geospaas:latest-slim
 
 FROM ${BASE_IMAGE} as base
 
@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir \
     graypy==2.1.0 \
     feedparser==5.2.1
 
+FROM base
+
 WORKDIR /tmp/setup
 COPY setup.py README.md ./
 COPY geospaas_harvesting ./geospaas_harvesting
@@ -16,4 +18,5 @@ RUN python setup.py bdist_wheel && \
     cd .. && rm -rf setup/
 WORKDIR /
 
-ENTRYPOINT ["python", "-m", "geospaas_harvesting.harvest"]
+ENTRYPOINT ["python"]
+CMD ["-m", "geospaas_harvesting.harvest"]
