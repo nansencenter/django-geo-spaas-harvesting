@@ -14,8 +14,11 @@ import geospaas_harvesting.crawlers as crawlers
 class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
     """Tests for the webDirectory crawler Exceptions"""
 
-    def test_lack_of_definition_of_get_download_url(self):
-        """shall return "NotImplementedError" exception in the case of lack of definition of get_download_url method """
+    def test_abstract_get_download_url(self):
+        """
+        A NotImplementedError should be raised if the get_download_url() method
+        is accessed directly on the WebDirectoryCrawler class
+        """
         crawler = crawlers.WebDirectoryCrawler('')
         with self.assertRaises(NotImplementedError):
             crawler.get_download_url("")
@@ -24,8 +27,11 @@ class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
 
-    def test_lack_of_definition_of_set_initial_state(self):
-        """shall return "NotImplementedError" exception in the case of lack of definition of set_initial_state method """
+    def test_abstract_set_initial_state(self):
+        """
+        A NotImplementedError should be raised if the set_initial_state() method
+        is accessed directly on the Crawler class
+        """
         crawler = crawlers.Crawler()
         with self.assertRaises(NotImplementedError):
             crawler.set_initial_state()
@@ -600,10 +606,14 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
     def test_iterating(self):
         """Tests that the correct values are returned when iterating"""
         expected_urls = [
-            "https://scihub.copernicus.eu/dhus/odata/v1/Products('d023819a-60d3-4b5e-bb81-645294d73b5b')/$value",  # pylint:disable=line-too-long
-            "https://scihub.copernicus.eu/dhus/odata/v1/Products('87ddb795-dab4-4985-85f4-c390c9cdd65b')/$value",  # pylint:disable=line-too-long
-            "https://scihub.copernicus.eu/dhus/odata/v1/Products('b54171e1-078b-4234-ae0a-7b27abb14baa')/$value",  # pylint:disable=line-too-long
-            "https://scihub.copernicus.eu/dhus/odata/v1/Products('e2842bc8-8b3e-4161-a88c-84c2b43e60f9')/$value"  # pylint:disable=line-too-long
+            "https://scihub.copernicus.eu/dhus/odata/v1/"
+            "Products('d023819a-60d3-4b5e-bb81-645294d73b5b')/$value",
+            "https://scihub.copernicus.eu/dhus/odata/v1/"
+            "Products('87ddb795-dab4-4985-85f4-c390c9cdd65b')/$value",
+            "https://scihub.copernicus.eu/dhus/odata/v1/"
+            "Products('b54171e1-078b-4234-ae0a-7b27abb14baa')/$value",
+            "https://scihub.copernicus.eu/dhus/odata/v1/"
+            "Products('e2842bc8-8b3e-4161-a88c-84c2b43e60f9')/$value"
         ]
 
         with self.assertLogs(self.crawler.LOGGER):
