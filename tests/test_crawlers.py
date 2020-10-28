@@ -6,7 +6,6 @@ import os
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
-from ftplib import socket
 import requests
 
 import geospaas_harvesting.crawlers as crawlers
