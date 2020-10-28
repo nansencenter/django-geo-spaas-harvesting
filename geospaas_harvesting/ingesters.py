@@ -356,8 +356,9 @@ class DDXIngester(MetanormIngester):
         if 'longitude' in extracted_attributes['raw_dataset_parameters']:
             extracted_attributes['raw_dataset_parameters'].remove('longitude')
         return extracted_attributes
-    @staticmethod
-    def prepare_url(url):
+
+    @classmethod
+    def prepare_url(cls, url):
         """
         Converts the downloadable link into the link for reading meta data. In all cases,
         this method results in a url that ends with '.ddx' which will be used in further steps
@@ -385,6 +386,20 @@ class DDXIngester(MetanormIngester):
         normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
 
         return normalized_attributes
+
+
+class ThreddsIngester(DDXIngester):
+    """Ingest datasets from the DDX metadata of the OpenDAP service of a Thredds server"""
+
+    url_matcher = re.compile(r'^(.*)/(fileServer)/(.*)$')
+
+    @classmethod
+    def prepare_url(cls, url):
+        url_match = cls.url_matcher.match(url)
+        if url_match:
+            return f"{url_match[1]}/dodsC/{url_match[3]}.ddx"
+        else:
+            raise ValueError(f"{url} is not a Thredds HTTPServer URL")
 
 
 class CopernicusODataIngester(MetanormIngester):

@@ -137,7 +137,7 @@ class PODAACHarvester(WebDirectoryHarvester):
 
 class OSISAFHarvester(WebDirectoryHarvester):
     """Harvester class for OSISAF project"""
-    ingester = ingesters.DDXIngester
+    ingester = ingesters.ThreddsIngester
     crawler = crawlers.ThreddsCrawler
 
 
