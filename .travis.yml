@@ -11,7 +11,7 @@ services:
 
 env:
   global:
-    - BASE_IMAGE_NAME="${DOCKER_ORG}/geospaas:v1.0.1"
+    - BASE_IMAGE_NAME="${DOCKER_ORG}/geospaas:2.0.0-slim"
     - METANORM_VERSION='2.0.0'
 
 jobs:
@@ -21,32 +21,31 @@ jobs:
       env:
         - GEOSPAAS_DB_HOST='db'
         - GEOSPAAS_DB_USER='test'
-        - LOG_DIR='logs'
+        - IMAGE_NAME='harvesting_tests'
       install:
-        - mkdir "$LOG_DIR"
         - docker network create testing
         - >
-          docker run -d --rm
-          --network testing
-          --name "$GEOSPAAS_DB_HOST"
-          -e "POSTGRES_USER=$GEOSPAAS_DB_USER" -e "POSTGRES_PASSWORD=$GEOSPAAS_DB_PASSWORD"
-          'postgis/postgis:12-2.5'
+          docker build .
+          -t "${IMAGE_NAME}"
+          --build-arg "BASE_IMAGE=${BASE_IMAGE_NAME}"
+          --build-arg "METANORM_VERSION=$METANORM_VERSION"
+          --target base
+        - /bin/bash ./scripts/start_test_database.sh
       script:
         - >
           docker run --rm
           --network testing
-          -v "$(pwd):/src" -v "$(pwd)/${LOG_DIR}:/var/log/geospaas"
+          -v "$(pwd):/src"
           -e "COVERALLS_REPO_TOKEN=$COVERALLS_REPO_TOKEN"
-          -e "TRAVIS=true" -e "TRAVIS_JOB_ID=$TRAVIS_JOB_ID"
-          -e "TRAVIS_BRANCH=$TRAVIS_BRANCH" -e "TRAVIS_PULL_REQUEST=$TRAVIS_PULL_REQUEST"
+          -e "TRAVIS=true"
+          -e "TRAVIS_JOB_ID=$TRAVIS_JOB_ID"
+          -e "TRAVIS_BRANCH=$TRAVIS_BRANCH"
+          -e "TRAVIS_PULL_REQUEST=$TRAVIS_PULL_REQUEST"
           -e "GEOSPAAS_DB_HOST=$GEOSPAAS_DB_HOST"
-          -e "GEOSPAAS_DB_USER=$GEOSPAAS_DB_USER" -e "GEOSPAAS_DB_PASSWORD=$GEOSPAAS_DB_PASSWORD"
-          "${BASE_IMAGE_NAME}"
-          bash -c "source /opt/conda/bin/activate
-          && pip install 'https://github.com/nansencenter/metanorm/releases/download/${METANORM_VERSION}/metanorm-${METANORM_VERSION}-py3-none-any.whl'
-          feedparser==5.2.1
-          && coverage run --source=./geospaas_harvesting ./runtests.py
-          && coveralls"
+          -e "GEOSPAAS_DB_USER=$GEOSPAAS_DB_USER"
+          -e "GEOSPAAS_DB_PASSWORD=$GEOSPAAS_DB_PASSWORD"
+          "${IMAGE_NAME}"
+          bash -c "coverage run --source=./geospaas_harvesting ./runtests.py && coveralls"
       after_script:
         - docker stop "$GEOSPAAS_DB_HOST"
 
