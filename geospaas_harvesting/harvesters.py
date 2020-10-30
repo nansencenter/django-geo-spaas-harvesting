@@ -146,10 +146,13 @@ class FTPHarvester(WebDirectoryHarvester):
     ingester = ingesters.URLNameIngester
     def _create_crawlers(self):
         return [
-            crawlers.FTPCrawler(root_url=url,
-                                username=self.config.get('username', None),
-                                password=self.config.get('password'),
-                                fileformat=self.config.get('fileformat', None),)
+            crawlers.FTPCrawler(
+                root_url=url,
+                username=self.config.get('username', None),
+                password=self.config.get('password'),
+                files_suffixes=self.config.get('fileformat', None),
+                time_range=(self.get_time_range())
+            )
             for url in self.config['urls']
         ]
 

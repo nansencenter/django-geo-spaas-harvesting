@@ -171,7 +171,9 @@ class ChildHarvestersTestCase(unittest.TestCase):
 
     def test_ftp_harvester(self):
         """The FTP harvester has the correct crawler and ingester"""
-        harvester = harvesters.FTPHarvester(urls=['ftp://'], max_fetcher_threads=1, max_db_threads=1)
+        with mock.patch.object(crawlers.FTPCrawler, '__init__', return_value=None):
+            harvester = harvesters.FTPHarvester(
+                urls=['ftp://'], max_fetcher_threads=1, max_db_threads=1)
         self.assertIsInstance(harvester._current_crawler, crawlers.FTPCrawler)
         self.assertIsInstance(harvester._ingester, ingesters.URLNameIngester)
 
@@ -189,9 +191,9 @@ class ChildHarvestersTestCase(unittest.TestCase):
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
                                                excludes=['ease', '_sh_polstere', ])
         self.assertListEqual(harvester._current_crawler.excludes,
-                             ['/thredds/', 'http', 'ease', '_sh_polstere'])
+                             crawlers.ThreddsCrawler.EXCLUDE + ['ease', '_sh_polstere'])
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertListEqual(harvester._current_crawler.excludes, ['/thredds/', 'http', ])
+        self.assertListEqual(harvester._current_crawler.excludes, crawlers.ThreddsCrawler.EXCLUDE)
 
         with self.assertRaises(HarvesterConfigurationError):
             harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
