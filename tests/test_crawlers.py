@@ -6,22 +6,11 @@ import os
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
+from urllib.parse import urlparse
+
 import requests
 
 import geospaas_harvesting.crawlers as crawlers
-
-
-class WebDirectoryCrawlerExceptionTestCase(unittest.TestCase):
-    """Tests for the webDirectory crawler Exceptions"""
-
-    def test_abstract_get_download_url(self):
-        """
-        A NotImplementedError should be raised if the get_download_url() method
-        is accessed directly on the WebDirectoryCrawler class
-        """
-        crawler = crawlers.WebDirectoryCrawler('')
-        with self.assertRaises(NotImplementedError):
-            crawler.get_download_url("")
 
 
 class BaseCrawlerTestCase(unittest.TestCase):
@@ -41,6 +30,60 @@ class BaseCrawlerTestCase(unittest.TestCase):
         base_crawler = crawlers.Crawler()
         with self.assertRaises(NotImplementedError):
             _ = iter(base_crawler)
+
+
+class WebDirectoryCrawlerTestCase(unittest.TestCase):
+    """Tests for the WebDirectoryCrawler"""
+
+    def test_abstract_list_folder_contents(self):
+        """
+        A NotImplementedError should be raised if the _list_folder_contents() method
+        is accessed directly on the WebDirectoryCrawler class
+        """
+        crawler = crawlers.WebDirectoryCrawler('')
+        with self.assertRaises(NotImplementedError):
+            crawler._list_folder_contents('')
+
+    def test_is_folder(self):
+        """
+        A NotImplementedError should be raised if the _is_folder() method
+        is accessed directly on the WebDirectoryCrawler class
+        """
+        crawler = crawlers.WebDirectoryCrawler('')
+        with self.assertRaises(NotImplementedError):
+            crawler._is_folder('')
+
+    def test_is_file(self):
+        """
+        A NotImplementedError should be raised if the _is_file() method
+        is accessed directly on the WebDirectoryCrawler class
+        """
+        crawler = crawlers.WebDirectoryCrawler('')
+        with self.assertRaises(NotImplementedError):
+            crawler._is_file('')
+
+    def test_get_download_url(self):
+        """
+        The get_download_url() method of the WebDirectoryCrawler
+        should return the resource URL unchanged
+        """
+        crawler = crawlers.WebDirectoryCrawler('')
+        self.assertEqual(crawler.get_download_url('foo'), 'foo')
+
+
+class HTTPDirectoryCrawlerTestCase(unittest.TestCase):
+    """Tests for the HTTPDirectoryCrawler crawler"""
+
+    def test_prepend_parent_path(self):
+        """
+        Should prepend all the paths with the parent_path, except if they already start with it
+        """
+        parent_path = '/foo'
+        paths = ['/foo/bar', 'baz']
+        self.assertEqual(
+            crawlers.HTTPDirectoryCrawler._prepend_parent_path(parent_path, paths),
+            ['/foo/bar', '/foo/baz']
+        )
 
 
 class OpenDAPCrawlerTestCase(unittest.TestCase):
@@ -130,10 +173,10 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         """Test the correct instantiation of an Opendap crawler"""
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
         self.assertIsInstance(crawler, crawlers.Crawler)
-        self.assertEqual(crawler.root_url, self.TEST_DATA['root']['urls'][0])
+        self.assertEqual(crawler.root_url, urlparse(self.TEST_DATA['root']['urls'][0]))
         self.assertEqual(crawler.time_range, (None, None))
         self.assertListEqual(crawler._urls, [])
-        self.assertListEqual(crawler._to_process, [self.TEST_DATA['root']['urls'][0]])
+        self.assertListEqual(crawler._to_process, [''])
 
     def test_set_initial_state(self):
         """Tests that the set_initial_state() method sets the correct values"""
@@ -143,7 +186,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             next(iter(crawler))
 
         crawler.set_initial_state()
-        self.assertListEqual(crawler._to_process, [crawler.root_url])
+        self.assertListEqual(crawler._to_process, [crawler.root_url.path])
         self.assertListEqual(crawler._urls, [])
 
     def test_get_correct_html_contents(self):
@@ -182,26 +225,26 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         with self.assertLogs(parser.LOGGER, level=logging.ERROR):
             parser.error('some message')
 
-    def test_explore_page(self):
+    def test_process_folder(self):
         """
         Explore root page and make sure the _url and _to_process attributes of the crawler have the
         right values
         """
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
-            crawler._explore_page(crawler._to_process.pop())
+            crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][0]])
-        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['urls'][0]])
+        self.assertListEqual(crawler._to_process, ['/folder/contents.html'])
 
-    def test_explore_page_with_duplicates(self):
+    def test_process_folder_with_duplicates(self):
         """If the same URL is present twice in the page, it should only be processed once"""
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['urls'][0])
         with self.assertLogs(crawler.LOGGER):
-            crawler._explore_page(crawler._to_process.pop())
+            crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][1]])
-        self.assertListEqual(crawler._to_process, [self.TEST_DATA['folder']['urls'][1]])
+        self.assertListEqual(crawler._to_process, ['/folder/contents.html'])
 
-    def test_explore_page_with_time_restriction_discriminated_by_timestamp(self):
+    def test_process_folder_with_time_restriction_discriminated_by_timestamp(self):
         """
         Explore a page and make sure the _url and _to_process attributes of the crawler have the
         right values according to a time restriction
@@ -210,12 +253,12 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             self.TEST_DATA['folder_day_of_year']['urls'][0],
             time_range=(datetime(2019, 2, 15, 11, 0, 0), datetime(2019, 2, 15, 13, 0, 0)))
         with self.assertLogs(crawler.LOGGER):
-            crawler._explore_page(crawler._to_process.pop())
+            crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(crawler._urls,
                              ['https://test-opendap.com/folder/2019/046/20190215120000_dataset.nc'])
         self.assertListEqual(crawler._to_process, [])
 
-    def test_explore_page_with_time_restriction_discriminated_by_folder_coverage(self):
+    def test_process_folder_with_time_restriction_discriminated_by_folder_coverage(self):
         """
         Explore a page and make sure the _url and _to_process attributes of the crawler have the
         right values according to a time restriction
@@ -224,7 +267,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             self.TEST_DATA['folder_day_of_year']['urls'][0],
             time_range=(datetime(2019, 2, 11, 11, 0, 0), datetime(2019, 2, 11, 13, 0, 0)))
         with self.assertLogs(crawler.LOGGER):
-            crawler._explore_page(crawler._to_process.pop())
+            crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [])
         self.assertListEqual(crawler._to_process, [])
 
@@ -634,40 +677,37 @@ class FTPCrawlerTestCase(unittest.TestCase):
     def test_ftp_correct_navigation(self, mock_ftp):
         """ shall categorize the specific file names (based on specific 'fileformat' which is
         revealed in the configuration file) as well as folder(s) inside the ftp resource """
-        test_crawler = crawlers.FTPCrawler('ftp:///', fileformat='.gz')
+        test_crawler = crawlers.FTPCrawler('ftp://foo', files_suffixes='.gz')
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
         test_crawler.ftp.cwd = self.emulate_cwd_of_ftp
         test_crawler.ftp.host = ''
         with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
-            test_crawler._explore_page('')
+            test_crawler._process_folder('')
         # '.gz' files must be in the "_urls" list
         # Other type of files should not be in the "_urls" list
-        self.assertCountEqual(['ftp://file1.gz', 'ftp://file2.gz'], test_crawler._urls)
+        self.assertCountEqual(['ftp://foo/file1.gz', 'ftp://foo/file2.gz'], test_crawler._urls)
         # folder with 'folder_name' must be in the "_to_process" list
         self.assertCountEqual(['/', 'folder_name'], test_crawler._to_process)
 
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.login')
-    @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.nlst')
-    def test_ftp_correct_exception(self, mock_nlst, mock_ftp):
+    def test_ftp_correct_exception(self, mock_ftp):
         """ shall return the costume 'ConnectionError'
          instead of 'ftplib.error_perm' in order to continue the harvesting process in the case of
          redundant or repetitive login attempt(s)
          after the first login attempt. "nlst" is placed after "login" in source code. So reach "nlst"
          means passing the login code. """
-        test_crawler = crawlers.FTPCrawler('ftp://', username="d", password="d", fileformat='.gz')
-        mock_nlst.side_effect = ConnectionError
+        test_crawler = crawlers.FTPCrawler(
+            'ftp://', username="d", password="d", files_suffixes='.gz')
+
         mock_ftp.side_effect = ftplib.error_perm("503")
-        with self.assertRaises(ConnectionError):
-            with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
-                test_crawler._explore_page('')
+        test_crawler.set_initial_state()
+
         mock_ftp.side_effect = ftplib.error_perm("230")
-        with self.assertRaises(ConnectionError):
-            with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
-                test_crawler._explore_page('')
+        test_crawler.set_initial_state()
+
         mock_ftp.side_effect = ftplib.error_perm("999")
         with self.assertRaises(ftplib.error_perm):
-            with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
-                test_crawler._explore_page('')
+            test_crawler.set_initial_state()
 
     def test_ftp_incorrect_entry(self):
         """Shall return 'ValueError' when there is an incorrect entry in ftp address of

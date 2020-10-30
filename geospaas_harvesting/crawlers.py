@@ -8,7 +8,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import feedparser
 import requests
@@ -87,8 +87,6 @@ class WebDirectoryCrawler(Crawler):
     in the form of HTML pages
     """
     LOGGER = None
-    FOLDERS_SUFFIXES = None
-    FILES_SUFFIXES = None
     EXCLUDE = None
 
     YEAR_PATTERN = r'(\d{4})'
@@ -96,15 +94,15 @@ class WebDirectoryCrawler(Crawler):
     DAY_OF_MONTH_PATTERN = r'(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9])'
     DAY_OF_YEAR_PATTERN = r'(36[0-6]|3[0-5]\d|[1-2]\d\d|0[1-9]\d|00[1-9]|[1-9]\d|0[1-9]|[1-9])'
 
-    YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/.*$')
-    MONTH_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}/.*$')
+    YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}(/.*)?$')
+    MONTH_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}(/.*)?$')
     DAY_OF_MONTH_MATCHER = re.compile(
         f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}/{DAY_OF_MONTH_PATTERN}/.*$')
-    DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}/.*$')
+    DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}(/.*)?$')
 
-    TIMESTAMP_MATCHER = re.compile((
-        r'(\d{4})(1[0-2]|0[1-9]|[1-9])(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9])'
-        r'(2[0-3]|[0-1]\d|\d)([0-5]\d|\d)(6[0-1]|[0-5]\d|\d)'))
+    TIMESTAMP_MATCHER = re.compile(
+        r'(?P<date>(\d{4})(1[0-2]|0[1-9]|[1-9])(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9]))_?'
+        r'(?P<time>(2[0-3]|[0-1]\d|\d)([0-5]\d|\d)(6[0-1]|[0-5]\d|\d))')
 
     def __init__(self, root_url, time_range=(None, None), excludes=None):
         """
@@ -114,12 +112,15 @@ class WebDirectoryCrawler(Crawler):
         `excludes` is the list of string that are the associated url is ignored during
         the harvesting process if these strings are found in the crawled url.
         """
-        self.root_url = root_url
+        self.root_url = urlparse(root_url)
         self.time_range = time_range
-        class_excludes = self.EXCLUDE or []
-        excludes = excludes or []
-        self.excludes = class_excludes + excludes
+        self.excludes = (self.EXCLUDE or []) + (excludes or [])
         self.set_initial_state()
+
+    @property
+    def base_url(self):
+        """Get the root URL without the path"""
+        return f"{self.root_url.scheme}://{self.root_url.netloc}"
 
     def set_initial_state(self):
         """
@@ -127,7 +128,7 @@ class WebDirectoryCrawler(Crawler):
         The `_to_process` attribute contains URLs to pages which need to be searched for resources.
         """
         self._urls = []
-        self._to_process = [self.root_url.rstrip('/')]
+        self._to_process = [self.root_url.path.rstrip('/')]
 
     def __iter__(self):
         """Make the crawler iterable"""
@@ -142,13 +143,14 @@ class WebDirectoryCrawler(Crawler):
             # If no more URLs from the previously processed folder are available,
             # process the next one
             try:
-                self._explore_page(self._to_process.pop())
+                self._process_folder(self._to_process.pop())
                 result = self.__next__()
             except IndexError:
                 raise StopIteration
         return result
 
-    def _folder_coverage(self, folder_url):
+    @classmethod
+    def _folder_coverage(cls, folder_path):
         """
         Find out if the folder has date info in its path. The resolution is one day.
         For now, it supports the following structures:
@@ -158,11 +160,11 @@ class WebDirectoryCrawler(Crawler):
           - .../year/day_of_year/...
         It will need to be updated to support new structures.
         """
-        match_year = self.YEAR_MATCHER.search(folder_url)
+        match_year = cls.YEAR_MATCHER.search(folder_path)
         if match_year:
-            match_month = self.MONTH_MATCHER.search(folder_url)
+            match_month = cls.MONTH_MATCHER.search(folder_path)
             if match_month:
-                match_day = self.DAY_OF_MONTH_MATCHER.search(folder_url)
+                match_day = cls.DAY_OF_MONTH_MATCHER.search(folder_path)
                 if match_day:
                     folder_coverage_start = datetime(
                         int(match_year[1]), int(match_month[2]), int(match_day[3]), 0, 0, 0)
@@ -176,7 +178,7 @@ class WebDirectoryCrawler(Crawler):
                     folder_coverage_stop = datetime(
                         int(match_year[1]), int(match_month[2]), last_day_of_month, 23, 59, 59)
             else:
-                match_day_of_year = self.DAY_OF_YEAR_MATCHER.search(folder_url)
+                match_day_of_year = cls.DAY_OF_YEAR_MATCHER.search(folder_path)
                 if match_day_of_year:
                     offset = timedelta(int(match_day_of_year[2]) - 1)
                     folder_coverage_start = (datetime(int(match_year[1]), 1, 1, 0, 0, 0)
@@ -191,17 +193,21 @@ class WebDirectoryCrawler(Crawler):
 
         return (folder_coverage_start, folder_coverage_stop)
 
-    def _dataset_timestamp(self, dataset_name):
+    @classmethod
+    def _dataset_timestamp(cls, dataset_name):
         """Tries to find a timestamp in the dataset's name"""
-        timestamp_match = self.TIMESTAMP_MATCHER.search(dataset_name)
+        timestamp_match = cls.TIMESTAMP_MATCHER.search(dataset_name)
         if timestamp_match:
-            return datetime.strptime(timestamp_match[0], '%Y%m%d%H%M%S')
+            return datetime.strptime(
+                timestamp_match['date'] + timestamp_match['time'],
+                '%Y%m%d%H%M%S'
+            )
         else:
             return None
 
     def _intersects_time_range(self, start_time=None, stop_time=None):
         """
-        Return True if:
+        Return True if either of these conditions is met:
           - a time coverage was extracted from the folder's path or a timestamp from the dataset's
             name, and this time coverage intersects with the Crawler's time range
           - no time range was defined when instantiating the crawler
@@ -210,29 +216,45 @@ class WebDirectoryCrawler(Crawler):
         return ((not start_time or not self.time_range[1] or start_time <= self.time_range[1]) and
                 (not stop_time or not self.time_range[0] or stop_time >= self.time_range[0]))
 
-    def _explore_page(self, folder_url):
+    def _list_folder_contents(self, folder_path):
+        """"""
+        raise NotImplementedError("_list_folder_contents is abstract in WebDirectoryCrawler")
+
+    def _is_folder(self, path):
+        """"""
+        raise NotImplementedError("_is_folder is abstract in WebDirectoryCrawler")
+
+    def _is_file(self, path):
+        """"""
+        raise NotImplementedError("_is_file is abstract in WebDirectoryCrawler")
+
+    def _add_url_to_return(self, path):
+        """"""
+        if self._intersects_time_range(*(self._dataset_timestamp(path),) * 2):
+            resource_url = urljoin(self.base_url, path)
+            download_url = self.get_download_url(resource_url)
+            if download_url is not None:
+                if download_url not in self._urls:
+                    self.LOGGER.debug("Adding '%s' to the list of resources.", download_url)
+                    self._urls.append(download_url)
+
+    def _add_folder_to_process(self, path):
+        """"""
+        if self._intersects_time_range(*self._folder_coverage(path)):
+            if path not in self._to_process:
+                self.LOGGER.debug("Adding '%s' to the list of pages to process.", path)
+                self._to_process.append(path)
+
+    def _process_folder(self, folder_path):
         """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
-        self.LOGGER.info("Looking for resources in '%s'...", folder_url)
-        current_location = re.sub(r'/\w+\.\w+$', '', folder_url)
-        links = self._get_links(self._http_get(folder_url))
-        for link in links:
-            # Select links which do not contain any of the self.excludes strings
-            if all(map(lambda s, l=link: s not in l, self.excludes)):
-                if link.endswith(self.FOLDERS_SUFFIXES):
-                    folder_url = f"{current_location}/{link}"
-                    if folder_url not in self._to_process:
-                        if self._intersects_time_range(*self._folder_coverage(folder_url)):
-                            self.LOGGER.debug("Adding '%s' to the list of pages to process.", link)
-                            self._to_process.append(folder_url)
-                elif link.endswith(self.FILES_SUFFIXES):
-                    resource_url = f"{current_location}/{link}"
-                    if resource_url not in self._urls:
-                        if self._intersects_time_range(*(self._dataset_timestamp(link),) * 2):
-                            self.LOGGER.debug(
-                                "Adding downloadable form of '%s' to the list of resources.", link)
-                            resource_url = self.get_download_url(resource_url)
-                            if resource_url is not None:
-                                self._urls.append(resource_url)
+        self.LOGGER.info("Looking for resources in '%s'...", folder_path)
+        for path in self._list_folder_contents(folder_path):
+            # Select paths which do not contain any of the self.excludes strings
+            if all(map(lambda s, p=path: s not in p, self.excludes)):
+                if self._is_folder(path):
+                    self._add_folder_to_process(path)
+                elif self._is_file(path):
+                    self._add_url_to_return(path)
 
     def get_download_url(self, resource_url):
         """
@@ -247,7 +269,25 @@ class WebDirectoryCrawler(Crawler):
         modify the link (i.e. both downloadable link and metadata provider link are the identical),
         then there is no need to define this method.
         """
-        raise NotImplementedError('The get_download_url() method was not implemented')
+        return resource_url
+
+
+class HTTPDirectoryCrawler(WebDirectoryCrawler):
+    """"""
+
+    FOLDERS_SUFFIXES = None
+    FILES_SUFFIXES = None
+
+    @staticmethod
+    def _strip_folder_page(folder_path):
+        """"""
+        return re.sub(r'/\w+\.html?$', r'', folder_path)
+
+    def _is_folder(self, path):
+        return path.endswith(self.FOLDERS_SUFFIXES)
+
+    def _is_file(self, path):
+        return path.endswith(self.FILES_SUFFIXES)
 
     @classmethod
     def _get_links(cls, html):
@@ -257,8 +297,27 @@ class WebDirectoryCrawler(Crawler):
         parser.feed(html)
         return parser.links
 
+    @staticmethod
+    def _prepend_parent_path(parent_path, paths):
+        """"""
+        result = []
+        if not parent_path.endswith('/'):
+            parent_path += '/'
+        for path in paths:
+            if path.startswith(parent_path):
+                result.append(path)
+            else:
+                result.append(urljoin(parent_path, path))
+        return result
 
-class OpenDAPCrawler(WebDirectoryCrawler):
+    def _list_folder_contents(self, folder_path):
+        """"""
+        html = self._http_get(f"{self.base_url}{folder_path}")
+        stripped_folder_path = self._strip_folder_page(folder_path)
+        return self._prepend_parent_path(stripped_folder_path, self._get_links(html))
+
+
+class OpenDAPCrawler(HTTPDirectoryCrawler):
     """
     Crawler for harvesting the data of OpenDAP
     """
@@ -267,23 +326,15 @@ class OpenDAPCrawler(WebDirectoryCrawler):
     FILES_SUFFIXES = ('.nc', '.nc.gz')
     EXCLUDE = ['?']
 
-    def get_download_url(self, resource_url):
-        return resource_url
 
-
-class ThreddsCrawler(WebDirectoryCrawler):
+class ThreddsCrawler(HTTPDirectoryCrawler):
     """
     Crawler for harvesting the data which are provided by Thredds
     """
     LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
     FILES_SUFFIXES = ('.nc',)
-    EXCLUDE = ['/thredds/', 'http']
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        parsed_url = urlparse(self.root_url)
-        self.base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    EXCLUDE = ['/thredds/catalog.html']
 
     def get_download_url(self, resource_url):
         result = None
@@ -389,14 +440,17 @@ class FTPCrawler(WebDirectoryCrawler):
     """
     LOGGER = logging.getLogger(__name__ + '.FTPCrawler')
 
-    def __init__(self, root_url, username='anonymous', password='anonymous', fileformat=''):
+    def __init__(self, root_url, time_range=(None, None), excludes=None,
+                 username='anonymous', password='anonymous', files_suffixes=''):
+
         if not root_url.startswith('ftp://'):
-            raise ValueError("root url must start with 'ftp://' in the configuration file")
-        self.root_url = root_url
-        self.password = password
+            raise ValueError("The root url must start with 'ftp://'")
+
         self.username = username
-        self.FILES_SUFFIXES = fileformat
-        self.set_initial_state()
+        self.password = password
+        self.files_suffixes = files_suffixes
+
+        super().__init__(root_url, time_range, excludes)
 
     def set_initial_state(self):
         """
@@ -404,32 +458,25 @@ class FTPCrawler(WebDirectoryCrawler):
         The `_to_process` attribute contains URLs to pages which need to be searched for resources.
         """
         self._urls = []
-        # giving the address that is declared in the config file to "_to_process" attribute
-        self._to_process = [urlparse(self.root_url).path]
-        self.ftp = ftplib.FTP(urlparse(self.root_url).netloc, user=self.username, passwd=self.password)
-
-    def _explore_page(self, folder_url):
-        """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
-        self.LOGGER.info("Looking for FTP resources in '%s'...", self.ftp.host+folder_url)
+        self._to_process = [self.root_url.path or '/']
+        self.ftp = ftplib.FTP(self.root_url.netloc, user=self.username, passwd=self.password)
         try:
             self.ftp.login(self.username, self.password)
         except ftplib.error_perm as err_content:
             # these two cases are in the mentioned FTP servers that deals with "login once again"
             if not (err_content.args[0].startswith('503') or err_content.args[0].startswith('230')):
                 raise
-        # searching through all subdirectory to check whether they are folders or files
-        for name in self.ftp.nlst(folder_url):
-            try:
-                self.ftp.cwd(name)
-            except ftplib.error_perm:
-                # if can not cd into new name then add that name to the "self._urls" in the case of
-                # having specified endings that are shown in "self.FILES_SUFFIXES"
-                if name.endswith(self.FILES_SUFFIXES):
-                    ftp_domain_name = self.ftp.host
-                    self._urls.append(f"ftp://{ftp_domain_name}{name}")
-            else:
-                # if successfully cd into new name then add
-                # it to "self._to_process" and then come back to original address
-                if name not in self._to_process:
-                    self._to_process.append(name)
-                self.ftp.cwd("..")
+
+    def _list_folder_contents(self, folder_path):
+        return self.ftp.nlst(folder_path)
+
+    def _is_folder(self, path):
+        try:
+            self.ftp.cwd(path)
+        except ftplib.error_perm:
+            return False
+        else:
+            return True
+
+    def _is_file(self, path):
+        return path.endswith(self.files_suffixes)
