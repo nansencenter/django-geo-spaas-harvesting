@@ -272,7 +272,7 @@ class WebDirectoryCrawler(Crawler):
         return resource_url
 
 
-class HTTPDirectoryCrawler(WebDirectoryCrawler):
+class HTMLDirectoryCrawler(WebDirectoryCrawler):
     """"""
 
     FOLDERS_SUFFIXES = None
@@ -317,7 +317,7 @@ class HTTPDirectoryCrawler(WebDirectoryCrawler):
         return self._prepend_parent_path(stripped_folder_path, self._get_links(html))
 
 
-class OpenDAPCrawler(HTTPDirectoryCrawler):
+class OpenDAPCrawler(HTMLDirectoryCrawler):
     """
     Crawler for harvesting the data of OpenDAP
     """
@@ -327,7 +327,7 @@ class OpenDAPCrawler(HTTPDirectoryCrawler):
     EXCLUDE = ['?']
 
 
-class ThreddsCrawler(HTTPDirectoryCrawler):
+class ThreddsCrawler(HTMLDirectoryCrawler):
     """
     Crawler for harvesting the data which are provided by Thredds
     """
