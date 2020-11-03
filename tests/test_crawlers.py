@@ -71,8 +71,8 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(crawler.get_download_url('foo'), 'foo')
 
 
-class HTTPDirectoryCrawlerTestCase(unittest.TestCase):
-    """Tests for the HTTPDirectoryCrawler crawler"""
+class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
+    """Tests for the HTMLDirectoryCrawler crawler"""
 
     def test_prepend_parent_path(self):
         """
@@ -81,7 +81,7 @@ class HTTPDirectoryCrawlerTestCase(unittest.TestCase):
         parent_path = '/foo'
         paths = ['/foo/bar', 'baz']
         self.assertEqual(
-            crawlers.HTTPDirectoryCrawler._prepend_parent_path(parent_path, paths),
+            crawlers.HTMLDirectoryCrawler._prepend_parent_path(parent_path, paths),
             ['/foo/bar', '/foo/baz']
         )
 
