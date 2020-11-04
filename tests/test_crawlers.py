@@ -1,4 +1,5 @@
 """Test suite for crawlers"""
+#pylint: disable=protected-access
 
 import ftplib
 import logging
@@ -69,6 +70,259 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         """
         crawler = crawlers.WebDirectoryCrawler('')
         self.assertEqual(crawler.get_download_url('foo'), 'foo')
+
+    def test_base_url(self):
+        """The base_url property should return the root_url without path"""
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        self.assertEqual(crawler.base_url, 'http://foo')
+
+    def test_set_initial_state(self):
+        """set_initial_state() should set the right values for _urls and _to_process"""
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        crawler._urls = None
+        crawler._to_process = None
+        crawler.set_initial_state()
+        self.assertListEqual(crawler._urls, [])
+        self.assertListEqual(crawler._to_process, ['/bar'])
+
+    def test_iter(self):
+        """__iter__() should return self"""
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        self.assertIs(iter(crawler), crawler)
+
+    def test_next_with_urls(self):
+        """__next__() should return the next URL from _urls"""
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        crawler._urls = ['http://foo/bar/baz.nc']
+        self.assertEqual(next(crawler), 'http://foo/bar/baz.nc')
+
+    def test_next_without_urls(self):
+        """If _urls is empty, _process_folder should be called"""
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        with mock.patch.object(crawler, '_process_folder') as mock_process_folder:
+            mock_process_folder.side_effect = lambda x: crawler._urls.append('http://foo/bar/baz.nc')
+            self.assertEqual(next(crawler), 'http://foo/bar/baz.nc')
+
+    def test_next_end_of_iteration(self):
+        """StopIteration should be raised when there are no more folders to process"""
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        crawler._to_process = []
+        with self.assertRaises(StopIteration):
+            next(crawler)
+
+    def test_add_url_to_return(self):
+        """
+        _add_url_to_return() should add the full URL corresponding
+        to the path if it fits in the time range constraint
+        """
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        crawler.LOGGER = mock.Mock()
+        crawler._add_url_to_return('/bar/baz.nc')
+        self.assertListEqual(crawler._urls, ['http://foo/bar/baz.nc'])
+
+    def test_add_folder_to_process(self):
+        """_add_folder_to_process() should add the path of the folder
+        if it fits in the time range constraint
+        """
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        crawler.LOGGER = mock.Mock()
+        crawler._to_process = []
+        crawler._add_folder_to_process('/bar/baz')
+        self.assertListEqual(crawler._to_process, ['/bar/baz'])
+
+    def test_process_folder_with_file(self):
+        """_process_folder() should feed the _urls stack
+        with file paths which are not excluded
+        """
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        crawler.excludes = ['.gz']
+        crawler.LOGGER = mock.Mock()
+        with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
+                mock.patch.object(crawler, '_is_file', return_value=True), \
+                mock.patch.object(crawler, '_is_folder', return_value=False), \
+                mock.patch.object(crawler, '_add_url_to_return') as mock_add_url:
+            mock_folder_contents.return_value = ['/bar/baz.nc', '/bar/qux.gz']
+            crawler._process_folder('')
+        mock_add_url.assert_called_with('/bar/baz.nc')
+
+    def test_process_folder_with_folder(self):
+        """_process_folder() should feed the _to_process stack
+        with folder paths which are not excluded
+        """
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        crawler.excludes = ['qux']
+        crawler.LOGGER = mock.Mock()
+        with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
+                mock.patch.object(crawler, '_is_file', return_value=False), \
+                mock.patch.object(crawler, '_is_folder', return_value=True), \
+                mock.patch.object(crawler, '_add_folder_to_process') as mock_add_folder:
+            mock_folder_contents.return_value = ['/bar/baz', '/bar/qux']
+            crawler._process_folder('')
+        mock_add_folder.assert_called_with('/bar/baz')
+
+    def test_get_year_folder_coverage(self):
+        """Get the correct time range from a year folder"""
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/2019/contents.html'),
+            (datetime(2019, 1, 1, 0, 0, 0), datetime(2019, 12, 31, 23, 59, 59))
+        )
+
+    def test_get_month_folder_coverage(self):
+        """Get the correct time range from a month folder"""
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/2019/02/contents.html'),
+            (datetime(2019, 2, 1, 0, 0, 0), datetime(2019, 2, 28, 23, 59, 59))
+        )
+
+    def test_get_day_of_month_folder_coverage(self):
+        """Get the correct time range from a day of month folder"""
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/2019/02/14/contents.html'),
+            (datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 23, 59, 59))
+        )
+
+    def test_get_day_of_year_folder_coverage(self):
+        """Get the correct time range from a day of year folder"""
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/2019/046/contents.html'),
+            (datetime(2019, 2, 15, 0, 0, 0), datetime(2019, 2, 15, 23, 59, 59))
+        )
+
+    def test_none_when_no_folder_coverage(self):
+        """
+        The `_folder_coverage` method should return `None` if no time range is inferred from the
+        folder's path
+        """
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/contents.html'), (None, None))
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/046/contents.html'),
+            (None, None)
+        )
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/02/contents.html'),
+            (None, None)
+        )
+
+    def test_get_dataset_timestamp(self):
+        """Get the correct date from a dataset prefixed by a timestamp"""
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._dataset_timestamp('20190214090812_dataset_name.nc'),
+            datetime(2019, 2, 14, 9, 8, 12),
+        )
+
+    def test_none_when_no_dataset_timestamp(self):
+        """
+        The `_dataset_timestamp` method should return `None` if no timestamp is found in the
+        dataset's name
+        """
+        self.assertEqual(crawlers.WebDirectoryCrawler._dataset_timestamp('dataset_name.nc'), None)
+
+    def test_intersects_time_range_finite_limits(self):
+        """
+        Test the behavior of the `_intersects_time_range` method with a finite time range limitation
+        `time_range[0]` and `time_range[1]` are the limits defined in the crawler
+        `start_time` and `stop_time` are the limits of the time range which is tested against the
+        crawler's condition
+        """
+        crawler = crawlers.WebDirectoryCrawler(
+            '', time_range=(datetime(2019, 2, 14), datetime(2019, 2, 20)))
+
+        # start_time < time_range[0] < stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 10), datetime(2019, 2, 17)))
+        # start_time < time_range[0] == stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 10), datetime(2019, 2, 14)))
+        # time_range[0] < start_time < time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 17), datetime(2019, 2, 25)))
+        # time_range[0] < start_time == time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 20), datetime(2019, 2, 25)))
+        # time_range[0] < start_time < stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 15), datetime(2019, 2, 19)))
+        # start_time < time_range[0] < time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 13), datetime(2019, 2, 25)))
+        # start_time < stop_time < time_range[0] < time_range[1]
+        self.assertFalse(crawler._intersects_time_range(
+            datetime(2019, 2, 10), datetime(2019, 2, 13)))
+        # time_range[0] < time_range[1] < start_time < stop_time
+        self.assertFalse(crawler._intersects_time_range(
+            datetime(2019, 2, 25), datetime(2019, 2, 26)))
+        # no start_time < time_range[0] < time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 27)))
+        # no start_time < time_range[0] < stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 17)))
+        # no start_time < stop_time < time_range[0] < time_range[1]
+        self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 10)))
+        # start_time < time_range[0] < time_range[1] < no stop time
+        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 10), None))
+        # time_range[0] < start_time < time_range[1] < no stop time
+        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 18), None))
+        # time_range[0] < time_range[1] < start_time < no stop time
+        self.assertFalse(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+
+    def test_intersects_time_range_no_lower_limit(self):
+        """
+        Test the behavior of the `_intersects_time_range` method without a lower limit for the
+        crawler's time range.
+        `time_range[1]` is the upper limit defined in the crawler
+        `start_time` and `stop_time` are the limits of the time range which is tested against the
+        crawler's condition
+        """
+        crawler = crawlers.WebDirectoryCrawler('', time_range=(None, datetime(2019, 2, 20)))
+
+        # no lower limit < time_range[1] < start_time < stop_time
+        self.assertFalse(crawler._intersects_time_range(
+            datetime(2019, 2, 25), datetime(2019, 2, 26)))
+        # no lower limit < start_time < time_range[1] < stop_time
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 18), datetime(2019, 2, 26)))
+        # no lower limit < start_time < stop_time < time_range[1]
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 18), datetime(2019, 2, 19)))
+        # no lower limit and no start time
+        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
+        # no lower limit and no stop_time, with intersection
+        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 19), None))
+        # no lower limit and no stop_time, without intersection
+        self.assertFalse(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+
+    def test_intersects_time_range_no_upper_limit(self):
+        """
+        Test the behavior of the `_intersects_time_range` method without an upper limit for the
+        crawler's time range.
+        `time_range[0]` is the upper limit defined in the crawler
+        `start_time` and `stop_time` are the limits of the time range which is tested against the
+        crawler's condition
+        """
+        crawler = crawlers.WebDirectoryCrawler('', time_range=(datetime(2019, 2, 20), None))
+
+        # start_time < stop_time < time_range[0] < no upper limit
+        self.assertFalse(crawler._intersects_time_range(
+            datetime(2019, 2, 10), datetime(2019, 2, 15)))
+        # start_time < time_range[0] < stop_time < no upper limit
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 18), datetime(2019, 2, 26)))
+        # time_range[0] < start_time < stop_time < no upper limit
+        self.assertTrue(crawler._intersects_time_range(
+            datetime(2019, 2, 21), datetime(2019, 2, 25)))
+        # no upper limit and no stop_time
+        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+        # no upper limit and no start_time, with intersection
+        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
+        # no upper limit and no start_time, without intersection
+        self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
 
 class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
@@ -178,17 +432,6 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         self.assertListEqual(crawler._urls, [])
         self.assertListEqual(crawler._to_process, [''])
 
-    def test_set_initial_state(self):
-        """Tests that the set_initial_state() method sets the correct values"""
-        # Create a crawler and start iterating to set a non-initial state
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
-        with self.assertLogs(crawler.LOGGER):
-            next(iter(crawler))
-
-        crawler.set_initial_state()
-        self.assertListEqual(crawler._to_process, [crawler.root_url.path])
-        self.assertListEqual(crawler._urls, [])
-
     def test_get_correct_html_contents(self):
         """Test that the _http_get() method returns the correct HTML string"""
         data_file = open(os.path.join(os.path.dirname(__file__), 'data/opendap/root.html'))
@@ -289,170 +532,6 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         with self.assertRaises(StopIteration):
             with self.assertRaises(KeyError):
                 next(crawler)
-
-    def test_get_year_folder_coverage(self):
-        """Get the correct time range from a year folder"""
-        crawler = crawlers.OpenDAPCrawler('')
-        self.assertEqual(
-            crawler._folder_coverage('https://test-opendap.com/folder/2019/contents.html'),
-            (datetime(2019, 1, 1, 0, 0, 0), datetime(2019, 12, 31, 23, 59, 59))
-        )
-
-    def test_get_month_folder_coverage(self):
-        """Get the correct time range from a month folder"""
-        crawler = crawlers.OpenDAPCrawler('')
-        self.assertEqual(
-            crawler._folder_coverage('https://test-opendap.com/folder/2019/02/contents.html'),
-            (datetime(2019, 2, 1, 0, 0, 0), datetime(2019, 2, 28, 23, 59, 59))
-        )
-
-    def test_get_day_of_month_folder_coverage(self):
-        """Get the correct time range from a day of month folder"""
-        crawler = crawlers.OpenDAPCrawler('')
-        self.assertEqual(
-            crawler._folder_coverage('https://test-opendap.com/folder/2019/02/14/contents.html'),
-            (datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 23, 59, 59))
-        )
-
-    def test_get_day_of_year_folder_coverage(self):
-        """Get the correct time range from a day of year folder"""
-        crawler = crawlers.OpenDAPCrawler('')
-        self.assertEqual(
-            crawler._folder_coverage('https://test-opendap.com/folder/2019/046/contents.html'),
-            (datetime(2019, 2, 15, 0, 0, 0), datetime(2019, 2, 15, 23, 59, 59))
-        )
-
-    def test_none_when_no_folder_coverage(self):
-        """
-        The `_folder_coverage` method should return `None` if no time range is inferred from the
-        folder's path
-        """
-        crawler = crawlers.OpenDAPCrawler('')
-        self.assertEqual(
-            crawler._folder_coverage('https://test-opendap.com/folder/contents.html'), (None, None))
-        self.assertEqual(
-            crawler._folder_coverage('https://test-opendap.com/folder/046/contents.html'),
-            (None, None)
-        )
-        self.assertEqual(
-            crawler._folder_coverage('https://test-opendap.com/folder/02/contents.html'),
-            (None, None)
-        )
-
-    def test_get_dataset_timestamp(self):
-        """Get the correct date from a dataset prefixed by a timestamp"""
-        crawler = crawlers.OpenDAPCrawler('')
-        self.assertEqual(
-            crawler._dataset_timestamp('20190214090812_dataset_name.nc'),
-            datetime(2019, 2, 14, 9, 8, 12),
-        )
-
-    def test_none_when_no_dataset_timestamp(self):
-        """
-        The `_dataset_timestamp` method should return `None` if no timestamp is found in the
-        dataset's name
-        """
-        crawler = crawlers.OpenDAPCrawler('')
-        self.assertEqual(crawler._dataset_timestamp('dataset_name.nc'), None)
-
-    def test_intersects_time_range_finite_limits(self):
-        """
-        Test the behavior of the `_intersects_time_range` method with a finite time range limitation
-        `time_range[0]` and `time_range[1]` are the limits defined in the crawler
-        `start_time` and `stop_time` are the limits of the time range which is tested against the
-        crawler's condition
-        """
-        crawler = crawlers.OpenDAPCrawler(
-            '', time_range=(datetime(2019, 2, 14), datetime(2019, 2, 20)))
-
-        # start_time < time_range[0] < stop_time < time_range[1]
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 10), datetime(2019, 2, 17)))
-        # start_time < time_range[0] == stop_time < time_range[1]
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 10), datetime(2019, 2, 14)))
-        # time_range[0] < start_time < time_range[1] < stop_time
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 17), datetime(2019, 2, 25)))
-        # time_range[0] < start_time == time_range[1] < stop_time
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 20), datetime(2019, 2, 25)))
-        # time_range[0] < start_time < stop_time < time_range[1]
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 15), datetime(2019, 2, 19)))
-        # start_time < time_range[0] < time_range[1] < stop_time
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 13), datetime(2019, 2, 25)))
-        # start_time < stop_time < time_range[0] < time_range[1]
-        self.assertFalse(crawler._intersects_time_range(
-            datetime(2019, 2, 10), datetime(2019, 2, 13)))
-        # time_range[0] < time_range[1] < start_time < stop_time
-        self.assertFalse(crawler._intersects_time_range(
-            datetime(2019, 2, 25), datetime(2019, 2, 26)))
-        # no start_time < time_range[0] < time_range[1] < stop_time
-        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 27)))
-        # no start_time < time_range[0] < stop_time < time_range[1]
-        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 17)))
-        # no start_time < stop_time < time_range[0] < time_range[1]
-        self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 10)))
-        # start_time < time_range[0] < time_range[1] < no stop time
-        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 10), None))
-        # time_range[0] < start_time < time_range[1] < no stop time
-        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 18), None))
-        # time_range[0] < time_range[1] < start_time < no stop time
-        self.assertFalse(crawler._intersects_time_range(datetime(2019, 2, 21), None))
-
-    def test_intersects_time_range_no_lower_limit(self):
-        """
-        Test the behavior of the `_intersects_time_range` method without a lower limit for the
-        crawler's time range.
-        `time_range[1]` is the upper limit defined in the crawler
-        `start_time` and `stop_time` are the limits of the time range which is tested against the
-        crawler's condition
-        """
-        crawler = crawlers.OpenDAPCrawler('', time_range=(None, datetime(2019, 2, 20)))
-
-        # no lower limit < time_range[1] < start_time < stop_time
-        self.assertFalse(crawler._intersects_time_range(
-            datetime(2019, 2, 25), datetime(2019, 2, 26)))
-        # no lower limit < start_time < time_range[1] < stop_time
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 18), datetime(2019, 2, 26)))
-        # no lower limit < start_time < stop_time < time_range[1]
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 18), datetime(2019, 2, 19)))
-        # no lower limit and no start time
-        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
-        # no lower limit and no stop_time, with intersection
-        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 19), None))
-        # no lower limit and no stop_time, without intersection
-        self.assertFalse(crawler._intersects_time_range(datetime(2019, 2, 21), None))
-
-    def test_intersects_time_range_no_upper_limit(self):
-        """
-        Test the behavior of the `_intersects_time_range` method without an upper limit for the
-        crawler's time range.
-        `time_range[0]` is the upper limit defined in the crawler
-        `start_time` and `stop_time` are the limits of the time range which is tested against the
-        crawler's condition
-        """
-        crawler = crawlers.OpenDAPCrawler('', time_range=(datetime(2019, 2, 20), None))
-
-        # start_time < stop_time < time_range[0] < no upper limit
-        self.assertFalse(crawler._intersects_time_range(
-            datetime(2019, 2, 10), datetime(2019, 2, 15)))
-        # start_time < time_range[0] < stop_time < no upper limit
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 18), datetime(2019, 2, 26)))
-        # time_range[0] < start_time < stop_time < no upper limit
-        self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 21), datetime(2019, 2, 25)))
-        # no upper limit and no stop_time
-        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 21), None))
-        # no upper limit and no start_time, with intersection
-        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
-        # no upper limit and no start_time, without intersection
-        self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
 
 class ThreddsCrawlerTestCase(unittest.TestCase):
