@@ -675,8 +675,8 @@ class FTPCrawlerTestCase(unittest.TestCase):
 
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP', autospec=True)
     def test_ftp_correct_navigation(self, mock_ftp):
-        """ shall categorize the specific file names (based on specific 'fileformat' which is
-        revealed in the configuration file) as well as folder(s) inside the ftp resource """
+        """check that file URLs and folders paths are added to the right stacks"""
+
         test_crawler = crawlers.FTPCrawler('ftp://foo', files_suffixes='.gz')
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
         test_crawler.ftp.cwd = self.emulate_cwd_of_ftp
@@ -691,11 +691,11 @@ class FTPCrawlerTestCase(unittest.TestCase):
 
     @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.login')
     def test_ftp_correct_exception(self, mock_ftp):
-        """ shall return the costume 'ConnectionError'
-         instead of 'ftplib.error_perm' in order to continue the harvesting process in the case of
-         redundant or repetitive login attempt(s)
-         after the first login attempt. "nlst" is placed after "login" in source code. So reach "nlst"
-         means passing the login code. """
+        """set_initial_state() should not raise an error in case of
+        503 or 230 responses from FTP.login(), but it should for
+        other error codes.
+        """
+
         test_crawler = crawlers.FTPCrawler(
             'ftp://', username="d", password="d", files_suffixes='.gz')
 

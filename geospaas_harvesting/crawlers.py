@@ -82,10 +82,7 @@ class LinkExtractor(HTMLParser):
 
 
 class WebDirectoryCrawler(Crawler):
-    """
-    Parent class for crawlers used on repositories which expose a directory-like structure
-    in the form of HTML pages
-    """
+    """Parent class for crawlers used on repositories which expose a directory-like structure"""
     LOGGER = None
     EXCLUDE = None
 
@@ -107,8 +104,8 @@ class WebDirectoryCrawler(Crawler):
     def __init__(self, root_url, time_range=(None, None), excludes=None):
         """
         `root_url` is the URL of the data repository to explore.
-        `time_range` is a tuple of datetime.datetime objects defining the time range of the datasets
-        returned the crawler.
+        `time_range` is a 2-tuple of datetime.datetime objects defining the time range
+        of the datasets returned the crawler.
         `excludes` is the list of string that are the associated url is ignored during
         the harvesting process if these strings are found in the crawled url.
         """
@@ -124,8 +121,10 @@ class WebDirectoryCrawler(Crawler):
 
     def set_initial_state(self):
         """
-        The `_urls` attribute contains URLs to the resources which will be returned by the crawler.
-        The `_to_process` attribute contains URLs to pages which need to be searched for resources.
+        The `_urls` attribute contains URLs to the resources which
+        will be returned by the crawler.
+        The `_to_process` attribute contains URLs to pages which
+        need to be searched for resources.
         """
         self._urls = []
         self._to_process = [self.root_url.path.rstrip('/')]
@@ -217,19 +216,22 @@ class WebDirectoryCrawler(Crawler):
                 (not stop_time or not self.time_range[0] or stop_time >= self.time_range[0]))
 
     def _list_folder_contents(self, folder_path):
-        """"""
+        """Lists the contents of a folder. Should return absolute paths"""
         raise NotImplementedError("_list_folder_contents is abstract in WebDirectoryCrawler")
 
     def _is_folder(self, path):
-        """"""
+        """Returns True if path points to a folder"""
         raise NotImplementedError("_is_folder is abstract in WebDirectoryCrawler")
 
     def _is_file(self, path):
-        """"""
+        """Returns True if path points to a file"""
         raise NotImplementedError("_is_file is abstract in WebDirectoryCrawler")
 
     def _add_url_to_return(self, path):
-        """"""
+        """
+        Add a URL to the list of URLs returned by the crawler after
+        checking that it fits inside the crawler's time range.
+        """
         if self._intersects_time_range(*(self._dataset_timestamp(path),) * 2):
             resource_url = urljoin(self.base_url, path)
             download_url = self.get_download_url(resource_url)
@@ -239,14 +241,14 @@ class WebDirectoryCrawler(Crawler):
                     self._urls.append(download_url)
 
     def _add_folder_to_process(self, path):
-        """"""
+        """Add a folder to the list of folder which will be explored later"""
         if self._intersects_time_range(*self._folder_coverage(path)):
             if path not in self._to_process:
                 self.LOGGER.debug("Adding '%s' to the list of pages to process.", path)
                 self._to_process.append(path)
 
     def _process_folder(self, folder_path):
-        """Get all relevant links from a page and feeds the _urls and _to_process attributes"""
+        """Get the contents of a folder and feed the _urls and _to_process attributes"""
         self.LOGGER.info("Looking for resources in '%s'...", folder_path)
         for path in self._list_folder_contents(folder_path):
             # Select paths which do not contain any of the self.excludes strings
@@ -258,29 +260,26 @@ class WebDirectoryCrawler(Crawler):
 
     def get_download_url(self, resource_url):
         """
-        This method should return the downloadable form of the crawled link. It means providing a
-        direct download link.
-
-        The philosophy of this method is to turn the link inside the "explore_pages" method into
-        the link that is downloadable by the geospaas user.
-
-        This method is only used in the "_explore_page" method.
-        Thus, if any class defined its "_explore_page" method in a way that there is no need to
-        modify the link (i.e. both downloadable link and metadata provider link are the identical),
-        then there is no need to define this method.
+        Get a download link from a resource URL, in case the URL found
+        by the crawler is not a direct download link.
+        By default, it just returns the ressource URL and can be
+        overridden in the child classes if necessary.
         """
         return resource_url
 
 
 class HTMLDirectoryCrawler(WebDirectoryCrawler):
-    """"""
+    """Implementation of WebDirectoryCrawler for repositories exposed as HTML pages."""
 
     FOLDERS_SUFFIXES = None
     FILES_SUFFIXES = None
 
     @staticmethod
     def _strip_folder_page(folder_path):
-        """"""
+        """
+        Remove the index page of a folder path.
+        For example: /foo/bar/contents.html becomes /foo/bar.
+        """
         return re.sub(r'/\w+\.html?$', r'', folder_path)
 
     def _is_folder(self, path):
@@ -299,7 +298,10 @@ class HTMLDirectoryCrawler(WebDirectoryCrawler):
 
     @staticmethod
     def _prepend_parent_path(parent_path, paths):
-        """"""
+        """
+        Prepend the parent_path to each path contained in paths,
+        except if the path already starts with the parent_path.
+        """
         result = []
         if not parent_path.endswith('/'):
             parent_path += '/'
@@ -311,7 +313,6 @@ class HTMLDirectoryCrawler(WebDirectoryCrawler):
         return result
 
     def _list_folder_contents(self, folder_path):
-        """"""
         html = self._http_get(f"{self.base_url}{folder_path}")
         stripped_folder_path = self._strip_folder_page(folder_path)
         return self._prepend_parent_path(stripped_folder_path, self._get_links(html))
@@ -348,8 +349,8 @@ class ThreddsCrawler(HTMLDirectoryCrawler):
 
 class CopernicusOpenSearchAPICrawler(Crawler):
     """
-    Crawler which returns the search results of an Opensearch API, given the URL and search
-    terms
+    Crawler which returns the search results of an Opensearch API,
+    given the URL and search terms.
     """
     LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
 
@@ -471,6 +472,7 @@ class FTPCrawler(WebDirectoryCrawler):
         return self.ftp.nlst(folder_path)
 
     def _is_folder(self, path):
+        """Determine if path is a folder by trying to change the working directory to path."""
         try:
             self.ftp.cwd(path)
         except ftplib.error_perm:
