@@ -105,7 +105,7 @@ class WebDirectoryCrawler(Crawler):
         """
         `root_url` is the URL of the data repository to explore.
         `time_range` is a 2-tuple of datetime.datetime objects defining the time range
-        of the datasets returned the crawler.
+        of the datasets returned by the crawler.
         `excludes` is the list of string that are the associated url is ignored during
         the harvesting process if these strings are found in the crawled url.
         """
