@@ -211,20 +211,6 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
             (None, None)
         )
 
-    def test_get_dataset_timestamp(self):
-        """Get the correct date from a dataset prefixed by a timestamp"""
-        self.assertEqual(
-            crawlers.WebDirectoryCrawler._dataset_timestamp('20190214090812_dataset_name.nc'),
-            datetime(2019, 2, 14, 9, 8, 12),
-        )
-
-    def test_none_when_no_dataset_timestamp(self):
-        """
-        The `_dataset_timestamp` method should return `None` if no timestamp is found in the
-        dataset's name
-        """
-        self.assertEqual(crawlers.WebDirectoryCrawler._dataset_timestamp('dataset_name.nc'), None)
-
     def test_intersects_time_range_finite_limits(self):
         """
         Test the behavior of the `_intersects_time_range` method with a finite time range limitation
@@ -355,8 +341,8 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
                 'https://test-opendap.com/dataset.nc',
                 'https://test2-opendap.com/dataset.nc',
                 'https://test-opendap.com/folder/dataset.nc',
-                'https://test-opendap.com/folder/2019/02/14/20190214000000_dataset.nc',
-                'https://test-opendap.com/folder/2019/046/20190215000000_dataset.nc'
+                'https://test-opendap.com/folder/2019/02/14/20190214120000_dataset.nc',
+                'https://test-opendap.com/folder/2019/02/14/20190214000000_dataset.nc'
             ],
             'file_path': None},
         'folder': {
@@ -487,31 +473,29 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][1]])
         self.assertListEqual(crawler._to_process, ['/folder/contents.html'])
 
-    def test_process_folder_with_time_restriction_discriminated_by_timestamp(self):
+    def test_process_folder_with_time_restriction(self):
         """
-        Explore a page and make sure the _url and _to_process attributes of the crawler have the
-        right values according to a time restriction
+        Process a folder and make sure the _url and _to_process
+        attributes of the crawler have the right values according to a
+        time restriction.
+        Since the precision of the time restriction is limited to the
+        folder level for WebDirectoryCrawlers, all datasets in a folder
+        whose time coverage intersects the crawler's time range are
+        selected, even if the timestamp of a dataset does not intersect
+        the crawler's time range.
         """
         crawler = crawlers.OpenDAPCrawler(
             self.TEST_DATA['folder_day_of_year']['urls'][0],
             time_range=(datetime(2019, 2, 15, 11, 0, 0), datetime(2019, 2, 15, 13, 0, 0)))
         with self.assertLogs(crawler.LOGGER):
             crawler._process_folder(crawler._to_process.pop())
-        self.assertListEqual(crawler._urls,
-                             ['https://test-opendap.com/folder/2019/046/20190215120000_dataset.nc'])
-        self.assertListEqual(crawler._to_process, [])
-
-    def test_process_folder_with_time_restriction_discriminated_by_folder_coverage(self):
-        """
-        Explore a page and make sure the _url and _to_process attributes of the crawler have the
-        right values according to a time restriction
-        """
-        crawler = crawlers.OpenDAPCrawler(
-            self.TEST_DATA['folder_day_of_year']['urls'][0],
-            time_range=(datetime(2019, 2, 11, 11, 0, 0), datetime(2019, 2, 11, 13, 0, 0)))
-        with self.assertLogs(crawler.LOGGER):
-            crawler._process_folder(crawler._to_process.pop())
-        self.assertListEqual(crawler._urls, [])
+        self.assertListEqual(
+            crawler._urls,
+            [
+                'https://test-opendap.com/folder/2019/046/20190215000000_dataset.nc',
+                'https://test-opendap.com/folder/2019/046/20190215120000_dataset.nc'
+            ]
+        )
         self.assertListEqual(crawler._to_process, [])
 
     def test_iterating(self):
@@ -526,9 +510,11 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][0])
             self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][2])
             self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][3])
+            self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][4])
 
-        # Test that a StopIteration is returned at the end. The nested context managers are
-        # necessary because the StopIteration exception is raised inside an 'except KeyError:' block
+        # Test that a StopIteration is raised in the end. The nested
+        # context managers are necessary because the StopIteration
+        # exception is raised inside an 'except KeyError:' block
         with self.assertRaises(StopIteration):
             with self.assertRaises(KeyError):
                 next(crawler)

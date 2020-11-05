@@ -97,10 +97,6 @@ class WebDirectoryCrawler(Crawler):
         f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}/{DAY_OF_MONTH_PATTERN}/.*$')
     DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}(/.*)?$')
 
-    TIMESTAMP_MATCHER = re.compile(
-        r'(?P<date>(\d{4})(1[0-2]|0[1-9]|[1-9])(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9]))_?'
-        r'(?P<time>(2[0-3]|[0-1]\d|\d)([0-5]\d|\d)(6[0-1]|[0-5]\d|\d))')
-
     def __init__(self, root_url, time_range=(None, None), excludes=None):
         """
         `root_url` is the URL of the data repository to explore.
@@ -192,18 +188,6 @@ class WebDirectoryCrawler(Crawler):
 
         return (folder_coverage_start, folder_coverage_stop)
 
-    @classmethod
-    def _dataset_timestamp(cls, dataset_name):
-        """Tries to find a timestamp in the dataset's name"""
-        timestamp_match = cls.TIMESTAMP_MATCHER.search(dataset_name)
-        if timestamp_match:
-            return datetime.strptime(
-                timestamp_match['date'] + timestamp_match['time'],
-                '%Y%m%d%H%M%S'
-            )
-        else:
-            return None
-
     def _intersects_time_range(self, start_time=None, stop_time=None):
         """
         Return True if either of these conditions is met:
@@ -232,13 +216,12 @@ class WebDirectoryCrawler(Crawler):
         Add a URL to the list of URLs returned by the crawler after
         checking that it fits inside the crawler's time range.
         """
-        if self._intersects_time_range(*(self._dataset_timestamp(path),) * 2):
-            resource_url = urljoin(self.base_url, path)
-            download_url = self.get_download_url(resource_url)
-            if download_url is not None:
-                if download_url not in self._urls:
-                    self.LOGGER.debug("Adding '%s' to the list of resources.", download_url)
-                    self._urls.append(download_url)
+        resource_url = urljoin(self.base_url, path)
+        download_url = self.get_download_url(resource_url)
+        if download_url is not None:
+            if download_url not in self._urls:
+                self.LOGGER.debug("Adding '%s' to the list of resources.", download_url)
+                self._urls.append(download_url)
 
     def _add_folder_to_process(self, path):
         """Add a folder to the list of folder which will be explored later"""
