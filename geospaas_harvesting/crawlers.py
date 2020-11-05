@@ -86,8 +86,8 @@ class WebDirectoryCrawler(Crawler):
     LOGGER = None
     EXCLUDE = None
 
-    YEAR_PATTERN = r'(\d{4})'
-    MONTH_PATTERN = r'(1[0-2]|0[1-9]|[1-9])'
+    YEAR_PATTERN = r'y?(\d{4})'
+    MONTH_PATTERN = r'm?(1[0-2]|0[1-9]|[1-9])'
     DAY_OF_MONTH_PATTERN = r'(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9])'
     DAY_OF_YEAR_PATTERN = r'(36[0-6]|3[0-5]\d|[1-2]\d\d|0[1-9]\d|00[1-9]|[1-9]\d|0[1-9]|[1-9])'
 
