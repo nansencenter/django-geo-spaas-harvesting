@@ -151,7 +151,8 @@ class FTPHarvester(WebDirectoryHarvester):
                 username=self.config.get('username', None),
                 password=self.config.get('password'),
                 files_suffixes=self.config.get('fileformat', None),
-                time_range=(self.get_time_range())
+                time_range=(self.get_time_range()),
+                excludes=self.config.get('excludes', None)
             )
             for url in self.config['urls']
         ]
