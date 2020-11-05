@@ -1,4 +1,5 @@
 ---
+endless: True
 harvesters:
   test:
     class: 'TestHarvester'
