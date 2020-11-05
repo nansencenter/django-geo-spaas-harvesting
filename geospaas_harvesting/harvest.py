@@ -233,6 +233,7 @@ def main():
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])
+    endless = config.get('endless', False)
     try:
         with multiprocessing.Pool(processes_number, initializer=init_worker) as pool:
             results = {}
@@ -255,10 +256,12 @@ def main():
                                 config.get('dump_on_interruption', True)
                             )
                         )
-                if not config.get('endless', False):
+                if not endless:
                     break
                 time.sleep(config.get('poll_interval', 600))
-            LOGGER.error("All harvester processes encountered errors")
+
+            if endless:
+                LOGGER.error("All harvester processes encountered errors")
             pool.close()
             pool.join()
     except KeyboardInterrupt:

@@ -40,6 +40,7 @@ class ConfigurationTestCase(unittest.TestCase):
         self.assertDictEqual(
             configuration._data,
             {
+                'endless': True,
                 'harvesters': {
                     'test': {
                         'class': 'TestHarvester',
@@ -154,7 +155,7 @@ class ConfigurationTestCase(unittest.TestCase):
         with self.assertLogs(harvest.LOGGER):
             configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
         self.assertTrue(callable(getattr(configuration, '__len__')))
-        self.assertEqual(len(configuration), 2)
+        self.assertEqual(len(configuration), 3)
 
     def test_iterable(self):
         """Configuration objects must be iterable"""
@@ -162,6 +163,7 @@ class ConfigurationTestCase(unittest.TestCase):
             configuration = harvest.Configuration(CONFIGURATION_FILES['ok'])
         self.assertTrue(callable(getattr(configuration, '__iter__')))
         config_iterator = iter(configuration)
+        self.assertEqual(next(config_iterator), 'endless')
         self.assertEqual(next(config_iterator), 'harvesters')
         self.assertEqual(next(config_iterator), 'poll_interval')
         with self.assertRaises(StopIteration):
