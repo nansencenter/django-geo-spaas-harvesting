@@ -235,7 +235,7 @@ class WebDirectoryCrawler(Crawler):
         self.LOGGER.info("Looking for resources in '%s'...", folder_path)
         for path in self._list_folder_contents(folder_path):
             # Select paths which do not contain any of the self.excludes strings
-            if all([excluded_string not in path for excluded_string in self.excludes]):
+            if all(excluded_string not in path for excluded_string in self.excludes):
                 if self._is_folder(path):
                     self._add_folder_to_process(path)
                 elif self._is_file(path):
