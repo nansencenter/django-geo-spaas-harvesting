@@ -433,6 +433,7 @@ class FTPCrawler(WebDirectoryCrawler):
         self.username = username
         self.password = password
         self.files_suffixes = files_suffixes
+        self.ftp = None
 
         super().__init__(root_url, time_range, excludes)
 
@@ -443,11 +444,15 @@ class FTPCrawler(WebDirectoryCrawler):
         """
         self._urls = []
         self._to_process = [self.root_url.path or '/']
+        self.connect()
+
+    def connect(self):
+        """Creates an FTP connection and logs in"""
         self.ftp = ftplib.FTP(self.root_url.netloc, user=self.username, passwd=self.password)
         try:
             self.ftp.login(self.username, self.password)
         except ftplib.error_perm as err_content:
-            # these two cases are in the mentioned FTP servers that deals with "login once again"
+            # these errors happen when we try to log in twice, so they can be ignored
             if not (err_content.args[0].startswith('503') or err_content.args[0].startswith('230')):
                 raise
 
