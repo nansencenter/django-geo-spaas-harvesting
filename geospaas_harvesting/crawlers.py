@@ -4,6 +4,7 @@ should inherit from the Crawler class and implement the abstract methods defined
 """
 import calendar
 import ftplib
+import functools
 import logging
 import re
 from datetime import datetime, timedelta
@@ -456,9 +457,33 @@ class FTPCrawler(WebDirectoryCrawler):
             if not (err_content.args[0].startswith('503') or err_content.args[0].startswith('230')):
                 raise
 
+    class Decorators():
+        """Decorators for the FTPCrawler"""
+        @staticmethod
+        def retry_on_timeout(method):
+            """Decorator which re-creates the FTP connection if a timeout error occurs"""
+            @functools.wraps(method)
+            def wrapper_reconnect(crawler_instance, *args, **kwargs):
+                """Try to execute the decorated method.
+                If a 421 error occurs, re-create the connection
+                and try to run the method again (once).
+                """
+                try:
+                    return method(crawler_instance, *args, **kwargs)
+                except (ftplib.error_temp, ConnectionError) as error:
+                    if isinstance(error, ftplib.error_temp) and '421' not in error.args[0]:
+                        raise
+                    else:
+                        crawler_instance.LOGGER.info("Re-initializing the FTP connection")
+                        crawler_instance.connect()
+                        return method(crawler_instance, *args, **kwargs)
+            return wrapper_reconnect
+
+    @Decorators.retry_on_timeout
     def _list_folder_contents(self, folder_path):
         return self.ftp.nlst(folder_path)
 
+    @Decorators.retry_on_timeout
     def _is_folder(self, path):
         """Determine if path is a folder by trying to change the working directory to path."""
         try:
