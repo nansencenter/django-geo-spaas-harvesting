@@ -16,9 +16,12 @@ DATABASES = {
         'NAME': os.getenv('GEOSPAAS_DB_NAME', 'geodjango'),
         'USER': os.getenv('GEOSPAAS_DB_USER', 'geodjango'),
         'PASSWORD': os.getenv('GEOSPAAS_DB_PASSWORD'),
-        'CONN_MAX_AGE': 600
+        'CONN_MAX_AGE': int(os.getenv('GEOSPAAS_CONN_MAX_AGE', '600')),
     }
 }
+
+if os.getenv('GEOSPAAS_DISABLE_SERVER_SIDE_CURSORS', 'false').lower() == 'true':
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
