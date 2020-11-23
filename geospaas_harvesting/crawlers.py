@@ -460,30 +460,41 @@ class FTPCrawler(WebDirectoryCrawler):
     class Decorators():
         """Decorators for the FTPCrawler"""
         @staticmethod
-        def retry_on_timeout(method):
-            """Decorator which re-creates the FTP connection if a timeout error occurs"""
-            @functools.wraps(method)
-            def wrapper_reconnect(crawler_instance, *args, **kwargs):
-                """Try to execute the decorated method.
-                If a 421 error occurs, re-create the connection
-                and try to run the method again (once).
-                """
-                try:
-                    return method(crawler_instance, *args, **kwargs)
-                except (ftplib.error_temp, ConnectionError) as error:
-                    if isinstance(error, ftplib.error_temp) and '421' not in error.args[0]:
-                        raise
-                    else:
-                        crawler_instance.LOGGER.info("Re-initializing the FTP connection")
-                        crawler_instance.connect()
-                        return method(crawler_instance, *args, **kwargs)
-            return wrapper_reconnect
+        def retry_on_timeout(tries=2):
+            """Wrapper around the retry decorator which
+            enables to pass the number of tries"""
+            def decorator_retry(method):
+                """Decorator which re-creates the FTP connection
+                if a timeout error occurs"""
+                @functools.wraps(method)
+                def wrapper_reconnect(crawler_instance, *args, **kwargs):
+                    """Try to execute the decorated method.
+                    If a FTP 421 error or a ConnectionError
+                    (a network issue) occurs, re-create the connection
+                    """
+                    countdown = tries
+                    last_error = None
+                    while countdown > 0:
+                        try:
+                            return method(crawler_instance, *args, **kwargs)
+                        except (ftplib.error_temp, ConnectionError) as error:
+                            last_error = error
+                            if isinstance(error, ftplib.error_temp) and '421' not in error.args[0]:
+                                raise
+                            else:
+                                crawler_instance.LOGGER.info("Re-initializing the FTP connection")
+                                crawler_instance.connect()
+                            countdown -= 1
+                    if last_error:
+                        raise last_error
+                return wrapper_reconnect
+            return decorator_retry
 
-    @Decorators.retry_on_timeout
+    @Decorators.retry_on_timeout(tries=5)
     def _list_folder_contents(self, folder_path):
         return self.ftp.nlst(folder_path)
 
-    @Decorators.retry_on_timeout
+    @Decorators.retry_on_timeout(tries=5)
     def _is_folder(self, path):
         """Determine if path is a folder by trying to change the working directory to path."""
         try:

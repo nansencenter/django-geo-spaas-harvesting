@@ -797,23 +797,21 @@ class FTPCrawlerTestCase(unittest.TestCase):
             self.assertEqual(log_cm.records[0].getMessage(), "Re-initializing the FTP connection")
 
     def test_retry_on_timeout_decorator_connection_error(self):
-        """The retry_on_timeout decorator should re-create
-        the connection when a connection error occurs, and
-        and re-run the method in which the error occurred once
+        """The retry_on_timeout decorator should try to re-create
+        the when a connection error occurs, and re-run the method
+        in which the error occurred 5 times
         """
-        for error in (ConnectionError, ConnectionRefusedError, ConnectionResetError):
-            with mock.patch('ftplib.FTP'):
-                crawler = crawlers.FTPCrawler('ftp://foo')
+        with mock.patch('ftplib.FTP'):
+            crawler = crawlers.FTPCrawler('ftp://foo')
+
+            for error in (ConnectionError, ConnectionRefusedError, ConnectionResetError):
                 crawler.ftp.nlst.side_effect = error
 
-                with self.assertRaises(error), \
-                        self.assertLogs(crawler.LOGGER, level=logging.INFO) as log_cm:
-                    crawler._list_folder_contents('/')
-
-                self.assertEqual(
-                    log_cm.records[0].getMessage(),
-                    "Re-initializing the FTP connection"
-                )
+                with mock.patch.object(crawler, 'connect') as mock_connect:
+                    with self.assertRaises(error), \
+                        self.assertLogs(crawler.LOGGER, level=logging.INFO):
+                        crawler._list_folder_contents('/')
+                self.assertEqual(mock_connect.call_count, 5)
 
     def test_no_retry_on_non_timeout_ftp_errors(self):
         """FTP errors other than timeouts should not trigger a retry"""
@@ -821,5 +819,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
             crawler = crawlers.FTPCrawler('ftp://foo')
             crawler.ftp.nlst.side_effect = ftplib.error_temp('422')
 
-            with self.assertRaises(ftplib.error_temp):
-                crawler._list_folder_contents('/')
+            with mock.patch.object(crawler, 'connect') as mock_connect:
+                with self.assertRaises(ftplib.error_temp):
+                    crawler._list_folder_contents('/')
+                mock_connect.assert_not_called()
