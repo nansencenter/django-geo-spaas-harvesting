@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import requests
 
 import geospaas_harvesting.crawlers as crawlers
+from geospaas_harvesting.crawlers import Crawler
 
 
 class BaseCrawlerTestCase(unittest.TestCase):
@@ -738,7 +739,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
         if name not in ["..", "folder_name", ""]:
             raise ftplib.error_perm
 
-    @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP', autospec=True)
+    @mock.patch('ftplib.FTP', autospec=True)
     def test_ftp_correct_navigation(self, mock_ftp):
         """check that file URLs and folders paths are added to the right stacks"""
 
@@ -779,3 +780,46 @@ class FTPCrawlerTestCase(unittest.TestCase):
         the configuration file """
         with self.assertRaises(ValueError):
             crawlers.FTPCrawler('ft:///')
+
+    def test_retry_on_timeout_decorator_timeout_error(self):
+        """The retry_on_timeout decorator should re-create
+        the connection when a FTP timeout error occurs, and
+        and re-run the method in which the error occurred once
+        """
+        with mock.patch('ftplib.FTP'):
+            crawler = crawlers.FTPCrawler('ftp://foo')
+            crawler.ftp.nlst.side_effect = ftplib.error_temp('421')
+
+            with self.assertRaises(ftplib.error_temp), \
+                 self.assertLogs(crawler.LOGGER, level=logging.INFO) as log_cm:
+                crawler._list_folder_contents('/')
+
+            self.assertEqual(log_cm.records[0].getMessage(), "Re-initializing the FTP connection")
+
+    def test_retry_on_timeout_decorator_connection_error(self):
+        """The retry_on_timeout decorator should try to re-create
+        the when a connection error occurs, and re-run the method
+        in which the error occurred 5 times
+        """
+        with mock.patch('ftplib.FTP'):
+            crawler = crawlers.FTPCrawler('ftp://foo')
+
+            for error in (ConnectionError, ConnectionRefusedError, ConnectionResetError):
+                crawler.ftp.nlst.side_effect = error
+
+                with mock.patch.object(crawler, 'connect') as mock_connect:
+                    with self.assertRaises(error), \
+                        self.assertLogs(crawler.LOGGER, level=logging.INFO):
+                        crawler._list_folder_contents('/')
+                self.assertEqual(mock_connect.call_count, 5)
+
+    def test_no_retry_on_non_timeout_ftp_errors(self):
+        """FTP errors other than timeouts should not trigger a retry"""
+        with mock.patch('ftplib.FTP'):
+            crawler = crawlers.FTPCrawler('ftp://foo')
+            crawler.ftp.nlst.side_effect = ftplib.error_temp('422')
+
+            with mock.patch.object(crawler, 'connect') as mock_connect:
+                with self.assertRaises(ftplib.error_temp):
+                    crawler._list_folder_contents('/')
+                mock_connect.assert_not_called()
