@@ -561,82 +561,90 @@ class ThreddsCrawlerTestCase(unittest.TestCase):
         self.assertIsNone(crawlers.ThreddsCrawler('').get_download_url("dummy"))
 
 
+class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
+    """Tests for the HTTPPaginatedAPICrawler base class"""
+
+    class TestCrawler(crawlers.HTTPPaginatedAPICrawler):
+        """Test class used to test HTTPPaginatedAPICrawler functionalities"""
+        PAGE_OFFSET_NAME = 'offset'
+        PAGE_SIZE_NAME = 'size'
+        MIN_OFFSET = 0
+
+        def __init__(self, url, search_terms=None, time_range=(None, None),
+                     username=None, password=None,
+                     page_size=100, initial_offset=None):
+            super().__init__(url, search_terms=None, time_range=(None, None),
+                             username=None, password=None,
+                             page_size=100, initial_offset=None)
+            self._ran_once = False
+
+        def _get_datasets_info(self, page):
+            if self._ran_once:
+                return False
+            else:
+                self._ran_once = True
+                self._results.append('url3')
+                return True
+
+    def setUp(self):
+        self.crawler = self.TestCrawler('foo', 'bar')
+
+    def test_instantiation(self):
+        """Test that attributes are correctly initialized"""
+        self.assertEqual(self.crawler.url, 'foo')
+        self.assertEqual(self.crawler.initial_offset, 0)
+        self.assertDictEqual(self.crawler.request_parameters, {
+            'params': {'size': 100, 'offset': 0}
+        })
+        self.assertListEqual(self.crawler._results, [])
+
+    def test_set_initial_state(self):
+        """Test that set_initial_state correctly resets the crawler"""
+        # Set non-default offset and _urls values
+        self.crawler.request_parameters['params']['offset'] = 200
+        self.crawler._results = ['url1', 'url2']
+
+        self.crawler.set_initial_state()
+        self.assertEqual(
+            self.crawler.request_parameters['params']['offset'], self.crawler.initial_offset)
+        self.assertListEqual(self.crawler._results, [])
+
+    def test_iterating(self):
+        """Test that iterating over the crawler returns the discovered urls"""
+        expected_urls = ['url2', 'url1', 'url3']
+        self.crawler._results = ['url1', 'url2']
+
+        with mock.patch.object(self.crawler, '_get_next_page', return_value=''):
+            self.assertListEqual(list(self.crawler), expected_urls)
+
+    def test_get_next_page(self):
+        """_get_next_page() should get the page at the current offset,
+        then increment the offset
+        """
+        with mock.patch.object(self.crawler, '_http_get', return_value='foo'):
+            with self.assertLogs(self.crawler.LOGGER, level=logging.INFO):
+                self.assertEqual(self.crawler._get_next_page(), 'foo')
+                self.assertEqual(self.crawler.request_parameters['params']['offset'], 1)
+
+    def test_abstract_get_datasets_info(self):
+        """_get_datasets_info() should raise a NotImplementedError
+        when called directly from HTTPPaginatedAPICrawler
+        """
+        crawler = crawlers.HTTPPaginatedAPICrawler('foo')
+        with self.assertRaises(NotImplementedError):
+            crawler._get_datasets_info('')
+
+
 class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
     """Tests for the Copernicus OpenSearch API crawler"""
     BASE_URL = 'https://scihub.copernicus.eu/dhus/search'
     SEARCH_TERMS = '(platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0'
     PAGE_SIZE = 2
-    TEST_DATA = {
-        'page1': {
-            'offset': 0,
-            'file_path': "data/copernicus_opensearch/page1.xml"},
-        'page2': {
-            'offset': 2,
-            'file_path': "data/copernicus_opensearch/page2.xml"},
-        'page3': {
-            'offset': 4,
-            'file_path': 'data/copernicus_opensearch/page3.xml'}
-    }
-
-    def requests_get_side_effect(self, url, **request_parameters):
-        """Side effect function used to mock calls to requests.get().text"""
-        data_file_relative_path = None
-        for test_data in self.TEST_DATA.values():
-            if (url == self.BASE_URL
-                    and request_parameters['params']['q'].startswith(f"({self.SEARCH_TERMS})")
-                    and request_parameters['params']['start'] == test_data['offset']
-                    and request_parameters['params']['rows'] == self.PAGE_SIZE):
-                data_file_relative_path = test_data['file_path']
-
-        response = requests.Response()
-
-        if data_file_relative_path:
-            # Open data file as binary stream so it can be used to mock a requests response
-            data_file = open(os.path.join(os.path.dirname(__file__), data_file_relative_path), 'rb')
-            # Store opened files so they can be closed when the test is finished
-            self.opened_files.append(data_file)
-
-            response.status_code = 200
-            response.raw = data_file
-        else:
-            response.status_code = 404
-
-        return response
 
     def setUp(self):
-        # Mock requests.get()
-        self.patcher_requests_get = mock.patch.object(crawlers.requests, 'get')
-        self.mock_requests_get = self.patcher_requests_get.start()
-        self.mock_requests_get.side_effect = self.requests_get_side_effect
-
-        # Initialize a list of opened files which will be closed in tearDown()
-        self.opened_files = []
-
         self.crawler = crawlers.CopernicusOpenSearchAPICrawler(
             url=self.BASE_URL, search_terms=self.SEARCH_TERMS, username='user', password='pass',
             page_size=self.PAGE_SIZE, initial_offset=0)
-
-    def tearDown(self):
-        self.patcher_requests_get.stop()
-        # Close any files opened during the test
-        for opened_file in self.opened_files:
-            opened_file.close()
-
-    def test_instantiation(self):
-        """Test the correct instantiation of a Copernicus OpenSearch API crawler"""
-        self.assertIsInstance(self.crawler, crawlers.Crawler)
-        self.assertEqual(self.crawler.url, self.BASE_URL)
-        self.assertEqual(self.crawler.initial_offset, 0)
-        self.assertDictEqual(self.crawler.request_parameters, {
-            'params': {
-                'q': f"({self.SEARCH_TERMS})",
-                'start': 0,
-                'rows': self.PAGE_SIZE,
-                'orderby': 'beginposition asc'
-            },
-            'auth': ('user', 'pass')
-        })
-        self.assertEqual(self.crawler._urls, [])
 
     def test_build_parameters_with_standard_time_range(self):
         """Build the request parameters with a time range composed of two datetime objects"""
@@ -684,47 +692,21 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
 
         self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS})")
 
-    def test_set_initial_state(self):
-        """Tests that the set_initial_state() method sets the correct values"""
-        # Create a crawler and start iterating to set a non-initial state
-        with self.assertLogs(self.crawler.LOGGER):
-            next(iter(self.crawler))
+    def test_get_datasets_info(self):
+        """_get_datasets_info() should extract download URLs from a response page"""
+        data_file_path = os.path.join(
+            os.path.dirname(__file__), 'data/copernicus_opensearch/page1.xml')
 
-        self.crawler.set_initial_state()
-        self.assertEqual(self.crawler.request_parameters['params']['start'],
-                         self.crawler.initial_offset)
-        self.assertListEqual(self.crawler._urls, [])
+        with open(data_file_path, 'r') as f_h:
+            page = f_h.read()
 
-    def test_get_next_page(self):
-        """Test the next page content"""
-        current_folder = os.path.dirname(__file__)
-
-        with open(os.path.join(current_folder, self.TEST_DATA['page1']['file_path']), 'r') as dfh:
-            with self.assertLogs(self.crawler.LOGGER):
-                self.assertEqual(self.crawler._get_next_page(), dfh.read())
-        with open(os.path.join(current_folder, self.TEST_DATA['page2']['file_path']), 'r') as dfh:
-            with self.assertLogs(self.crawler.LOGGER):
-                self.assertEqual(self.crawler._get_next_page(), dfh.read())
-        with open(os.path.join(current_folder, self.TEST_DATA['page3']['file_path']), 'r') as dfh:
-            with self.assertLogs(self.crawler.LOGGER):
-                self.assertEqual(self.crawler._get_next_page(), dfh.read())
-
-    def test_iterating(self):
-        """Tests that the correct values are returned when iterating"""
-        expected_urls = [
-            "https://scihub.copernicus.eu/dhus/odata/v1/"
-            "Products('d023819a-60d3-4b5e-bb81-645294d73b5b')/$value",
+        self.crawler._get_datasets_info(page)
+        self.assertListEqual(self.crawler._results, [
             "https://scihub.copernicus.eu/dhus/odata/v1/"
             "Products('87ddb795-dab4-4985-85f4-c390c9cdd65b')/$value",
             "https://scihub.copernicus.eu/dhus/odata/v1/"
-            "Products('b54171e1-078b-4234-ae0a-7b27abb14baa')/$value",
-            "https://scihub.copernicus.eu/dhus/odata/v1/"
-            "Products('e2842bc8-8b3e-4161-a88c-84c2b43e60f9')/$value"
-        ]
-
-        with self.assertLogs(self.crawler.LOGGER):
-            for i, url in enumerate(self.crawler):
-                self.assertEqual(url, expected_urls[i])
+            "Products('d023819a-60d3-4b5e-bb81-645294d73b5b')/$value"
+        ])
 
 
 class FTPCrawlerTestCase(unittest.TestCase):
