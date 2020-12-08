@@ -413,13 +413,12 @@ class DDXIngesterTestCase(django.test.TestCase):
 
         self.assertEqual(normalized_parameters['entry_title'],
                          'VIIRS L2P Sea Surface Skin Temperature')
-        self.assertEqual(normalized_parameters['summary'], ('Description: ' +
+        self.assertEqual(normalized_parameters['summary'], (
             'Sea surface temperature (SST) retrievals produced at the NASA OBPG for the Visible I' +
             'nfrared Imaging\n                Radiometer Suite (VIIRS) sensor on the Suomi Nation' +
             'al Polar-Orbiting Partnership (Suomi NPP) platform.\n                These have been' +
             ' reformatted to GHRSST GDS version 2 Level 2P specifications by the JPL PO.DAAC. VII' +
-            'RS\n                SST algorithms developed by the University of Miami, RSMAS;' +
-            'Processing level: 2P'))
+            'RS\n                SST algorithms developed by the University of Miami, RSMAS'))
         self.assertEqual(normalized_parameters['time_coverage_start'], datetime(
             year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()))
         self.assertEqual(normalized_parameters['time_coverage_end'], datetime(
@@ -594,9 +593,8 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['entry_title'],
                          'S1A_IW_GRDH_1SDV_20200318T062305_20200318T062330_031726_03A899_F558')
         self.assertEqual(normalized_parameters['summary'], (
-            'Description: Date=2020-03-18T06:23:05.976Z, '
-            'Instrument name=Synthetic Aperture Radar (C-band), '
-            'Mode=IW, Satellite=Sentinel-1, Size=1.65 GB;Processing level: 1'))
+            'Date: 2020-03-18T06:23:05.976Z, Instrument: SAR-C, Mode: IW, ' +
+            'Satellite: Sentinel-1, Size: 1.65 GB'))
         self.assertEqual(normalized_parameters['time_coverage_start'], datetime(
             year=2020, month=3, day=18, hour=6, minute=23, second=5,
             tzinfo=tzutc()))
