@@ -529,10 +529,10 @@ class CopernicusOpenSearchAPICrawler(HTTPPaginatedAPICrawler):
         request_parameters = super()._build_request_parameters(
             search_terms, time_range, username, password, page_size)
 
-        request_parameters['params'].update({
-            'q': f"({search_terms})",
-            'orderby': 'beginposition asc'
-        })
+        if search_terms:
+            request_parameters['params']['q'] = f"({search_terms})"
+
+        request_parameters['params']['orderby'] = 'beginposition asc'
 
         if time_range[0] or time_range[1]:
             api_date_format = '%Y-%m-%dT%H:%M:%SZ'
