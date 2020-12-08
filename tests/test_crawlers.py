@@ -583,7 +583,7 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
             if (url == self.BASE_URL
-                    and request_parameters['params']['q'].startswith(f"({self.SEARCH_TERMS}) AND ")
+                    and request_parameters['params']['q'].startswith(f"({self.SEARCH_TERMS})")
                     and request_parameters['params']['start'] == test_data['offset']
                     and request_parameters['params']['rows'] == self.PAGE_SIZE):
                 data_file_relative_path = test_data['file_path']
@@ -629,7 +629,7 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         self.assertEqual(self.crawler.initial_offset, 0)
         self.assertDictEqual(self.crawler.request_parameters, {
             'params': {
-                'q': f"({self.SEARCH_TERMS}) AND (beginposition:[1-01-01T00:00:00Z TO NOW])",
+                'q': f"({self.SEARCH_TERMS})",
                 'start': 0,
                 'rows': self.PAGE_SIZE,
                 'orderby': 'beginposition asc'
@@ -640,11 +640,11 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
 
     def test_build_parameters_with_standard_time_range(self):
         """Build the request parameters with a time range composed of two datetime objects"""
-        request_parameters = crawlers.CopernicusOpenSearchAPICrawler._build_request_parameters(
+        request_parameters = self.crawler._build_request_parameters(
             search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, initial_offset=0,
-            time_range=(datetime(2020, 2, 10, tzinfo=timezone.utc),
-                        datetime(2020, 2, 11, tzinfo=timezone.utc)))
+            page_size=self.PAGE_SIZE, time_range=(
+                datetime(2020, 2, 10, tzinfo=timezone.utc),
+                datetime(2020, 2, 11, tzinfo=timezone.utc)))
 
         self.assertDictEqual(request_parameters, {
             'params': {
@@ -659,19 +659,17 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
 
     def test_build_parameters_with_time_range_without_lower_limit(self):
         """Build the request parameters with a time range in which the first element is None"""
-        request_parameters = crawlers.CopernicusOpenSearchAPICrawler._build_request_parameters(
+        request_parameters = self.crawler._build_request_parameters(
             search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, initial_offset=0,
-            time_range=(None, datetime(2020, 2, 11, tzinfo=timezone.utc)))
+            page_size=self.PAGE_SIZE, time_range=(None, datetime(2020, 2, 11, tzinfo=timezone.utc)))
         self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS}) AND " +
-                         "(beginposition:[1-01-01T00:00:00Z TO 2020-02-11T00:00:00Z])")
+                         "(beginposition:[1000-01-01T00:00:00Z TO 2020-02-11T00:00:00Z])")
 
     def test_build_parameters_with_time_range_without_upper_limit(self):
         """Build the request parameters with a time range in which the second element is None"""
-        request_parameters = crawlers.CopernicusOpenSearchAPICrawler._build_request_parameters(
+        request_parameters = self.crawler._build_request_parameters(
             search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, initial_offset=0,
-            time_range=(datetime(2020, 2, 10, tzinfo=timezone.utc), None))
+            page_size=self.PAGE_SIZE, time_range=(datetime(2020, 2, 10, tzinfo=timezone.utc), None))
         self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS}) AND " +
                          "(beginposition:[2020-02-10T00:00:00Z TO NOW])")
 
@@ -680,12 +678,11 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         Build the request parameters with a time range in which the both elements are None
         The result is equivalent to a search without a time condition.
         """
-        request_parameters = crawlers.CopernicusOpenSearchAPICrawler._build_request_parameters(
+        request_parameters = self.crawler._build_request_parameters(
             search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, initial_offset=0,
-            time_range=(None, None))
-        self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS}) AND " +
-                         "(beginposition:[1-01-01T00:00:00Z TO NOW])")
+            page_size=self.PAGE_SIZE, time_range=(None, None))
+
+        self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS})")
 
     def test_set_initial_state(self):
         """Tests that the set_initial_state() method sets the correct values"""
