@@ -458,8 +458,8 @@ class HTTPPaginatedAPICrawler(Crawler):
     def increment_offset(self):
         self.page_offset += 1
 
-    def _build_request_parameters(self, search_terms, time_range,
-                                  username, password, page_size):
+    def _build_request_parameters(self, search_terms=None, time_range=(None, None),
+                                  username=None, password=None, page_size=100):
         """Build a dict containing the parameters used to query the API.
         This dict will be unpacked to provide the arguments to `requests.get()`.
         """
