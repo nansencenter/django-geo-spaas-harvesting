@@ -16,8 +16,6 @@ import requests
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-MIN_DATETIME = datetime(1, 1, 1)
-
 
 class Crawler():
     """Base Crawler class"""
@@ -331,93 +329,6 @@ class ThreddsCrawler(HTMLDirectoryCrawler):
         return result
 
 
-class CopernicusOpenSearchAPICrawler(Crawler):
-    """
-    Crawler which returns the search results of an Opensearch API,
-    given the URL and search terms.
-    """
-    LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
-
-    def __init__(self, url, search_terms='*', time_range=(None, None),
-                 username=None, password=None,
-                 page_size=100, initial_offset=0):
-        self.url = url
-        self.initial_offset = initial_offset
-        self.request_parameters = self._build_request_parameters(
-            search_terms, time_range, username, password, page_size, initial_offset)
-        self.set_initial_state()
-
-    def set_initial_state(self):
-        self.request_parameters['params']['start'] = self.initial_offset
-        self._urls = []
-
-    @staticmethod
-    def _build_request_parameters(search_terms, time_range, username, password, page_size,
-                                  initial_offset):
-        """Build a dict containing the parameters used to query the Copernicus API"""
-        if time_range:
-            api_date_format = '%Y-%m-%dT%H:%M:%SZ'
-            start = (time_range[0] or MIN_DATETIME).strftime(api_date_format)
-            end = time_range[1].strftime(api_date_format) if time_range[1] else 'NOW'
-            time_condition = f"beginposition:[{start} TO {end}]"
-
-        request_parameters = {
-            'params': {
-                'q': f"({search_terms}) AND ({time_condition})",
-                'start': initial_offset,
-                'rows': page_size,
-                'orderby': 'beginposition asc'
-            }
-        }
-
-        if username and password:
-            request_parameters['auth'] = (username, password)
-        return request_parameters
-
-    def __iter__(self):
-        """Makes the crawler iterable"""
-        return self
-
-    def __next__(self):
-        """Makes the crawler an iterator"""
-        try:
-            # Return all resource URLs from the previously processed page
-            result = self._urls.pop()
-        except IndexError:
-            # If no more URLs from the previously processed page are available, process the next one
-            if not self._get_resources_urls(self._get_next_page()):
-                self.LOGGER.debug("No more entries found at '%s' matching '%s'",
-                                  self.url, self.request_parameters['params']['q'])
-                raise StopIteration
-            result = self.__next__()
-        return result
-
-    def _get_next_page(self):
-        """
-        Get the next page of search results. Results are sorted ascending, which avoids missing some
-        if products are added while the harvesting is happening (it will generally be the case)
-        """
-        self.LOGGER.info("Looking for ressources at '%s', matching '%s' with an offset of %s",
-                         self.url, self.request_parameters['params']['q'],
-                         self.request_parameters['params']['start'])
-
-        current_page = self._http_get(self.url, self.request_parameters)
-        self.request_parameters['params']['start'] += self.request_parameters['params']['rows']
-
-        return current_page
-
-    def _get_resources_urls(self, xml):
-        """Get links from the current page. Returns True if links were found, False otherwise"""
-
-        entries = feedparser.parse(xml)['entries']
-
-        for entry in entries:
-            self.LOGGER.debug("Adding '%s' to the list of resources.", entry['link'])
-            self._urls.append(entry['link'])
-
-        return bool(entries)
-
-
 class FTPCrawler(WebDirectoryCrawler):
     """
     Crawler which returns the search results of an FTP, given the URL and search
@@ -506,3 +417,142 @@ class FTPCrawler(WebDirectoryCrawler):
 
     def _is_file(self, path):
         return path.endswith(self.files_suffixes)
+
+
+class HTTPPaginatedAPICrawler(Crawler):
+    """Base class for crawlers used on repositories exposing a paginated API over HTTP"""
+
+    PAGE_OFFSET_NAME = ''
+    PAGE_SIZE_NAME = ''
+    MIN_OFFSET = 0
+
+    def __init__(self, url, search_terms=None, time_range=(None, None),
+                 username=None, password=None,
+                 page_size=100, initial_offset=None):
+        self.url = url
+        self._results = None
+        self.initial_offset = initial_offset or self.MIN_OFFSET
+        self.request_parameters = self._build_request_parameters(
+            search_terms, time_range, username, password, page_size)
+        self.set_initial_state()
+
+    def set_initial_state(self):
+        self.page_offset = self.initial_offset
+        self._results = []
+
+    @property
+    def page_size(self):
+        """Getter for the page size"""
+        return self.request_parameters['params'][self.PAGE_SIZE_NAME]
+
+    @property
+    def page_offset(self):
+        """Getter for the page offset"""
+        return self.request_parameters['params'][self.PAGE_OFFSET_NAME]
+
+    @page_offset.setter
+    def page_offset(self, offset):
+        """Setter for the page offset"""
+        self.request_parameters['params'][self.PAGE_OFFSET_NAME] = offset
+
+    def increment_offset(self):
+        self.page_offset += 1
+
+    def _build_request_parameters(self, search_terms, time_range,
+                                  username, password, page_size):
+        """Build a dict containing the parameters used to query the API.
+        This dict will be unpacked to provide the arguments to `requests.get()`.
+        """
+        return {
+            'params': {
+                self.PAGE_OFFSET_NAME: self.initial_offset,
+                self.PAGE_SIZE_NAME: page_size,
+            }
+        }
+
+    def __iter__(self):
+        """Makes the crawler iterable"""
+        return self
+
+    def __next__(self):
+        """Makes the crawler an iterator"""
+        try:
+            # Return all resource URLs from the previously processed page
+            result = self._results.pop()
+        except IndexError:
+            # If no more URLs from the previously processed page are available, process the next one
+            if not self._get_datasets_info(self._get_next_page()):
+                self.LOGGER.debug("No more entries found at '%s' matching '%s'",
+                                  self.url, self.request_parameters['params'])
+                raise StopIteration
+            result = self.__next__()
+        return result
+
+    def _get_next_page(self):
+        """Get the next page of search results"""
+        self.LOGGER.info("Looking for ressources at '%s', matching '%s'",
+                         self.url, self.request_parameters['params'])
+        current_page = self._http_get(self.url, self.request_parameters)
+        self.increment_offset()
+        return current_page
+
+    def _get_datasets_info(self, page):
+        """Get dataset information from the current page and add it
+        to self._results. It can be a download URL or a dictionary
+        of dataset metadata.
+        Returns True if information was found, False otherwise"""
+        raise NotImplementedError()
+
+
+class CopernicusOpenSearchAPICrawler(HTTPPaginatedAPICrawler):
+    """
+    Crawler which returns the search results of an Opensearch API,
+    given the URL and search terms.
+    """
+    LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
+    MIN_DATETIME = datetime(1000, 1, 1)
+
+    PAGE_OFFSET_NAME = 'start'
+    PAGE_SIZE_NAME = 'rows'
+    MIN_OFFSET = 0
+
+    def increment_offset(self):
+        self.page_offset += self.page_size
+
+    def _build_request_parameters(self, search_terms=None, time_range=(None, None),
+                                  username=None, password=None, page_size=100):
+        """Build a dict containing the parameters used to query the Copernicus API.
+        Results are sorted ascending, which avoids missing some
+        if products are added while the harvesting is happening
+        (it will generally be the case)
+        """
+        request_parameters = super()._build_request_parameters(
+            search_terms, time_range, username, password, page_size)
+
+        request_parameters['params'].update({
+            'q': f"({search_terms})",
+            'orderby': 'beginposition asc'
+        })
+
+        if time_range[0] or time_range[1]:
+            api_date_format = '%Y-%m-%dT%H:%M:%SZ'
+            start = (time_range[0] or self.MIN_DATETIME).strftime(api_date_format)
+            end = time_range[1].strftime(api_date_format) if time_range[1] else 'NOW'
+            time_condition = f"beginposition:[{start} TO {end}]"
+            request_parameters['params']['q'] += f" AND ({time_condition})"
+
+        if username and password:
+            request_parameters['auth'] = (username, password)
+
+        return request_parameters
+
+    def _get_datasets_info(self, page):
+        """Get links from the current page and adds them to self._results.
+        Returns True if links were found, False otherwise"""
+        entries = feedparser.parse(page)['entries']
+
+        for entry in entries:
+            self.LOGGER.debug("Adding '%s' to the list of resources.", entry['link'])
+            self._results.append(entry['link'])
+
+        return bool(entries)
