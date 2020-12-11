@@ -180,3 +180,23 @@ class CopernicusSentinelHarvester(Harvester):
         if 'password' in self.config:
             parameters['password'] = self.config.get('password')
         return ingesters.CopernicusODataIngester(**parameters)
+
+
+class CreodiasEOFinderHarvester(Harvester):
+    """Harvester class for Creodias data"""
+
+    def _create_crawlers(self):
+        return [
+            crawlers.CreodiasEOFinderCrawler(
+                url=self.config['url'],
+                search_terms=search,
+                time_range=(self.get_time_range()))
+            for search in self.config['search_terms']
+        ]
+
+    def _create_ingester(self):
+        parameters = {}
+        for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
+            if parameter_name in self.config:
+                parameters[parameter_name] = self.config[parameter_name]
+        return ingesters.CreodiasEOFinderIngester(**parameters)
