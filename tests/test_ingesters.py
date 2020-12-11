@@ -67,6 +67,12 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self._create_dummy_dataset_uri(uri, dataset)
         self.assertTrue(self.ingester._uri_exists(uri))
 
+    def test_get_download_url(self):
+        """get_download_url() should return the download URL from the
+        information provided by a crawler.
+        """
+        self.assertEqual(self.ingester.get_download_url('url'), 'url')
+
     def test_get_normalized_attributes_must_be_implemented(self):
         """An error must be raised if the _get_normalized_attributes() method is not implemented"""
         with self.assertRaises(NotImplementedError), self.assertLogs(self.ingester.LOGGER):
@@ -151,7 +157,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
             mock_normalize.side_effect = TypeError
             with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR) as logger_cm:
                 self.ingester._thread_get_normalized_attributes('some_url')
-            self.assertEqual(logger_cm.records[0].message, "Could not get metadata from 'some_url'")
+            self.assertEqual(logger_cm.records[0].message, "Could not get metadata for 'some_url'")
 
     def test_fetching_threads_stop_on_keyboard_interrupt(self):
         """

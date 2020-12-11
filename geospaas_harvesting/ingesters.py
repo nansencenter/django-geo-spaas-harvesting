@@ -77,6 +77,14 @@ class Ingester():
         """Checks if the given URI already exists in the database"""
         return DatasetURI.objects.filter(uri=uri).exists()
 
+    @staticmethod
+    def get_download_url(dataset_info):
+        """Get the download URL from the information returned by a
+        crawler. The default behavior is for crawlers to return
+        download URLs, so here it just returns its argument.
+        """
+        return dataset_info
+
     def _get_normalized_attributes(self, url, *args, **kwargs):
         """
         Returns a dictionary of normalized attribute which characterize a Dataset. It should
@@ -160,17 +168,24 @@ class Ingester():
 
         return (created_dataset, created_dataset_uri)
 
-    def _thread_get_normalized_attributes(self, url, *args, **kwargs):
+    def _thread_get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """
         Gets the attributes needed to insert a dataset into the database from its URL, and puts a
         dictionary containing these attribtues in the queue to be written in the database.
         This method is meant to be run in a thread.
         """
-        self.LOGGER.debug("Getting metadata from '%s'", url)
+        download_url = self.get_download_url(dataset_info)
+        if self._uri_exists(download_url):
+            self.LOGGER.info("'%s' is already present in the database", download_url)
+            return None
+
+        self.LOGGER.debug("Getting metadata for '%s'", download_url)
         try:
-            self._to_ingest.put((url, self._get_normalized_attributes(url, *args, **kwargs)))
+            normalized_attributes = self._get_normalized_attributes(dataset_info, *args, **kwargs)
         except Exception:  # pylint: disable=broad-except
-            self.LOGGER.error("Could not get metadata from '%s'", url, exc_info=True)
+            self.LOGGER.error("Could not get metadata for '%s'", download_url, exc_info=True)
+        else:
+            self._to_ingest.put((download_url, normalized_attributes))
 
     def _thread_ingest_dataset(self):
         """
@@ -208,7 +223,7 @@ class Ingester():
         # It's important to close the database connection after the thread has done its work
         django.db.connection.close()
 
-    def ingest(self, urls, *args, **kwargs):
+    def ingest(self, datasets_info, *args, **kwargs):
         """
         `urls` should be an iterable. This method iterates over it and ingests the datasets at these
         URLs into the database.
@@ -245,12 +260,9 @@ class Ingester():
                         max_workers=self.max_fetcher_threads,
                         thread_name_prefix=self.__class__.__name__ + '.attr') as attr_executor:
                     attr_futures = []
-                    for url in urls:
-                        if self._uri_exists(url):
-                            self.LOGGER.info("'%s' is already present in the database", url)
-                        else:
-                            attr_futures.append(attr_executor.submit(
-                                self._thread_get_normalized_attributes, url, *args, *kwargs))
+                    for dataset_info in datasets_info:
+                        attr_futures.append(attr_executor.submit(
+                            self._thread_get_normalized_attributes, dataset_info, *args, *kwargs))
             except KeyboardInterrupt:
                 for future in attr_futures:
                     future.cancel()
