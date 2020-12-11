@@ -462,6 +462,27 @@ class CopernicusODataIngester(MetanormIngester):
         return normalized_attributes
 
 
+class CreodiasEOFinderIngester(MetanormIngester):
+    """Ingest datasets from the metadata returned by calls to the Creodias finder API"""
+
+    LOGGER = logging.getLogger(__name__ + '.CreodiasEOFinderIngester')
+
+    def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
+        """Get attributes from the Creodias finder API"""
+        self.add_url(self.get_download_url(dataset_info), dataset_info)
+
+        normalized_attributes = self._metadata_handler.get_parameters(dataset_info)
+        normalized_attributes['geospaas_service'] = HTTP_SERVICE
+        normalized_attributes['geospaas_service_name'] = HTTP_SERVICE_NAME
+
+        return normalized_attributes
+
+    @staticmethod
+    def get_download_url(dataset_info):
+        """Checks if the dataset's URI already exists in the database"""
+        return dataset_info['services']['download']['url']
+
+
 class URLNameIngester(MetanormIngester):
     """ Ingester class using FTP to read meta-data from the name of the dataset """
     LOGGER = logging.getLogger(__name__ + '.FTPIngester')
