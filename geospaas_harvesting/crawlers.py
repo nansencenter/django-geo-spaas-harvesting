@@ -5,6 +5,7 @@ should inherit from the Crawler class and implement the abstract methods defined
 import calendar
 import ftplib
 import functools
+import json
 import logging
 import re
 from datetime import datetime, timedelta
@@ -554,5 +555,57 @@ class CopernicusOpenSearchAPICrawler(HTTPPaginatedAPICrawler):
         for entry in entries:
             self.LOGGER.debug("Adding '%s' to the list of resources.", entry['link'])
             self._results.append(entry['link'])
+
+        return bool(entries)
+
+
+class CreodiasEOFinderCrawler(HTTPPaginatedAPICrawler):
+    """Crawler for the Creodias EO finder API"""
+
+    LOGGER = logging.getLogger(__name__ + '.CreodiasEOFinderCrawler')
+
+    PAGE_OFFSET_NAME = 'page'
+    PAGE_SIZE_NAME = 'maxRecords'
+    MIN_OFFSET = 1
+
+    def _build_request_parameters(self, search_terms=None, time_range=(None, None),
+                                  username=None, password=None, page_size=100):
+        """Build a dict containing the parameters used to query
+        the Creodias EO finder API.
+        search_terms should be a dictionary containing the search
+        parameters and their values.
+        Results are sorted ascending, which avoids missing some
+        if products are added while the harvesting is happening
+        (it will generally be the case)
+        """
+        request_parameters = super()._build_request_parameters(
+            search_terms, time_range, username, password, page_size)
+
+        if search_terms:
+            request_parameters['params'].update(**search_terms)
+
+        request_parameters['params']['sortParam'] = 'startDate'
+        request_parameters['params']['sortOrder'] = 'ascending'
+
+        api_date_format = '%Y-%m-%dT%H:%M:%SZ'
+        if time_range[0]:
+            request_parameters['params']['startDate'] = time_range[0].strftime(api_date_format)
+        if time_range[1]:
+            request_parameters['params']['completionDate'] = time_range[1].strftime(api_date_format)
+
+        return request_parameters
+
+    def _get_datasets_info(self, page):
+        """Get dataset attributes from the current page and
+        adds them to self._results.
+        Returns True if attributes were found, False otherwise"""
+        entries = json.loads(page)['features']
+
+        for entry in entries:
+            url = entry['properties']
+            url['geometry'] = json.dumps(entry['geometry'])
+            self.LOGGER.debug("Adding '%s' to the list of resources.",
+                              url['services']['download']['url'])
+            self._results.append(url)
 
         return bool(entries)

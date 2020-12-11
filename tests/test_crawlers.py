@@ -2,6 +2,7 @@
 #pylint: disable=protected-access
 
 import ftplib
+import json
 import logging
 import os
 import unittest
@@ -707,6 +708,109 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
             "https://scihub.copernicus.eu/dhus/odata/v1/"
             "Products('d023819a-60d3-4b5e-bb81-645294d73b5b')/$value"
         ])
+
+
+class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
+    """Tests for CreodiasEOFinderCrawler"""
+    SEARCH_TERMS = {'param1': 'value1', 'param2': 'value2'}
+
+    def setUp(self):
+        self.crawler = crawlers.CreodiasEOFinderCrawler('foo', self.SEARCH_TERMS)
+
+    def test_build_request_parameters_no_argument(self):
+        """Test building the request parameters without specifying any argument"""
+        self.assertDictEqual(self.crawler._build_request_parameters(), {
+            'params': {
+                'maxRecords': 100,
+                'page': 1,
+                'sortOrder': 'ascending',
+                'sortParam': 'startDate'
+            }
+        })
+
+    def test_build_request_parameters_no_time_range(self):
+        """Test building the request parameters without time range"""
+        self.assertDictEqual(self.crawler._build_request_parameters(self.SEARCH_TERMS), {
+            'params': {
+                'param1': 'value1',
+                'param2': 'value2',
+                'maxRecords': 100,
+                'page': 1,
+                'sortOrder': 'ascending',
+                'sortParam': 'startDate'
+            }
+        })
+
+    def test_build_request_parameters_with_time_range(self):
+        """Test building the request parameters without time range"""
+        time_range = (
+            datetime(2020, 2, 1, tzinfo=timezone.utc),
+            datetime(2020, 2, 2, tzinfo=timezone.utc)
+        )
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'maxRecords': 100,
+                    'page': 1,
+                    'sortOrder': 'ascending',
+                    'sortParam': 'startDate',
+                    'startDate': '2020-02-01T00:00:00Z',
+                    'completionDate': '2020-02-02T00:00:00Z'
+                }
+            }
+        )
+
+    def test_build_request_parameters_with_time_range_start_only(self):
+        """Test building the request parameters without time range"""
+        time_range = (datetime(2020, 2, 1, tzinfo=timezone.utc), None)
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'maxRecords': 100,
+                    'page': 1,
+                    'sortOrder': 'ascending',
+                    'sortParam': 'startDate',
+                    'startDate': '2020-02-01T00:00:00Z'
+                }
+            })
+
+    def test_build_request_parameters_with_time_range_end_only(self):
+        """Test building the request parameters without time range"""
+        time_range = (None, datetime(2020, 2, 2, tzinfo=timezone.utc))
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'maxRecords': 100,
+                    'page': 1,
+                    'sortOrder': 'ascending',
+                    'sortParam': 'startDate',
+                    'completionDate': '2020-02-02T00:00:00Z'
+                }
+            })
+
+    def test_get_datasets_info(self):
+        """_get_datasets_info() should extract datasets information from a response page"""
+        data_file_path = os.path.join(
+            os.path.dirname(__file__), 'data/creodias_eofinder/result_page.json')
+
+        with open(data_file_path, 'r') as f_h:
+            page = f_h.read()
+
+        expected_entry = json.loads(page)['features'][0]
+        expected_result = expected_entry['properties']
+        expected_result['geometry'] = json.dumps(expected_entry['geometry'])
+
+        self.crawler._get_datasets_info(page)
+        self.assertDictEqual(self.crawler._results[0], expected_result)
 
 
 class FTPCrawlerTestCase(unittest.TestCase):
