@@ -255,28 +255,30 @@ class Ingester():
                 db_executor.submit(self._thread_ingest_dataset)
 
             # Launch threads which fetch datasets attributes and put them in the queue
-            try:
-                with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=self.max_fetcher_threads,
-                        thread_name_prefix=self.__class__.__name__ + '.attr') as attr_executor:
+            with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=self.max_fetcher_threads,
+                    thread_name_prefix=self.__class__.__name__ + '.attr') as attr_executor:
+                try:
                     attr_futures = []
                     for dataset_info in datasets_info:
                         attr_futures.append(attr_executor.submit(
                             self._thread_get_normalized_attributes, dataset_info, *args, *kwargs))
-            except KeyboardInterrupt:
-                for future in attr_futures:
-                    future.cancel()
-                self.LOGGER.debug(
-                    'Cancelled future fetching threads, waiting for the running threads to finish')
-                concurrent.futures.wait(attr_futures)
-                raise
-            finally:
-                # Wait for all queue elements to be processed and stop database access threads
-                self.LOGGER.debug('Waiting for all the datasets in the queue to be ingested...')
-                self._to_ingest.join()
-                self.LOGGER.debug('Stopping all database access threads')
-                for _ in range(self.max_db_threads):
-                    self._to_ingest.put(None)
+                except KeyboardInterrupt:
+                    for future in reversed(attr_futures):
+                        future.cancel()
+                    self.LOGGER.debug(
+                        'Cancelled future fetching threads, '
+                        'waiting for the running threads to finish')
+                    raise
+                finally:
+                    # Wait for running fetching threads to finish
+                    concurrent.futures.wait(attr_futures)
+                    # Wait for all queue elements to be processed and stop database access threads
+                    self.LOGGER.debug('Waiting for all the datasets in the queue to be ingested...')
+                    self._to_ingest.join()
+                    self.LOGGER.debug('Stopping all database access threads')
+                    for _ in range(self.max_db_threads):
+                        self._to_ingest.put(None)
 
 
 class MetanormIngester(Ingester):
