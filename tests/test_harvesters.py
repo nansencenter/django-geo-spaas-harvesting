@@ -196,8 +196,8 @@ class ChildHarvestersTestCase(unittest.TestCase):
         self.assertListEqual(harvester._current_crawler.excludes, crawlers.ThreddsCrawler.EXCLUDE)
 
         with self.assertRaises(HarvesterConfigurationError):
-            harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
-                                                   excludes='ease')
+            harvester = harvesters.OSISAFHarvester(
+                urls=[''], max_fetcher_threads=1, max_db_threads=1, excludes='ease')
 
     def test_extra_excludes_with_no_CLASS_EXCLUDE(self):
         """ shall return the excludes from the config file """
