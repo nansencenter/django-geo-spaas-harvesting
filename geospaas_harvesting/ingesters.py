@@ -85,7 +85,7 @@ class Ingester():
         """
         return dataset_info
 
-    def _get_normalized_attributes(self, url, *args, **kwargs):
+    def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """
         Returns a dictionary of normalized attribute which characterize a Dataset. It should
         contain the following extra entries: `geospaas_service` and `geospaas_service_name`, which
@@ -313,7 +313,7 @@ class MetanormIngester(Ingester):
         self._metadata_handler = GeospatialMetadataHandler(
             self.DATASET_PARAMETER_NAMES, self.DATASET_CUMULATIVE_PARAMETER_NAMES)
 
-    def _get_normalized_attributes(self, url, *args, **kwargs):
+    def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Returns a dictionary of normalized attribute which characterize a Dataset"""
         raise NotImplementedError('The _ingest_dataset() method was not implemented')
 
@@ -387,15 +387,15 @@ class DDXIngester(MetanormIngester):
         else:
             return url + '.ddx'
 
-    def _get_normalized_attributes(self, url, *args, **kwargs):
+    def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
-        prepared_url = self.prepare_url(url)
+        prepared_url = self.prepare_url(dataset_info)
         # Get the metadata from the dataset as an XML tree
         stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
         # Get all the global attributes of the Dataset into a dictionary
         extracted_attributes = self._extract_attributes(
             ET.parse(stream).getroot())
-        self.add_url(url, extracted_attributes)
+        self.add_url(dataset_info, extracted_attributes)
         # Get the parameters needed to create a geospaas catalog dataset from the global attributes
         normalized_attributes = self._metadata_handler.get_parameters(extracted_attributes)
         normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
@@ -447,13 +447,13 @@ class CopernicusODataIngester(MetanormIngester):
         else:
             return json.load(io.BytesIO(stream))
 
-    def _get_normalized_attributes(self, url, *args, **kwargs):
+    def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Get attributes from the Copernicus OData API"""
 
-        raw_metadata = self._get_raw_metadata(url)
+        raw_metadata = self._get_raw_metadata(dataset_info)
         attributes = {a['Name']: a['Value'] for a in raw_metadata['d']['Attributes']['results']}
 
-        self.add_url(url, attributes)
+        self.add_url(dataset_info, attributes)
 
         normalized_attributes = self._metadata_handler.get_parameters(attributes)
         normalized_attributes['geospaas_service'] = HTTP_SERVICE
@@ -487,10 +487,10 @@ class URLNameIngester(MetanormIngester):
     """ Ingester class using FTP to read meta-data from the name of the dataset """
     LOGGER = logging.getLogger(__name__ + '.FTPIngester')
 
-    def _get_normalized_attributes(self, url, *args, **kwargs):
+    def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Gets dataset attributes using ftp"""
         raw_attributes = {}
-        self.add_url(url, raw_attributes)
+        self.add_url(dataset_info, raw_attributes)
         normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
         # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
         normalized_attributes['geospaas_service_name'] = 'ftp'
@@ -503,20 +503,20 @@ class NansatIngester(Ingester):
 
     LOGGER = logging.getLogger(__name__ + '.NansatIngester')
 
-    def _get_normalized_attributes(self, url, *args, **kwargs):
+    def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Gets dataset attributes using nansat"""
         normalized_attributes = {}
         n_points = int(kwargs.get('n_points', 10))
         nansat_options = kwargs.get('nansat_options', {})
 
         # Open file with Nansat
-        nansat_object = Nansat(nansat_filename(url), **nansat_options)
+        nansat_object = Nansat(nansat_filename(dataset_info), **nansat_options)
 
         # get metadata from Nansat and get objects from vocabularies
         n_metadata = nansat_object.get_metadata()
 
         # set service info attributes
-        url_scheme = urlparse(url).scheme
+        url_scheme = urlparse(dataset_info).scheme
         if 'http' in url_scheme:
             normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
             normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
