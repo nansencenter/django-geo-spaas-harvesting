@@ -67,6 +67,12 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self._create_dummy_dataset_uri(uri, dataset)
         self.assertTrue(self.ingester._uri_exists(uri))
 
+    def test_get_download_url(self):
+        """get_download_url() should return the download URL from the
+        information provided by a crawler.
+        """
+        self.assertEqual(self.ingester.get_download_url('url'), 'url')
+
     def test_get_normalized_attributes_must_be_implemented(self):
         """An error must be raised if the _get_normalized_attributes() method is not implemented"""
         with self.assertRaises(NotImplementedError), self.assertLogs(self.ingester.LOGGER):
@@ -151,33 +157,39 @@ class IngesterTestCase(django.test.TransactionTestCase):
             mock_normalize.side_effect = TypeError
             with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR) as logger_cm:
                 self.ingester._thread_get_normalized_attributes('some_url')
-            self.assertEqual(logger_cm.records[0].message, "Could not get metadata from 'some_url'")
+            self.assertEqual(logger_cm.records[0].message, "Could not get metadata for 'some_url'")
 
     def test_fetching_threads_stop_on_keyboard_interrupt(self):
+        """Test that the scheduled threads which fetch datasets
+        metadata are stopped when a KeyboardInterrupt (i.e. SIGINT or
+        SIGTERM) occurs.
         """
-        Test that the scheduled threads which fetch datasets metadata are stopped when a
-        KeyboardInterrupt (i.e. SIGINT or SIGTERM) occurs. If the exception is not correctly
-        handled, this test will hang.
-        """
+        def range_error_generator(size):
+            """Yields integers from 0 to size - 1,
+            then raise a KeyboardInterrupt"""
+            for i in range(size):
+                yield i
+            raise KeyboardInterrupt
 
-        ingester = ingesters.Ingester(max_fetcher_threads=100, max_db_threads=1)
-        fetcher_patcher = mock.patch.object(ingesters.Ingester, '_thread_get_normalized_attributes')
-        uri_exists_patcher = mock.patch.object(ingesters.Ingester, '_uri_exists')
+        ingester = ingesters.Ingester(max_fetcher_threads=1, max_db_threads=1)
 
-        def sleep():
-            time.sleep(1)
-
-        def uri_exists(uri):
-            if uri < 99:
-                return False
-            else:
-                raise KeyboardInterrupt
-
-        with fetcher_patcher as fetcher_mock, uri_exists_patcher as uri_exists_mock:
-            fetcher_mock.side_effect = sleep
-            uri_exists_mock.side_effect = uri_exists
+        # The test is done by scheduling 5 tasks which sleep for 0.5s,
+        # then raising a KeyboardInterrupt exception. Usually, by this
+        # point one task is running and the others are scheduled. If
+        # the scheduled tasks are correctly canceled, only the running
+        # task is executed, so the test takes a bit more than 0.5s.
+        # If the tasks are not cancelled, they all run and the test
+        # takes more than 2.5s.
+        # This way of testing is far from ideal, good ideas are
+        # welcome.
+        with mock.patch.object(ingester,
+                               '_thread_get_normalized_attributes',
+                               side_effect=lambda x: time.sleep(0.5)):
+            start = time.monotonic()
             with self.assertRaises(KeyboardInterrupt):
-                ingester.ingest(range(100))
+                ingester.ingest(range_error_generator(5))
+            stop = time.monotonic()
+        self.assertLess(stop - start, 2.5)
 
 
 class MetanormIngesterTestCase(django.test.TestCase):
