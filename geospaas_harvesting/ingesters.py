@@ -223,10 +223,12 @@ class Ingester():
         # It's important to close the database connection after the thread has done its work
         django.db.connection.close()
 
-    def ingest(self, datasets_info, *args, **kwargs):
+    def ingest(self, datasets_to_ingest, *args, **kwargs):
         """
-        `urls` should be an iterable. This method iterates over it and ingests the datasets at these
-        URLs into the database.
+        `datasets_to_ingest` should be an iterable containing information about the datasets to
+        ingest. The nature of this information depends on the crawler and the ingester, but it
+        usually is the URL where the dataset can be downloaded.
+        This method iterates over datasets_to_ingest and ingests the datasets into the database.
         To be efficient, the tasks of getting the datasets' attributes from their URLs and inserting
         them in the database are multi-threaded.
 
@@ -260,7 +262,7 @@ class Ingester():
                     thread_name_prefix=self.__class__.__name__ + '.attr') as attr_executor:
                 try:
                     attr_futures = []
-                    for dataset_info in datasets_info:
+                    for dataset_info in datasets_to_ingest:
                         attr_futures.append(attr_executor.submit(
                             self._thread_get_normalized_attributes, dataset_info, *args, *kwargs))
                 except KeyboardInterrupt:
