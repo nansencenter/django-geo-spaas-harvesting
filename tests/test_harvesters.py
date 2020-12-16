@@ -185,6 +185,12 @@ class ChildHarvestersTestCase(unittest.TestCase):
         self.assertIsInstance(harvester._current_crawler, crawlers.CopernicusOpenSearchAPICrawler)
         self.assertIsInstance(harvester._ingester, ingesters.CopernicusODataIngester)
 
+    def test_creodias_harvester(self):
+        """The Creodias harvester should create the correct crawlers and ingesters"""
+        harvester = harvesters.CreodiasEOFinderHarvester(url='', search_terms=[{}])
+        self.assertIsInstance(harvester._current_crawler, crawlers.CreodiasEOFinderCrawler)
+        self.assertIsInstance(harvester._ingester, ingesters.CreodiasEOFinderIngester)
+
     def test_osisaf_harvester_extra_excludes(self):
         """ extra excludes should have passed by the excludes as a list in configuration file.
         Otherwise, accossiated error must be raised """
