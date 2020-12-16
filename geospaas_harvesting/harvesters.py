@@ -190,7 +190,7 @@ class CreodiasEOFinderHarvester(Harvester):
             crawlers.CreodiasEOFinderCrawler(
                 url=self.config['url'],
                 search_terms=search,
-                time_range=(self.get_time_range()))
+                time_range=self.get_time_range())
             for search in self.config['search_terms']
         ]
 
