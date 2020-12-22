@@ -6,6 +6,8 @@ import calendar
 import ftplib
 import functools
 import logging
+import os
+import os.path
 import re
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
@@ -248,6 +250,21 @@ class WebDirectoryCrawler(Crawler):
         overridden in the child classes if necessary.
         """
         return resource_url
+
+
+class LocalDirectoryCrawler(WebDirectoryCrawler):
+    """Crawl through the contents of a local folder"""
+
+    LOGGER = logging.getLogger(__name__ + '.LocalDirectoryCrawler')
+
+    def _list_folder_contents(self, folder_path):
+        return [os.path.join(folder_path, file_path) for file_path in os.listdir(folder_path)]
+
+    def _is_folder(self, path):
+        return os.path.isdir(path)
+
+    def _is_file(self, path):
+        return os.path.isfile(path)
 
 
 class HTMLDirectoryCrawler(WebDirectoryCrawler):

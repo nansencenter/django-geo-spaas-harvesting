@@ -312,6 +312,38 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
 
+class LocalDirectoryCrawlerTestCase(unittest.TestCase):
+    """Tests for LocalDirectoryCrawler"""
+
+    def setUp(self):
+        self.crawler = crawlers.LocalDirectoryCrawler('')
+
+    def test_list_folder_contents(self):
+        """_list_folder_contents() should return the absolute
+        path of all files contained in the folder"""
+        with mock.patch('os.listdir', return_value=['foo', 'bar', 'baz']):
+            self.assertListEqual(
+                self.crawler._list_folder_contents('/tmp'),
+                ['/tmp/foo', '/tmp/bar', '/tmp/baz',]
+            )
+
+    def test_is_folder(self):
+        """_is_folder() should return True if the
+        path points to a folder, False otherwise"""
+        with mock.patch('os.path.isdir', return_value=True):
+            self.assertTrue(self.crawler._is_folder(''), "_is_folder() should return True")
+        with mock.patch('os.path.isdir', return_value=False):
+            self.assertFalse(self.crawler._is_folder(''), "_is_folder() should return False")
+
+    def test_is_file(self):
+        """_is_file() should return True if the path points
+        to a regular file, False otherwise"""
+        with mock.patch('os.path.isfile', return_value=True):
+            self.assertTrue(self.crawler._is_file(''), "_is_file() should return True")
+        with mock.patch('os.path.isfile', return_value=False):
+            self.assertFalse(self.crawler._is_file(''), "_is_file() should return False")
+
+
 class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
     """Tests for the HTMLDirectoryCrawler crawler"""
 
