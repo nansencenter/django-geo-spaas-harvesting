@@ -185,6 +185,12 @@ class ChildHarvestersTestCase(unittest.TestCase):
         self.assertIsInstance(harvester._current_crawler, crawlers.CopernicusOpenSearchAPICrawler)
         self.assertIsInstance(harvester._ingester, ingesters.CopernicusODataIngester)
 
+    def test_creodias_harvester(self):
+        """The Creodias harvester should create the correct crawlers and ingesters"""
+        harvester = harvesters.CreodiasEOFinderHarvester(url='', search_terms=[{}])
+        self.assertIsInstance(harvester._current_crawler, crawlers.CreodiasEOFinderCrawler)
+        self.assertIsInstance(harvester._ingester, ingesters.CreodiasEOFinderIngester)
+
     def test_osisaf_harvester_extra_excludes(self):
         """ extra excludes should have passed by the excludes as a list in configuration file.
         Otherwise, accossiated error must be raised """
@@ -196,8 +202,8 @@ class ChildHarvestersTestCase(unittest.TestCase):
         self.assertListEqual(harvester._current_crawler.excludes, crawlers.ThreddsCrawler.EXCLUDE)
 
         with self.assertRaises(HarvesterConfigurationError):
-            harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
-                                                   excludes='ease')
+            harvester = harvesters.OSISAFHarvester(
+                urls=[''], max_fetcher_threads=1, max_db_threads=1, excludes='ease')
 
     def test_extra_excludes_with_no_CLASS_EXCLUDE(self):
         """ shall return the excludes from the config file """

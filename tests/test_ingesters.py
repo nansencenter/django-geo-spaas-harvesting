@@ -724,6 +724,40 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(created_dataset_uri, False)
 
 
+class CreodiasEOFinderIngesterTestCase(django.test.TestCase):
+    """Test the CreodiasEOFinderIngester"""
+
+    fixtures = [os.path.join(os.path.dirname(__file__), "fixtures", "harvest")]
+
+    def setUp(self):
+        self.ingester = ingesters.CreodiasEOFinderIngester()
+
+    def test_get_normalized_attributes(self):
+        """_get_normalized_attributes() should add the download URL to
+        the raw attributes, get the attributes from metanorm and
+        add service information
+        """
+        dataset_info = {'services': {'download': {'url': 'http://something'}}}
+        with mock.patch.object(
+                self.ingester._metadata_handler, 'get_parameters', return_value={'foo': 'bar'}), \
+             mock.patch.object(self.ingester, 'add_url') as mock_add_url:
+            self.assertDictEqual(
+                self.ingester._get_normalized_attributes(dataset_info),
+                {
+                    'foo': 'bar',
+                    'geospaas_service': ingesters.HTTP_SERVICE,
+                    'geospaas_service_name': ingesters.HTTP_SERVICE_NAME
+                }
+            )
+            mock_add_url.assert_called_once()
+
+    def test_get_download_url(self):
+        """Test that the download URL is correctly extracted from the
+        dataset information"""
+        dataset_info = {'services': {'download': {'url': 'http://something'}}}
+        self.assertEqual(self.ingester.get_download_url(dataset_info), 'http://something')
+
+
 class URLNameIngesterTestCase(django.test.TestCase):
     """Test the URLNameIngester"""
 
