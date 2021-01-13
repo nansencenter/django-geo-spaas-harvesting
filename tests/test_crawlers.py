@@ -5,6 +5,7 @@ import ftplib
 import json
 import logging
 import os
+import os.path
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
@@ -13,7 +14,6 @@ from urllib.parse import urlparse
 import requests
 
 import geospaas_harvesting.crawlers as crawlers
-from geospaas_harvesting.crawlers import Crawler
 
 
 class BaseCrawlerTestCase(unittest.TestCase):
@@ -323,9 +323,14 @@ class LocalDirectoryCrawlerTestCase(unittest.TestCase):
         """_list_folder_contents() should return the absolute
         path of all files contained in the folder"""
         with mock.patch('os.listdir', return_value=['foo', 'bar', 'baz']):
+            base_dir_name = 'base_dir'
             self.assertListEqual(
-                self.crawler._list_folder_contents('/tmp'),
-                ['/tmp/foo', '/tmp/bar', '/tmp/baz',]
+                self.crawler._list_folder_contents(base_dir_name),
+                [
+                    os.path.join(base_dir_name, 'foo'),
+                    os.path.join(base_dir_name, 'bar'),
+                    os.path.join(base_dir_name, 'baz'),
+                ]
             )
 
     def test_is_folder(self):
