@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 import requests
 
 import geospaas_harvesting.crawlers as crawlers
-from geospaas_harvesting.crawlers import Crawler
 
 
 class BaseCrawlerTestCase(unittest.TestCase):
