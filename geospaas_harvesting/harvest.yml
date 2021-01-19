@@ -42,4 +42,12 @@
 #      fileformat: '.h5'
 #      urls:
 #        - 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2012/07/'
+#    radarsat_local:
+#      class: 'LOCALHarvester'
+#      excludes: ['.DS_Store']
+#      max_fetcher_threads: 1
+#      max_db_threads: 1
+#      preventer_re: RS2_*
+#      Addresses:
+#        - '/blahblahblah'
 ...
