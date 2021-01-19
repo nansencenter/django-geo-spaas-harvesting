@@ -200,3 +200,15 @@ class CreodiasEOFinderHarvester(Harvester):
             if parameter_name in self.config:
                 parameters[parameter_name] = self.config[parameter_name]
         return ingesters.CreodiasEOFinderIngester(**parameters)
+
+class LOCALHarvester(WebDirectoryHarvester):
+    """ Harvester class for some specific local files """
+    def _create_crawlers(self):
+        return [
+            crawlers.LocalDirectoryCrawler(
+                url,
+                excludes=self.config.get('excludes', None),
+                preventer_re=self.config.get('preventer_re', ''))
+            for url in self.config['Addresses']
+        ]
+    ingester = ingesters.NansatIngester

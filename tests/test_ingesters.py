@@ -833,9 +833,9 @@ class NansatIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_attributes['entry_title'], 'NONE')
         self.assertEqual(normalized_attributes['summary'], 'NONE')
         self.assertEqual(normalized_attributes['time_coverage_start'], datetime(
-            year=2017, month=5, day=18, hour=0, minute=0, second=0))
+            year=2017, month=5, day=18, hour=0, minute=0, second=0, tzinfo=tzutc()))
         self.assertEqual(normalized_attributes['time_coverage_end'], datetime(
-            year=2017, month=5, day=27, hour=0, minute=0, second=0))
+            year=2017, month=5, day=27, hour=0, minute=0, second=0, tzinfo=tzutc()))
 
         self.assertEqual(normalized_attributes['instrument']['Short_Name'], 'Computer')
         self.assertEqual(normalized_attributes['instrument']['Long_Name'], 'Computer')

@@ -99,17 +99,20 @@ class WebDirectoryCrawler(Crawler):
         f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}/{DAY_OF_MONTH_PATTERN}/.*$')
     DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}(/.*)?$')
 
-    def __init__(self, root_url, time_range=(None, None), excludes=None):
+    def __init__(self, root_url, time_range=(None, None), excludes=None, preventer_re=''):
         """
         `root_url` is the URL of the data repository to explore.
         `time_range` is a 2-tuple of datetime.datetime objects defining the time range
         of the datasets returned by the crawler.
         `excludes` is the list of string that are the associated url is ignored during
         the harvesting process if these strings are found in the crawled url.
+        `preventer` is regex criteria for preventing the crawler to search inside a folder with
+        a specific type of name and return the folder's name instead of content(s) of the folder.
         """
         self.root_url = urlparse(root_url)
         self.time_range = time_range
         self.excludes = (self.EXCLUDE or []) + (excludes or [])
+        self.preventer_re = preventer_re
         self.set_initial_state()
 
     @property
@@ -238,10 +241,15 @@ class WebDirectoryCrawler(Crawler):
         for path in self._list_folder_contents(folder_path):
             # Select paths which do not contain any of the self.excludes strings
             if all(excluded_string not in path for excluded_string in self.excludes):
-                if self._is_folder(path):
-                    self._add_folder_to_process(path)
-                elif self._is_file(path):
+                if (len(self.preventer_re) > 0
+                    and self._is_folder(path)
+                    and re.search(self.preventer_re, os.path.basename(path))):
                     self._add_url_to_return(path)
+                else:
+                    if self._is_folder(path):
+                        self._add_folder_to_process(path)
+                    elif self._is_file(path):
+                        self._add_url_to_return(path)
 
     def get_download_url(self, resource_url):
         """

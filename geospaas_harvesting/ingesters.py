@@ -11,6 +11,7 @@ import re
 import uuid
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
+from dateutil.tz import tzutc
 import dateutil.parser
 import django.db
 import django.db.utils
@@ -28,7 +29,7 @@ from geospaas.vocabularies.models import (DataCenter, Instrument,
                                           ISOTopicCategory, Location, Parameter, Platform)
 from nansat import Nansat
 from metanorm.handlers import GeospatialMetadataHandler
-
+from metanorm.utils import get_cf_or_wkv_standard_name
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
@@ -540,9 +541,9 @@ class NansatIngester(Ingester):
         normalized_attributes['entry_title'] = n_metadata.get('entry_title', 'NONE')
         normalized_attributes['summary'] = n_metadata.get('summary', 'NONE')
         normalized_attributes['time_coverage_start'] = dateutil.parser.parse(
-            n_metadata['time_coverage_start'])
+            n_metadata['time_coverage_start']).replace(tzinfo=tzutc())
         normalized_attributes['time_coverage_end'] = dateutil.parser.parse(
-            n_metadata['time_coverage_end'])
+            n_metadata['time_coverage_end']).replace(tzinfo=tzutc())
         normalized_attributes['platform'] = json.loads(n_metadata['platform'])
         normalized_attributes['instrument'] = json.loads(n_metadata['instrument'])
         normalized_attributes['specs'] = n_metadata.get('specs', '')
@@ -551,8 +552,7 @@ class NansatIngester(Ingester):
         # set optional ForeignKey metadata from Nansat or from defaults
         normalized_attributes['gcmd_location'] = n_metadata.get(
             'gcmd_location', pti.get_gcmd_location('SEA SURFACE'))
-        normalized_attributes['provider'] = n_metadata.get(
-            'data_center', pti.get_gcmd_provider('NERSC'))
+        normalized_attributes['provider'] = pti.get_gcmd_provider(n_metadata.get('provider', 'NERSC'))
         normalized_attributes['iso_topic_category'] = n_metadata.get(
             'ISO_topic_category', pti.get_iso19115_topic_category('Oceans'))
 
@@ -560,6 +560,10 @@ class NansatIngester(Ingester):
         if len(nansat_object.vrt.dataset.GetGCPs()) > 0:
             nansat_object.reproject_gcps()
         normalized_attributes['location_geometry'] = GEOSGeometry(
-            nansat_object.get_border_wkt(nPoints=n_points), srid=4326)
+            nansat_object.get_border_wkt(n_points=n_points), srid=4326)
+
+        if n_metadata.get('dataset_parameters', None):
+            normalized_attributes['dataset_parameters'] = [get_cf_or_wkv_standard_name(dataset_param)
+                for dataset_param in json.loads(n_metadata['dataset_parameters'])]
 
         return normalized_attributes
