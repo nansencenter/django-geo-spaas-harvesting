@@ -37,6 +37,7 @@ class Configuration(collections.abc.Mapping):
         'harvesters',
         'poll_interval',
         'update_vocabularies',
+        'update_pythesint'
     ])
     HARVESTER_CLASS_KEY = 'class'
 
@@ -236,7 +237,7 @@ def main():
 
     if config.get('update_vocabularies', True):
         LOGGER.info('Updating vocabularies...')
-        update_vocabularies.Command().handle()
+        update_vocabularies.Command().handle(force=config.get('update_pythesint', False))
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])
