@@ -31,7 +31,13 @@ class Configuration(collections.abc.Mapping):
     """Manages harvesting configuration"""
 
     DEFAULT_CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'harvest.yml')
-    TOP_LEVEL_KEYS = set(['harvesters', 'poll_interval', 'endless', 'dump_on_interruption'])
+    TOP_LEVEL_KEYS = set([
+        'dump_on_interruption',
+        'endless',
+        'harvesters',
+        'poll_interval',
+        'update_vocabularies',
+    ])
     HARVESTER_CLASS_KEY = 'class'
 
     def __init__(self, config_path=None):
@@ -227,9 +233,10 @@ def main():
     except AssertionError:
         LOGGER.error('Invalid configuration', exc_info=True)
         sys.exit(1)
-    LOGGER.info('Updating vocabularies...')
 
-    update_vocabularies.Command().handle()  # updating the vocabulary with this command
+    if config.get('update_vocabularies', True):
+        LOGGER.info('Updating vocabularies...')
+        update_vocabularies.Command().handle()
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])
