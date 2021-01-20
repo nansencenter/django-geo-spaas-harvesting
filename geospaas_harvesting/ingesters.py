@@ -11,12 +11,15 @@ import re
 import uuid
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
-from dateutil.tz import tzutc
+
 import dateutil.parser
 import django.db
 import django.db.utils
+import netCDF4
 import requests
-from django.contrib.gis.geos import GEOSGeometry
+from dateutil.tz import tzutc
+from django.contrib.gis.geos import GEOSGeometry, LineString
+from django.contrib.gis.geos.point import Point
 
 import pythesint as pti
 from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
@@ -509,6 +512,67 @@ class URLNameIngester(MetanormIngester):
         normalized_attributes['geospaas_service_name'] = 'ftp'
         normalized_attributes['geospaas_service'] = 'ftp'
         return normalized_attributes
+
+
+class NetCDFIngester(MetanormIngester):
+    """Ingests metadata from NetCDF files. The files can be either
+    local or remote (if the remote repository supports it).
+    """
+
+    def _get_geometry_wkt(self, dataset):
+        """Extracts the WKT string for the dataset's spatial coverage
+        """
+        raise NotImplementedError()
+
+    def _get_raw_attributes(self, dataset_path):
+        """Get the raw metadata from the NetCDF file"""
+        dataset = netCDF4.Dataset(dataset_path)
+        raw_attributes = dataset.__dict__
+        self.add_url(dataset_path, raw_attributes)
+        raw_attributes['geometry'] = self._get_geometry_wkt(dataset)
+        raw_attributes['raw_dataset_parameters'] = self._get_parameter_names(dataset)
+        return raw_attributes
+
+    def _get_parameter_names(self, dataset):
+        """Get the names of the dataset's variables"""
+        return [
+            variable.standard_name
+            for variable in dataset.variables.values()
+            if hasattr(variable, 'standard_name')
+        ]
+
+    def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
+        raw_attributes = self._get_raw_attributes(dataset_info)
+        return self._metadata_handler.get_parameters(raw_attributes)
+
+
+class OneDimensionNetCDFIngester(NetCDFIngester):
+    """NetCDF ingester able to extract one-dimensional geographic
+    locations"""
+
+    def _get_geometry_wkt(self, dataset):
+        longitudes = dataset.variables['LONGITUDE']
+        latitudes = dataset.variables['LATITUDE']
+
+        if not len(longitudes.shape) == len(latitudes.shape) == 1:
+            raise ValueError("This ingester should only be used for one-dimensional data")
+
+        if longitudes.shape[0] != latitudes.shape[0]:
+            raise ValueError("The longitude and latitude have different shapes")
+
+        points_number = longitudes.shape[0]
+
+        points = []
+        for i in range(points_number):
+            new_point = Point(float(longitudes[i]), float(latitudes[i]))
+            if not points or new_point != points[-1]:
+                points.append(new_point)
+
+        if len(points) == 1:
+            return Point(float(longitudes[0]), float(latitudes[0])).wkt
+        else:
+            trajectory = LineString(points, srid=4326)
+            return trajectory.wkt
 
 
 class NansatIngester(Ingester):
