@@ -211,9 +211,17 @@ class Ingester():
                 if created_dataset:
                     self.LOGGER.info("Successfully created dataset from url: '%s'", url)
                 else:
-                    self.LOGGER.info("Dataset at '%s' already exists in the database.", url)
+                    # This can happen if the dataset was already
+                    # present, or if a database problem occurred in
+                    # _ingest_dataset(). Note that this problem might
+                    # not happen during the dataset creation.
+                    self.LOGGER.info("Dataset at '%s' was not created.", url)
                 if not created_dataset_uri:
-                    self.LOGGER.error("The Dataset's URI already exists. This should never happen.")
+                    # This should only happen if a database problem
+                    # occurred in _ingest_dataset(), because the
+                    # presence of the URI in the database is checked
+                    # before attempting to ingest.
+                    self.LOGGER.error("The Dataset URI '%s' was not created.", url)
             self._to_ingest.task_done()
         # It's important to close the database connection after the thread has done its work
         django.db.connection.close()
