@@ -168,17 +168,12 @@ class Ingester():
 
         return (created_dataset, created_dataset_uri)
 
-    def _thread_get_normalized_attributes(self, dataset_info, *args, **kwargs):
+    def _thread_get_normalized_attributes(self, download_url, dataset_info, *args, **kwargs):
         """
         Gets the attributes needed to insert a dataset into the database from its URL, and puts a
         dictionary containing these attribtues in the queue to be written in the database.
         This method is meant to be run in a thread.
         """
-        download_url = self.get_download_url(dataset_info)
-        if self._uri_exists(download_url):
-            self.LOGGER.info("'%s' is already present in the database", download_url)
-            return None
-
         self.LOGGER.debug("Getting metadata for '%s'", download_url)
         try:
             normalized_attributes = self._get_normalized_attributes(dataset_info, *args, **kwargs)
@@ -263,8 +258,17 @@ class Ingester():
                 try:
                     attr_futures = []
                     for dataset_info in datasets_to_ingest:
-                        attr_futures.append(attr_executor.submit(
-                            self._thread_get_normalized_attributes, dataset_info, *args, *kwargs))
+                        download_url = self.get_download_url(dataset_info)
+                        if self._uri_exists(download_url):
+                            self.LOGGER.info(
+                                "'%s' is already present in the database", download_url)
+                        else:
+                            attr_futures.append(attr_executor.submit(
+                                self._thread_get_normalized_attributes,
+                                download_url,
+                                dataset_info,
+                                *args, **kwargs
+                            ))
                 except KeyboardInterrupt:
                     for future in reversed(attr_futures):
                         future.cancel()
