@@ -225,6 +225,17 @@ def init_worker():
     # signal.signal(signal.SIGTERM, raise_keyboard_interrupt)
 
 
+def refresh_vocabularies(config):
+    """Update the Vocabulary objects in the database if the
+    `update_vocabularies` settings is True.
+    If the `update_pythesint` setting is also True,
+    the local pythesint data is also updated.
+    """
+    if config.get('update_vocabularies', True):
+        LOGGER.info('Updating vocabularies...')
+        update_vocabularies.Command().handle(force=config.get('update_pythesint', False))
+
+
 def main():
     """Loads harvesting configuration and runs each harvester in its own process"""
     signal.signal(signal.SIGTERM, raise_keyboard_interrupt)
@@ -235,9 +246,7 @@ def main():
         LOGGER.error('Invalid configuration', exc_info=True)
         sys.exit(1)
 
-    if config.get('update_vocabularies', True):
-        LOGGER.info('Updating vocabularies...')
-        update_vocabularies.Command().handle(force=config.get('update_pythesint', False))
+    refresh_vocabularies(config)
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])
