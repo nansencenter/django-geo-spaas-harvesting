@@ -138,7 +138,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
             with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR) as logger_cm:
                 self.ingester._thread_ingest_dataset()
             self.assertEqual(logger_cm.records[0].message,
-                             "The Dataset's URI already exists. This should never happen.")
+                             "The Dataset URI 'some_url' was not created.")
 
     def test_log_on_dataset_already_ingested_from_different_uri(self):
         """A message must be logged if a dataset was already ingested from a different URI"""
@@ -149,14 +149,14 @@ class IngesterTestCase(django.test.TransactionTestCase):
             with self.assertLogs(self.ingester.LOGGER, level=logging.INFO) as logger_cm:
                 self.ingester._thread_ingest_dataset()
             self.assertEqual(logger_cm.records[0].message,
-                             "Dataset at 'some_url' already exists in the database.")
+                             "Dataset at 'some_url' was not created.")
 
     def test_log_on_metadata_fetching_error(self):
         """A message must be logged if an error occurs while fetching the metadata for a dataset"""
         with mock.patch.object(ingesters.Ingester, '_get_normalized_attributes') as mock_normalize:
             mock_normalize.side_effect = TypeError
             with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR) as logger_cm:
-                self.ingester._thread_get_normalized_attributes('some_url')
+                self.ingester._thread_get_normalized_attributes('some_url', 'some_url')
             self.assertEqual(logger_cm.records[0].message, "Could not get metadata for 'some_url'")
 
     def test_fetching_threads_stop_on_keyboard_interrupt(self):
