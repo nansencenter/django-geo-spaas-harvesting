@@ -550,7 +550,7 @@ class CopernicusOpenSearchAPICrawler(HTTPPaginatedAPICrawler):
         if search_terms:
             request_parameters['params']['q'] = f"({search_terms})"
 
-        request_parameters['params']['orderby'] = 'beginposition asc'
+        request_parameters['params']['orderby'] = 'ingestiondate asc'
 
         if time_range[0] or time_range[1]:
             api_date_format = '%Y-%m-%dT%H:%M:%SZ'
@@ -601,7 +601,7 @@ class CreodiasEOFinderCrawler(HTTPPaginatedAPICrawler):
         if search_terms:
             request_parameters['params'].update(**search_terms)
 
-        request_parameters['params']['sortParam'] = 'startDate'
+        request_parameters['params']['sortParam'] = 'published'
         request_parameters['params']['sortOrder'] = 'ascending'
 
         api_date_format = '%Y-%m-%dT%H:%M:%SZ'
