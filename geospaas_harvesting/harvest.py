@@ -31,7 +31,14 @@ class Configuration(collections.abc.Mapping):
     """Manages harvesting configuration"""
 
     DEFAULT_CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'harvest.yml')
-    TOP_LEVEL_KEYS = set(['harvesters', 'poll_interval', 'endless', 'dump_on_interruption'])
+    TOP_LEVEL_KEYS = set([
+        'dump_on_interruption',
+        'endless',
+        'harvesters',
+        'poll_interval',
+        'update_vocabularies',
+        'update_pythesint'
+    ])
     HARVESTER_CLASS_KEY = 'class'
 
     def __init__(self, config_path=None):
@@ -218,6 +225,17 @@ def init_worker():
     # signal.signal(signal.SIGTERM, raise_keyboard_interrupt)
 
 
+def refresh_vocabularies(config):
+    """Update the Vocabulary objects in the database if the
+    `update_vocabularies` settings is True.
+    If the `update_pythesint` setting is also True,
+    the local pythesint data is also updated.
+    """
+    if config.get('update_vocabularies', True):
+        LOGGER.info('Updating vocabularies...')
+        update_vocabularies.Command().handle(force=config.get('update_pythesint', False))
+
+
 def main():
     """Loads harvesting configuration and runs each harvester in its own process"""
     signal.signal(signal.SIGTERM, raise_keyboard_interrupt)
@@ -227,9 +245,8 @@ def main():
     except AssertionError:
         LOGGER.error('Invalid configuration', exc_info=True)
         sys.exit(1)
-    LOGGER.info('Updating vocabularies...')
 
-    update_vocabularies.Command().handle()  # updating the vocabulary with this command
+    refresh_vocabularies(config)
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])

@@ -48,6 +48,12 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
   process can then be resumed where it stopped.
 - **poll_interval** (default: 600): the interval in seconds at which the main process checks if the
   running harvester processes have finished executing.
+- **update_vocabularies** (default: True): update the Vocabulary objects stored in the database
+  with the local `pythesint` data. If **update_pythesint** is also set to True, the local data is
+  refreshed before the database is updated.
+- **update_pythesint** (default: False): update the local pythesint data before harvesting.
+  Note that setting this parameter to `True` will have no effect if **update_vocabularies** is set
+  to `False`.
 - **harvesters**: dictionary mapping the harvesters names to a dictionary containing their
   properties.
 
