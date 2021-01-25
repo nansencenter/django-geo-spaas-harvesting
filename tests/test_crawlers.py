@@ -698,7 +698,7 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
                      "(beginposition:[2020-02-10T00:00:00Z TO 2020-02-11T00:00:00Z])",
                 'start': 0,
                 'rows': self.PAGE_SIZE,
-                'orderby': 'beginposition asc'
+                'orderby': 'ingestiondate asc'
             },
             'auth': ('user', 'pass')
         })
@@ -761,7 +761,7 @@ class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
                 'maxRecords': 100,
                 'page': 1,
                 'sortOrder': 'ascending',
-                'sortParam': 'startDate'
+                'sortParam': 'published'
             }
         })
 
@@ -774,7 +774,7 @@ class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
                 'maxRecords': 100,
                 'page': 1,
                 'sortOrder': 'ascending',
-                'sortParam': 'startDate'
+                'sortParam': 'published'
             }
         })
 
@@ -793,7 +793,7 @@ class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
                     'maxRecords': 100,
                     'page': 1,
                     'sortOrder': 'ascending',
-                    'sortParam': 'startDate',
+                    'sortParam': 'published',
                     'startDate': '2020-02-01T00:00:00Z',
                     'completionDate': '2020-02-02T00:00:00Z'
                 }
@@ -812,7 +812,7 @@ class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
                     'maxRecords': 100,
                     'page': 1,
                     'sortOrder': 'ascending',
-                    'sortParam': 'startDate',
+                    'sortParam': 'published',
                     'startDate': '2020-02-01T00:00:00Z'
                 }
             })
@@ -829,7 +829,7 @@ class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
                     'maxRecords': 100,
                     'page': 1,
                     'sortOrder': 'ascending',
-                    'sortParam': 'startDate',
+                    'sortParam': 'published',
                     'completionDate': '2020-02-02T00:00:00Z'
                 }
             })
