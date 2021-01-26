@@ -12,6 +12,7 @@ import sys
 import time
 from datetime import datetime
 import django
+import django.db
 import yaml
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
@@ -196,6 +197,9 @@ def load_or_create_harvester(harvester_name, harvester_config, load_dumped=True)
 
 def launch_harvest(harvester_name, harvester_config, dump_on_interruption=True):
     """Launch the harvest operation and process errors. Meant to be run in a separate process"""
+    # Force the creation of a new database connection for each new process
+    django.db.connection.close()
+
     try:
         harvester = load_or_create_harvester(harvester_name, harvester_config, dump_on_interruption)
         harvester.harvest()
