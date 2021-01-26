@@ -552,7 +552,8 @@ class NansatIngester(Ingester):
         # set optional ForeignKey metadata from Nansat or from defaults
         normalized_attributes['gcmd_location'] = n_metadata.get(
             'gcmd_location', pti.get_gcmd_location('SEA SURFACE'))
-        normalized_attributes['provider'] = pti.get_gcmd_provider(n_metadata.get('provider', 'NERSC'))
+        normalized_attributes['provider'] = pti.get_gcmd_provider(
+            n_metadata.get('provider', 'NERSC'))
         normalized_attributes['iso_topic_category'] = n_metadata.get(
             'ISO_topic_category', pti.get_iso19115_topic_category('Oceans'))
 
@@ -561,9 +562,20 @@ class NansatIngester(Ingester):
             nansat_object.reproject_gcps()
         normalized_attributes['location_geometry'] = GEOSGeometry(
             nansat_object.get_border_wkt(n_points=n_points), srid=4326)
-
-        if n_metadata.get('dataset_parameters', None):
-            normalized_attributes['dataset_parameters'] = [get_cf_or_wkv_standard_name(dataset_param)
-                for dataset_param in json.loads(n_metadata['dataset_parameters'])]
+        json_dumped_dataset_parameters = n_metadata.get('dataset_parameters', None)
+        if json_dumped_dataset_parameters:
+            try:
+                json_loads_result = json.loads(json_dumped_dataset_parameters)
+            except TypeError:
+                self.LOGGER.error("'dataset_parameters' section of metadata is incorrectly dumped.")
+            else:
+                if isinstance(json_loads_result, list):
+                    normalized_attributes['dataset_parameters'] = [
+                        get_cf_or_wkv_standard_name(dataset_param)
+                        for dataset_param in json_loads_result
+                    ]
+                else:
+                    self.LOGGER.error(
+                        "'dataset_parameters' section of metadata is not a json-dumped python list")
 
         return normalized_attributes
