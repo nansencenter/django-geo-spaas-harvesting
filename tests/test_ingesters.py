@@ -426,12 +426,12 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['entry_title'],
                          'VIIRS L2P Sea Surface Skin Temperature')
         self.assertEqual(normalized_parameters['summary'], ('Description: ' +
-                                                            'Sea surface temperature (SST) retrievals produced at the NASA OBPG for the Visible I' +
-                                                            'nfrared Imaging\n                Radiometer Suite (VIIRS) sensor on the Suomi Nation' +
-                                                            'al Polar-Orbiting Partnership (Suomi NPP) platform.\n                These have been' +
-                                                            ' reformatted to GHRSST GDS version 2 Level 2P specifications by the JPL PO.DAAC. VII' +
-                                                            'RS\n                SST algorithms developed by the University of Miami, RSMAS;' +
-                                                            'Processing level: 2P'))
+            'Sea surface temperature (SST) retrievals produced at the NASA OBPG for the Visible I' +
+            'nfrared Imaging\n                Radiometer Suite (VIIRS) sensor on the Suomi Nation' +
+            'al Polar-Orbiting Partnership (Suomi NPP) platform.\n                These have been' +
+            ' reformatted to GHRSST GDS version 2 Level 2P specifications by the JPL PO.DAAC. VII' +
+            'RS\n                SST algorithms developed by the University of Miami, RSMAS;' +
+            'Processing level: 2P'))
         self.assertEqual(normalized_parameters['time_coverage_start'], datetime(
             year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()))
         self.assertEqual(normalized_parameters['time_coverage_end'], datetime(
