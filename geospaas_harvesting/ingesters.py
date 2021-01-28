@@ -521,21 +521,19 @@ class NansatIngester(Ingester):
         normalized_attributes = {}
         n_points = int(kwargs.get('n_points', 10))
         nansat_options = kwargs.get('nansat_options', {})
+        url_scheme = urlparse(dataset_info).scheme
+        if not 'http' in url_scheme and not 'ftp' in url_scheme:
+            normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
+            normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
+        else:
+            raise ValueError("LOCALHarvester(which uses NansatIngester) is only for local file"
+        " addresses, not for http or ftp protocol")
 
         # Open file with Nansat
         nansat_object = Nansat(nansat_filename(dataset_info), **nansat_options)
 
         # get metadata from Nansat and get objects from vocabularies
         n_metadata = nansat_object.get_metadata()
-
-        # set service info attributes
-        url_scheme = urlparse(dataset_info).scheme
-        if 'http' in url_scheme:
-            normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
-            normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
-        else:
-            normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
-            normalized_attributes['geospaas_service'] = LOCAL_FILE_SERVICE
 
         # set compulsory metadata (source)
         normalized_attributes['entry_title'] = n_metadata.get('entry_title', 'NONE')
@@ -558,24 +556,23 @@ class NansatIngester(Ingester):
             'ISO_topic_category', pti.get_iso19115_topic_category('Oceans'))
 
         # Find coverage to set number of points in the geolocation
-        if len(nansat_object.vrt.dataset.GetGCPs()) > 0:
+        if nansat_object.vrt.dataset.GetGCPs():
             nansat_object.reproject_gcps()
         normalized_attributes['location_geometry'] = GEOSGeometry(
             nansat_object.get_border_wkt(n_points=n_points), srid=4326)
         json_dumped_dataset_parameters = n_metadata.get('dataset_parameters', None)
         if json_dumped_dataset_parameters:
-            try:
-                json_loads_result = json.loads(json_dumped_dataset_parameters)
-            except TypeError:
-                self.LOGGER.error("'dataset_parameters' section of metadata is incorrectly dumped.")
-            else:
-                if isinstance(json_loads_result, list):
-                    normalized_attributes['dataset_parameters'] = [
+            json_loads_result = json.loads(json_dumped_dataset_parameters)
+            if isinstance(json_loads_result, list):
+                normalized_attributes['dataset_parameters'] = [
                         get_cf_or_wkv_standard_name(dataset_param)
                         for dataset_param in json_loads_result
                     ]
-                else:
-                    self.LOGGER.error(
-                        "'dataset_parameters' section of metadata is not a json-dumped python list")
+            else:
+                self.LOGGER.error(
+                    "'dataset_parameters' section of metadata is not a json-dumped python list",
+                    exc_info=True)
+                raise TypeError(
+                    "'dataset_parameters' section of metadata is not a json-dumped python list")
 
         return normalized_attributes
