@@ -188,6 +188,7 @@ class TemporaryPersistenceDirTestCase(unittest.TestCase):
 
 class MainTestCase(TemporaryPersistenceDirTestCase):
     """Test the main() function in the daemon script"""
+
     @mock.patch.object(sys, 'argv', ['harvest.py'])
     @mock.patch.object(
         harvest.Configuration, 'DEFAULT_CONFIGURATION_PATH', CONFIGURATION_FILES['empty'])
@@ -223,6 +224,38 @@ class MainTestCase(TemporaryPersistenceDirTestCase):
             harvest.main()
         self.assertEqual(daemon_logs_cm.records[0].message,
                          "All harvester processes encountered errors")
+
+    def test_refresh_vocabularies(self):
+        """The database vocabulary objects must be updated
+        only if the corresponding setting is True
+        """
+        config = {'update_vocabularies': True}
+        with mock.patch('geospaas_harvesting.harvest.update_vocabularies') as mock_updater:
+            with self.assertLogs(logger= harvest.LOGGER, level=logging.INFO):
+                harvest.refresh_vocabularies(config)
+            mock_updater.Command.return_value.handle.assert_called_with(force=False)
+
+        config = {'update_vocabularies': False}
+        with mock.patch('geospaas_harvesting.harvest.update_vocabularies') as mock_updater:
+            harvest.refresh_vocabularies(config)
+            mock_updater.Command.return_value.handle.assert_not_called()
+
+    def test_refresh_vocabularies_and_update_pythesint(self):
+        """The database vocabulary objects must be updated and
+        pythesint's data refreshed only if the corresponding settings
+        are both True
+        """
+        config = {'update_vocabularies': True, 'update_pythesint': False}
+        with mock.patch('geospaas_harvesting.harvest.update_vocabularies') as mock_updater:
+            with self.assertLogs(logger=harvest.LOGGER, level=logging.INFO):
+                harvest.refresh_vocabularies(config)
+            mock_updater.Command.return_value.handle.assert_called_with(force=False)
+
+        config = {'update_vocabularies': True, 'update_pythesint': True}
+        with mock.patch('geospaas_harvesting.harvest.update_vocabularies') as mock_updater:
+            with self.assertLogs(logger=harvest.LOGGER, level=logging.INFO):
+                harvest.refresh_vocabularies(config)
+            mock_updater.Command.return_value.handle.assert_called_with(force=True)
 
     #TODO
     # def test_interrupt_main_process(self):
