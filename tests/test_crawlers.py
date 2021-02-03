@@ -5,7 +5,7 @@ import ftplib
 import json
 import logging
 import os
-import os.path
+import re
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
@@ -56,14 +56,6 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             crawler._is_folder('')
 
-    def test_is_file(self):
-        """
-        A NotImplementedError should be raised if the _is_file() method
-        is accessed directly on the WebDirectoryCrawler class
-        """
-        crawler = crawlers.WebDirectoryCrawler('')
-        with self.assertRaises(NotImplementedError):
-            crawler._is_file('')
 
     def test_get_download_url(self):
         """
@@ -134,33 +126,31 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
 
     def test_process_folder_with_file(self):
         """_process_folder() should feed the _urls stack
-        with file paths which are not excluded
+        with only file paths which are included
         """
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        crawler.excludes = ['.gz']
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar', includes=['\.nc$'])
+        crawler.EXCLUDE = re.compile(r'\.h5$')
         crawler.LOGGER = mock.Mock()
         with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
-                mock.patch.object(crawler, '_is_file', return_value=True), \
                 mock.patch.object(crawler, '_is_folder', return_value=False), \
                 mock.patch.object(crawler, '_add_url_to_return') as mock_add_url:
             mock_folder_contents.return_value = ['/bar/baz.nc', '/bar/qux.gz']
             crawler._process_folder('')
-        mock_add_url.assert_called_with('/bar/baz.nc')
+        mock_add_url.assert_called_once_with('/bar/baz.nc')
 
     def test_process_folder_with_folder(self):
         """_process_folder() should feed the _to_process stack
         with folder paths which are not excluded
         """
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        crawler.excludes = ['qux']
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar', includes=['baz'])
+        crawler.EXCLUDE = re.compile(r'qux')
         crawler.LOGGER = mock.Mock()
         with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
-                mock.patch.object(crawler, '_is_file', return_value=False), \
                 mock.patch.object(crawler, '_is_folder', return_value=True), \
                 mock.patch.object(crawler, '_add_folder_to_process') as mock_add_folder:
             mock_folder_contents.return_value = ['/bar/baz', '/bar/qux']
             crawler._process_folder('')
-        mock_add_folder.assert_called_with('/bar/baz')
+        mock_add_folder.assert_called_once_with('/bar/baz')
 
     def test_get_year_folder_coverage(self):
         """Get the correct time range from a year folder"""
@@ -341,14 +331,6 @@ class LocalDirectoryCrawlerTestCase(unittest.TestCase):
         with mock.patch('os.path.isdir', return_value=False):
             self.assertFalse(self.crawler._is_folder(''), "_is_folder() should return False")
 
-    def test_is_file(self):
-        """_is_file() should return True if the path points
-        to a regular file, False otherwise"""
-        with mock.patch('os.path.isfile', return_value=True):
-            self.assertTrue(self.crawler._is_file(''), "_is_file() should return True")
-        with mock.patch('os.path.isfile', return_value=False):
-            self.assertFalse(self.crawler._is_file(''), "_is_file() should return False")
-
 
 class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
     """Tests for the HTMLDirectoryCrawler crawler"""
@@ -498,7 +480,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         Explore root page and make sure the _url and _to_process attributes of the crawler have the
         right values
         """
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0],includes=['\.nc$'])
         with self.assertLogs(crawler.LOGGER):
             crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][0]])
@@ -506,7 +488,8 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def test_process_folder_with_duplicates(self):
         """If the same URL is present twice in the page, it should only be processed once"""
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['urls'][0])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['urls'][0],
+        includes=['\.nc$'])
         with self.assertLogs(crawler.LOGGER):
             crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][1]])
@@ -524,7 +507,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         the crawler's time range.
         """
         crawler = crawlers.OpenDAPCrawler(
-            self.TEST_DATA['folder_day_of_year']['urls'][0],
+            self.TEST_DATA['folder_day_of_year']['urls'][0], includes=['\.nc$'],
             time_range=(datetime(2019, 2, 15, 11, 0, 0), datetime(2019, 2, 15, 13, 0, 0)))
         with self.assertLogs(crawler.LOGGER):
             crawler._process_folder(crawler._to_process.pop())
@@ -540,7 +523,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
     def test_iterating(self):
         """Test the call to the __iter__ method"""
         crawler = crawlers.OpenDAPCrawler(
-            self.TEST_DATA['root']['urls'][0],
+            self.TEST_DATA['root']['urls'][0], includes=['\.nc$'],
             time_range=(datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 9, 0, 0)))
         crawler_iterator = iter(crawler)
 
@@ -863,7 +846,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
     def test_ftp_correct_navigation(self, mock_ftp):
         """check that file URLs and folders paths are added to the right stacks"""
 
-        test_crawler = crawlers.FTPCrawler('ftp://foo', files_suffixes='.gz')
+        test_crawler = crawlers.FTPCrawler('ftp://foo', includes=['\.gz$'])
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
         test_crawler.ftp.cwd = self.emulate_cwd_of_ftp
         test_crawler.ftp.host = ''
@@ -883,7 +866,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
         """
 
         test_crawler = crawlers.FTPCrawler(
-            'ftp://', username="d", password="d", files_suffixes='.gz')
+            'ftp://', username="d", password="d", includes=['\.gz$'])
 
         mock_ftp.side_effect = ftplib.error_perm("503")
         test_crawler.set_initial_state()

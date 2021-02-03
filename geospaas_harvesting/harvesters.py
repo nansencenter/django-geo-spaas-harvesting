@@ -95,10 +95,10 @@ class WebDirectoryHarvester(Harvester):
 
     def __init__(self, **config):
         super().__init__(**config)
-        if 'excludes' in config:
-            if not isinstance(config['excludes'], list):
+        if 'includes' in config:
+            if not isinstance(config['includes'], list):
                 raise HarvesterConfigurationError(
-                    "'excludes' field must be fed with a python list of excluded names ")
+                    "'includes' field must be fed with a python list of included names ")
 
     def _create_crawlers(self):
         if self.crawler is None:
@@ -107,7 +107,7 @@ class WebDirectoryHarvester(Harvester):
         try:
             return [
                 self.crawler(url, time_range=(self.get_time_range()),
-                             excludes=self.config.get('excludes', None))
+                             includes=self.config.get('includes', None))
                 for url in self.config['urls']
             ]
         except TypeError as error:
@@ -150,9 +150,9 @@ class FTPHarvester(WebDirectoryHarvester):
                 root_url=url,
                 username=self.config.get('username', None),
                 password=self.config.get('password'),
-                files_suffixes=self.config.get('fileformat', None),
+                #files_suffixes=self.config.get('fileformat', None),
                 time_range=(self.get_time_range()),
-                excludes=self.config.get('excludes', None)
+                includes=self.config.get('includes', None)
             )
             for url in self.config['urls']
         ]
@@ -207,8 +207,7 @@ class LOCALHarvester(WebDirectoryHarvester):
         return [
             crawlers.LocalDirectoryCrawler(
                 url,
-                excludes=self.config.get('excludes', None),
-                preventer_re=self.config.get('preventer_re', ''))
+                includes=self.config.get('includes', None))
             for url in self.config['Addresses']
         ]
     ingester = ingesters.NansatIngester

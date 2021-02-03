@@ -1,10 +1,10 @@
 """Tests for the harvesters"""
 #pylint: disable=protected-access
 
+import re
 import unittest
 import unittest.mock as mock
 from datetime import datetime
-
 from geospaas.vocabularies.models import Parameter
 
 import geospaas_harvesting.crawlers as crawlers
@@ -191,33 +191,35 @@ class ChildHarvestersTestCase(unittest.TestCase):
         self.assertIsInstance(harvester._current_crawler, crawlers.CreodiasEOFinderCrawler)
         self.assertIsInstance(harvester._ingester, ingesters.CreodiasEOFinderIngester)
 
-    def test_osisaf_harvester_extra_excludes(self):
-        """ extra excludes should have passed by the excludes as a list in configuration file.
+    def test_osisaf_harvester_include(self):
+        """ include criteria should have passed by the "includes" as a list in configuration file.
         Otherwise, accossiated error must be raised """
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
-                                               excludes=['ease', '_sh_polstere', ])
-        self.assertListEqual(harvester._current_crawler.excludes,
-                             crawlers.ThreddsCrawler.EXCLUDE + ['ease', '_sh_polstere'])
+                                               includes=['ease', '_sh_polstere', ])
+        self.assertEqual(harvester._current_crawler.include, re.compile('ease|_sh_polstere'))
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertListEqual(harvester._current_crawler.excludes, crawlers.ThreddsCrawler.EXCLUDE)
-
+        self.assertIsNone(harvester._current_crawler.include)
         with self.assertRaises(HarvesterConfigurationError):
             harvester = harvesters.OSISAFHarvester(
-                urls=[''], max_fetcher_threads=1, max_db_threads=1, excludes='ease')
+                urls=[''], max_fetcher_threads=1, max_db_threads=1, includes='ease')
 
-    def test_extra_excludes_with_no_CLASS_EXCLUDE(self):
-        """ shall return the excludes from the config file """
+    def test_excludes_with_and_without_CLASS_EXCLUDE(self):
+        """ shall return the proper excludes in harvester from the class EXCLUDEs of crawler """
         class TestCrawler(crawlers.WebDirectoryCrawler):
             EXCLUDE = None
-
         class TestHarvester(harvesters.WebDirectoryHarvester):
             ingester = ingesters.DDXIngester
             crawler = TestCrawler
-        harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
-                                  excludes=['ease', '_sh_polstere', ])
-        self.assertListEqual(harvester._current_crawler.excludes, ['ease', '_sh_polstere'])
-        harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,)
-        self.assertEqual(harvester._current_crawler.excludes, [])
+        harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
+        self.assertIsNone(harvester._current_crawler.EXCLUDE)
+
+        class TestCrawler(crawlers.WebDirectoryCrawler):
+            EXCLUDE = re.compile('excluding_criteria')
+        class TestHarvester(harvesters.WebDirectoryHarvester):
+            ingester = ingesters.DDXIngester
+            crawler = TestCrawler
+        harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
+        self.assertEqual(harvester._current_crawler.EXCLUDE, re.compile('excluding_criteria'))
 
 
 class HarvesterExceptTestCase(unittest.TestCase):
