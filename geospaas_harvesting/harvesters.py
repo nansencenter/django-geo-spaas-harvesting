@@ -95,8 +95,8 @@ class WebDirectoryHarvester(Harvester):
 
     def __init__(self, **config):
         super().__init__(**config)
-        if 'includes' in config:
-            if not isinstance(config['includes'], str):
+        if 'include' in config:
+            if not isinstance(config['include'], str):
                 raise HarvesterConfigurationError(
                     "The 'include' field must be fed with a regex matching URLs to include")
 
