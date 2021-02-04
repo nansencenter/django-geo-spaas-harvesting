@@ -192,16 +192,16 @@ class ChildHarvestersTestCase(unittest.TestCase):
         self.assertIsInstance(harvester._ingester, ingesters.CreodiasEOFinderIngester)
 
     def test_osisaf_harvester_include(self):
-        """ include criteria should have passed by the "includes" as a list in configuration file.
+        """ include criteria should have passed by the "includes" as a regex in configuration file.
         Otherwise, accossiated error must be raised """
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
-                                               includes='ease|_sh_polstere')
+                                               include='ease|_sh_polstere')
         self.assertEqual(harvester._current_crawler.include, re.compile('ease|_sh_polstere'))
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
         self.assertIsNone(harvester._current_crawler.include)
-        with self.assertRaises(HarvesterConfigurationError):
+        with self.assertRaises(HarvesterConfigurationError):#incorrectly passsed as a list
             harvester = harvesters.OSISAFHarvester(
-                urls=[''], max_fetcher_threads=1, max_db_threads=1, includes=['ease'])
+                urls=[''], max_fetcher_threads=1, max_db_threads=1, include=['ease'])
 
     def test_excludes_with_and_without_CLASS_EXCLUDE(self):
         """ shall return the proper excludes in harvester from the class EXCLUDEs of crawler """

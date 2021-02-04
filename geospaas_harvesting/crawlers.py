@@ -99,18 +99,17 @@ class WebDirectoryCrawler(Crawler):
         f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}/{DAY_OF_MONTH_PATTERN}/.*$')
     DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}(/.*)?$')
 
-
-    def __init__(self, root_url, time_range=(None, None), includes=None):
+    def __init__(self, root_url, time_range=(None, None), include=None):
         """
         `root_url` is the URL of the data repository to explore.
         `time_range` is a 2-tuple of datetime.datetime objects defining the time range
         of the datasets returned by the crawler.
-        `includes` is the string of regex that are the associated url are searched based on them.
-        The only ones that are match with regex are returned in the crawler output.
+        `include` is a regular expression string used to filter the crawler's output.
+        Only URLs matching it are returned.
         """
         self.root_url = urlparse(root_url)
         self.time_range = time_range
-        self.include = re.compile(includes) if includes else None
+        self.include = re.compile(include) if include else None
         self.set_initial_state()
 
     @property
@@ -236,14 +235,14 @@ class WebDirectoryCrawler(Crawler):
         """
         self.LOGGER.info("Looking for resources in '%s'...", folder_path)
         for path in self._list_folder_contents(folder_path):
+            if self._is_folder(path):
+                self._add_folder_to_process(path)
             # deselect paths which contains any of the excludes strings
             if self.EXCLUDE and self.EXCLUDE.search(path):
                 continue
             # select paths which are matched based on input config file
             if self.include and self.include.search(path):
                 self._add_url_to_return(path)
-            if self._is_folder(path):
-                self._add_folder_to_process(path)
 
     def get_download_url(self, resource_url):
         """
@@ -350,7 +349,7 @@ class FTPCrawler(WebDirectoryCrawler):
     """
     LOGGER = logging.getLogger(__name__ + '.FTPCrawler')
 
-    def __init__(self, root_url, time_range=(None, None), includes=None,
+    def __init__(self, root_url, time_range=(None, None), include=None,
                  username='anonymous', password='anonymous'):
 
         if not root_url.startswith('ftp://'):
@@ -360,7 +359,7 @@ class FTPCrawler(WebDirectoryCrawler):
         self.password = password
         self.ftp = None
 
-        super().__init__(root_url, time_range, includes)
+        super().__init__(root_url, time_range, include)
 
     def set_initial_state(self):
         """

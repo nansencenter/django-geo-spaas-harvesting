@@ -999,7 +999,7 @@ class NansatIngesterTestCase(django.test.TestCase):
             "LOCALHarvester (which uses NansatIngester) is only for local file addresses or http "
             "addresses, not for ftp protocol")
 
-    def test_repojection_based_on_gcps(self):
+    def test_reprojection_based_on_gcps(self):
         """Nansat ingester should reproject if there is any GC point in the metadata"""
         self.mock_get_metadata.return_value.vrt.dataset.GetGCPs.return_value = True
         self.mock_get_metadata.return_value.get_metadata.side_effect = [{
