@@ -5,10 +5,10 @@
 #  harvesters:
 #   radarsat_local:
 #     class: 'LOCALHarvester'
-#     includes: ['RS2_.*[^\.xml][^\.kml][^\.xsd][^\.txt][^|\.DS_Store][^schemas]$']
+#     include: 'RS2_\w+(?!.)'
 #     max_fetcher_threads: 1
 #     max_db_threads: 1
-#     Addresses:
+#     paths:
 #       - "/src/sample/test_multi_nansat"
 #   FTP_jaxa:
 #    class: 'FTPHarvester'
@@ -16,14 +16,14 @@
 #    max_db_threads: 1
 #    username: username
 #    password: !ENV 'JAXA_PASSWORD'
-#    includes: ['\.h5$']
+#    include: '\.h5$'
 #    urls:
 #      - 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2012/07/'
 #   OSISAF:
 #     class: 'OSISAFHarvester'
 #     max_fetcher_threads: 1
 #     # We include "_nh_polstere" in order to only harvest the northen-hemisphere data
-#     includes: ['_nh_polstere',]
+#     include: '_nh_polstere'
 #     max_db_threads: 1
 #     #time_range:
 #     #   - !ENV HARVESTING_START_TIME
@@ -39,7 +39,7 @@
 #     class: 'PODAACHarvester'
 #     max_fetcher_threads: 1
 #     max_db_threads: 1
-#     includes: ['\.nc$|\.h5$']
+#     include: '\.nc$|\.h5$'
 #     urls:
 #         - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/contents.html'
 #         - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
@@ -49,7 +49,7 @@
 #    class: 'CopernicusSentinelHarvester'
 #    max_fetcher_threads: 30
 #    max_db_threads: 1
-#    includes: ['.*']
+#    include: '.*'
 #    #time_range:
 #    # - !ENV HARVESTING_START_TIME
 #    # - !ENV HARVESTING_END_TIME
