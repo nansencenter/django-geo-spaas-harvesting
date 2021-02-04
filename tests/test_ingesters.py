@@ -18,7 +18,8 @@ from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset, DatasetURI
 from geospaas.vocabularies.models import DataCenter, ISOTopicCategory, Parameter
 import geospaas_harvesting.ingesters as ingesters
-
+from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
+                                       LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
 
 class IngesterTestCase(django.test.TransactionTestCase):
     """Test the base ingester class"""
@@ -950,16 +951,42 @@ class NansatIngesterTestCase(django.test.TestCase):
             err.exception.args[0],
             "'dataset_parameters' section of metadata is not a json-dumped python list")
 
-    def test_exception_handling_of_bad_inputting_of_nansat_ingester_with_http_protocol(self):
-        """LOCALHarvester(which uses NansatIngester) is only for local file addresses"""
+    def test_usage_of_nansat_ingester_with_http_protocol_in_the_OPENDAP_cases(self):
+        """LOCALHarvester(which uses NansatIngester) can be used for `OPENDAP provided` files """
         ingester = ingesters.NansatIngester()
-        self.mock_get_metadata.return_value.get_metadata.side_effect = ['']
-        with self.assertRaises(ValueError) as err:
-            normalized_attributes = ingester._get_normalized_attributes('http://')
-        self.assertEqual(
-            err.exception.args[0],
-            "LOCALHarvester(which uses NansatIngester) is only for local file addresses, not for "
-            "http or ftp protocol")
+        self.mock_get_metadata.return_value.get_metadata.side_effect = [{
+            'time_coverage_end': '2017-05-27T00:00:00', 'time_coverage_start':
+                '2017-05-18T00:00:00',
+                'platform':
+                '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+                '"Long_Name": ""}',
+                'instrument':
+                '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+                '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+                '"Long_Name": "Computer"}',
+        }]
+        normalized_attributes = ingester._get_normalized_attributes('http://')
+        self.assertEqual(normalized_attributes['geospaas_service_name'], DAP_SERVICE_NAME)
+        self.assertEqual(normalized_attributes['geospaas_service'], OPENDAP_SERVICE)
+
+    def test_usage_of_nansat_ingester_with_local_file(self):
+        """LOCALHarvester(which uses NansatIngester) can be used for local files """
+        ingester = ingesters.NansatIngester()
+        self.mock_get_metadata.return_value.get_metadata.side_effect = [{
+            'time_coverage_end': '2017-05-27T00:00:00', 'time_coverage_start':
+                '2017-05-18T00:00:00',
+                'platform':
+                '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+                '"Long_Name": ""}',
+                'instrument':
+                '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+                '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+                '"Long_Name": "Computer"}',
+        }]
+        normalized_attributes = ingester._get_normalized_attributes('/src/blabla')
+        self.assertEqual(normalized_attributes['geospaas_service_name'], FILE_SERVICE_NAME)
+        self.assertEqual(normalized_attributes['geospaas_service'], LOCAL_FILE_SERVICE)
+
 
     def test_exception_handling_of_bad_inputting_of_nansat_ingester_with_ftp_protocol(self):
         """LOCALHarvester(which uses NansatIngester) is only for local file addresses"""
@@ -969,8 +996,8 @@ class NansatIngesterTestCase(django.test.TestCase):
             normalized_attributes = ingester._get_normalized_attributes('ftp://')
         self.assertEqual(
             err.exception.args[0],
-            "LOCALHarvester(which uses NansatIngester) is only for local file addresses, not for "
-            "http or ftp protocol")
+            "LOCALHarvester (which uses NansatIngester) is only for local file addresses or http "
+            "addresses, not for ftp protocol")
 
     def test_repojection_based_on_gcps(self):
         """Nansat ingester should reproject if there is any GC point in the metadata"""

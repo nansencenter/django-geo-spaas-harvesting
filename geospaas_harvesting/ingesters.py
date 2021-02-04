@@ -523,11 +523,14 @@ class NansatIngester(Ingester):
         nansat_options = kwargs.get('nansat_options', {})
         url_scheme = urlparse(dataset_info).scheme
         if not 'http' in url_scheme and not 'ftp' in url_scheme:
+            normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
+            normalized_attributes['geospaas_service'] = LOCAL_FILE_SERVICE
+        elif 'http' in url_scheme and not 'ftp' in url_scheme:
             normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
             normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
-        else:
-            raise ValueError("LOCALHarvester(which uses NansatIngester) is only for local file"
-        " addresses, not for http or ftp protocol")
+        elif 'ftp' in url_scheme:
+            raise ValueError("LOCALHarvester (which uses NansatIngester) is only for local file"
+        " addresses or http addresses, not for ftp protocol")
 
         # Open file with Nansat
         nansat_object = Nansat(nansat_filename(dataset_info), **nansat_options)
@@ -560,6 +563,7 @@ class NansatIngester(Ingester):
             nansat_object.reproject_gcps()
         normalized_attributes['location_geometry'] = GEOSGeometry(
             nansat_object.get_border_wkt(n_points=n_points), srid=4326)
+
         json_dumped_dataset_parameters = n_metadata.get('dataset_parameters', None)
         if json_dumped_dataset_parameters:
             json_loads_result = json.loads(json_dumped_dataset_parameters)

@@ -128,7 +128,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         """_process_folder() should feed the _urls stack
         with only file paths which are included
         """
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar', includes=['\.nc$'])
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar', includes='\.nc$')
         crawler.EXCLUDE = re.compile(r'\.h5$')
         crawler.LOGGER = mock.Mock()
         with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
@@ -142,7 +142,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         """_process_folder() should feed the _to_process stack
         with folder paths which are not excluded
         """
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar', includes=['baz'])
+        crawler = crawlers.WebDirectoryCrawler('http://foo/bar', includes='baz')
         crawler.EXCLUDE = re.compile(r'qux')
         crawler.LOGGER = mock.Mock()
         with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
@@ -480,7 +480,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         Explore root page and make sure the _url and _to_process attributes of the crawler have the
         right values
         """
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0],includes=['\.nc$'])
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0],includes='\.nc$')
         with self.assertLogs(crawler.LOGGER):
             crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][0]])
@@ -489,7 +489,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
     def test_process_folder_with_duplicates(self):
         """If the same URL is present twice in the page, it should only be processed once"""
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['urls'][0],
-        includes=['\.nc$'])
+        includes='\.nc$')
         with self.assertLogs(crawler.LOGGER):
             crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][1]])
@@ -507,7 +507,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         the crawler's time range.
         """
         crawler = crawlers.OpenDAPCrawler(
-            self.TEST_DATA['folder_day_of_year']['urls'][0], includes=['\.nc$'],
+            self.TEST_DATA['folder_day_of_year']['urls'][0], includes='\.nc$',
             time_range=(datetime(2019, 2, 15, 11, 0, 0), datetime(2019, 2, 15, 13, 0, 0)))
         with self.assertLogs(crawler.LOGGER):
             crawler._process_folder(crawler._to_process.pop())
@@ -523,7 +523,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
     def test_iterating(self):
         """Test the call to the __iter__ method"""
         crawler = crawlers.OpenDAPCrawler(
-            self.TEST_DATA['root']['urls'][0], includes=['\.nc$'],
+            self.TEST_DATA['root']['urls'][0], includes='\.nc$',
             time_range=(datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 9, 0, 0)))
         crawler_iterator = iter(crawler)
 
@@ -846,7 +846,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
     def test_ftp_correct_navigation(self, mock_ftp):
         """check that file URLs and folders paths are added to the right stacks"""
 
-        test_crawler = crawlers.FTPCrawler('ftp://foo', includes=['\.gz$'])
+        test_crawler = crawlers.FTPCrawler('ftp://foo', includes='\.gz$')
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
         test_crawler.ftp.cwd = self.emulate_cwd_of_ftp
         test_crawler.ftp.host = ''
@@ -866,7 +866,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
         """
 
         test_crawler = crawlers.FTPCrawler(
-            'ftp://', username="d", password="d", includes=['\.gz$'])
+            'ftp://', username="d", password="d", includes='\.gz$')
 
         mock_ftp.side_effect = ftplib.error_perm("503")
         test_crawler.set_initial_state()

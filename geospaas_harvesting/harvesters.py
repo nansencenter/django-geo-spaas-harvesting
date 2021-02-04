@@ -96,9 +96,9 @@ class WebDirectoryHarvester(Harvester):
     def __init__(self, **config):
         super().__init__(**config)
         if 'includes' in config:
-            if not isinstance(config['includes'], list):
+            if not isinstance(config['includes'], str):
                 raise HarvesterConfigurationError(
-                    "'includes' field must be fed with a python list of included names ")
+                   "'includes' field must be fed with a python string of included names as a regex")
 
     def _create_crawlers(self):
         if self.crawler is None:
@@ -150,7 +150,6 @@ class FTPHarvester(WebDirectoryHarvester):
                 root_url=url,
                 username=self.config.get('username', None),
                 password=self.config.get('password'),
-                #files_suffixes=self.config.get('fileformat', None),
                 time_range=(self.get_time_range()),
                 includes=self.config.get('includes', None)
             )
@@ -207,7 +206,9 @@ class LOCALHarvester(WebDirectoryHarvester):
         return [
             crawlers.LocalDirectoryCrawler(
                 url,
-                includes=self.config.get('includes', None))
+                includes = self.config.get('includes', None),
+                time_range = self.get_time_range()
+                )
             for url in self.config['Addresses']
         ]
     ingester = ingesters.NansatIngester

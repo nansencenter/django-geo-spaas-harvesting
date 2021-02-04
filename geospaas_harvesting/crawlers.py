@@ -105,15 +105,12 @@ class WebDirectoryCrawler(Crawler):
         `root_url` is the URL of the data repository to explore.
         `time_range` is a 2-tuple of datetime.datetime objects defining the time range
         of the datasets returned by the crawler.
-        `includes` is the list of regex that are the associated url are searched based on them. The
-        only ones that are match with ANY of those regex are returned in the crawler output. In
-        other words, there is a logical `OR` will be placed between these regexes if then len of
-        'includes' list is more than one.
+        `includes` is the string of regex that are the associated url are searched based on them.
+        The only ones that are match with regex are returned in the crawler output.
         """
         self.root_url = urlparse(root_url)
         self.time_range = time_range
-        crawler_obj_include_str = '|'.join(includes) if includes else None
-        self.include = re.compile(crawler_obj_include_str) if crawler_obj_include_str else None
+        self.include = re.compile(includes) if includes else None
         self.set_initial_state()
 
     @property
@@ -239,11 +236,11 @@ class WebDirectoryCrawler(Crawler):
         """
         self.LOGGER.info("Looking for resources in '%s'...", folder_path)
         for path in self._list_folder_contents(folder_path):
-            # deselect paths which do not contain any of the excludes strings
-            if hasattr(self.EXCLUDE, 'search') and self.EXCLUDE.search(path):
+            # deselect paths which contains any of the excludes strings
+            if self.EXCLUDE and self.EXCLUDE.search(path):
                 continue
-            # select paths which ar matched based on input config file
-            if hasattr(self.include, 'search') and self.include.search(path):
+            # select paths which are matched based on input config file
+            if self.include and self.include.search(path):
                 self._add_url_to_return(path)
             if self._is_folder(path):
                 self._add_folder_to_process(path)
