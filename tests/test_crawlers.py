@@ -141,7 +141,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
 
     def test_process_folder_with_folder(self):
         """_process_folder() should feed the _to_process stack
-        with folder paths regardless of being excluded
+        with folder paths which are not excluded
         """
         crawler = crawlers.WebDirectoryCrawler('http://foo/bar', include='baz')
         crawler.EXCLUDE = re.compile(r'qux')
@@ -151,7 +151,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
                 mock.patch.object(crawler, '_add_folder_to_process') as mock_add_folder:
             mock_folder_contents.return_value = ['/bar/baz', '/bar/qux']
             crawler._process_folder('')
-        self.assertEqual(mock_add_folder.call_args_list, [call('/bar/baz'), call('/bar/qux')])
+        mock_add_folder.assert_called_once_with('/bar/baz')
 
     def test_get_year_folder_coverage(self):
         """Get the correct time range from a year folder"""

@@ -235,11 +235,11 @@ class WebDirectoryCrawler(Crawler):
         """
         self.LOGGER.info("Looking for resources in '%s'...", folder_path)
         for path in self._list_folder_contents(folder_path):
-            if self._is_folder(path):
-                self._add_folder_to_process(path)
             # deselect paths which contains any of the excludes strings
             if self.EXCLUDE and self.EXCLUDE.search(path):
                 continue
+            if self._is_folder(path):
+                self._add_folder_to_process(path)
             # select paths which are matched based on input config file
             if self.include and self.include.search(path):
                 self._add_url_to_return(path)
