@@ -550,9 +550,15 @@ class OneDimensionNetCDFIngester(NetCDFIngester):
     """NetCDF ingester able to extract one-dimensional geographic
     locations"""
 
+    def __init__(self, max_fetcher_threads=1, max_db_threads=1,
+                 longitude_attribute='LONGITUDE', latitude_attribute='LATITUDE'):
+        super().__init__(max_fetcher_threads, max_db_threads)
+        self.longitude_attribute = longitude_attribute
+        self.latitude_attribute = latitude_attribute
+
     def _get_geometry_wkt(self, dataset):
-        longitudes = dataset.variables['LONGITUDE']
-        latitudes = dataset.variables['LATITUDE']
+        longitudes = dataset.variables[self.longitude_attribute]
+        latitudes = dataset.variables[self.latitude_attribute]
 
         if not len(longitudes.shape) == len(latitudes.shape) == 1:
             raise ValueError("This ingester should only be used for one-dimensional data")
