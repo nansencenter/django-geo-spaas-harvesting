@@ -3,43 +3,61 @@
 #  dump_on_interruption: False
 #  poll_interval: 600
 #  harvesters:
-#    OSISAF:
-#      class: 'OSISAFHarvester'
-#      max_fetcher_threads: 30
-#      # We exclude "EASE-Grid map projections" and "southern hemispheres" from harvesting process
-#      excludes: ['ease', '_sh_polstere',]
-#      max_db_threads: 1
-#      urls:
-#        - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
-#        - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
-#    podaac:
-#      class: 'PODAACHarvester'
-#      max_fetcher_threads: 30
-#      max_db_threads: 1
-#      urls:
-#        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/contents.html'
-#        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
-#        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
-#        - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
-#    copernicus_sentinel:
-#      class: 'CopernicusSentinelHarvester'
-#      max_fetcher_threads: 30
-#      max_db_threads: 1
-#      url: 'https://scihub.copernicus.eu/apihub/search'
-#      search_terms:
-#        - 'platformname:Sentinel-1 AND NOT L0'
-#        - 'platformname:Sentinel-2 AND NOT L0'
-#        - 'platformname:Sentinel-3 AND NOT L0'
-#      username: 'username'
-#      # Environment variable name
-#      password: !ENV 'COPERNICUS_OPEN_HUB_PASSWORD'
-#    FTP_jaxa:
-#      class: 'FTPHarvester'
-#      max_fetcher_threads: 30
-#      max_db_threads: 1
-#      username: username
-#      password: !ENV 'JAXA_PASSWORD'
-#      fileformat: '.h5'
-#      urls:
-#        - 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2012/07/'
+#   radarsat_local:
+#     class: 'LOCALHarvester'
+#     include: 'RS2_\w+(?!.)'
+#     max_fetcher_threads: 1
+#     max_db_threads: 1
+#     paths:
+#       - "/src/sample/test_multi_nansat"
+#   FTP_jaxa:
+#    class: 'FTPHarvester'
+#    max_fetcher_threads: 1
+#    max_db_threads: 1
+#    username: username
+#    password: !ENV 'JAXA_PASSWORD'
+#    include: '\.h5$'
+#    urls:
+#      - 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2012/07/'
+#   OSISAF:
+#     class: 'OSISAFHarvester'
+#     max_fetcher_threads: 1
+#     # We include "_nh_polstere" in order to only harvest the northen-hemisphere data
+#     include: '_nh_polstere'
+#     max_db_threads: 1
+#     #time_range:
+#     #   - !ENV HARVESTING_START_TIME
+#     #   - !ENV HARVESTING_END_TIME
+#     urls:
+#       - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/amsr2_conc/catalog.html'
+#       - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/conc/catalog.html'
+#       - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/type/catalog.html'
+#       - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/drift_mr/catalog.html'
+#       - 'https://thredds.met.no/thredds/catalog/osisaf/met.no/ice/drift_lr/merged/catalog.html'
+#
+#   podaac:
+#     class: 'PODAACHarvester'
+#     max_fetcher_threads: 1
+#     max_db_threads: 1
+#     include: '\.nc$|\.h5$'
+#     urls:
+#         - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/NAVO/v1/2014/005/contents.html'
+#         - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_N20/'
+#         - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/VIIRS_NPP/'
+#         - 'https://opendap.jpl.nasa.gov/opendap/allData/ghrsst/data/GDS2/L2P/MODIS_A/'
+#   copernicus_sentinel:
+#    class: 'CopernicusSentinelHarvester'
+#    max_fetcher_threads: 30
+#    max_db_threads: 1
+#    include: '.*'
+#    #time_range:
+#    # - !ENV HARVESTING_START_TIME
+#    # - !ENV HARVESTING_END_TIME
+#    url: 'https://scihub.copernicus.eu/apihub/search'
+#    search_terms:
+#       - 'platformname:Sentinel-1 AND NOT L0'
+#       - 'platformname:Sentinel-2 AND NOT L0'
+#       - 'platformname:Sentinel-3 AND NOT L0'
+#    username: "username"
+#    password: !ENV COPERNICUS_OPEN_HUB_PASSWORD
 ...

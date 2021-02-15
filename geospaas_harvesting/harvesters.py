@@ -95,10 +95,10 @@ class WebDirectoryHarvester(Harvester):
 
     def __init__(self, **config):
         super().__init__(**config)
-        if 'excludes' in config:
-            if not isinstance(config['excludes'], list):
+        if 'include' in config:
+            if not isinstance(config['include'], str):
                 raise HarvesterConfigurationError(
-                    "'excludes' field must be fed with a python list of excluded names ")
+                    "The 'include' field must be fed with a regex matching URLs to include")
 
     def _create_crawlers(self):
         if self.crawler is None:
@@ -107,7 +107,7 @@ class WebDirectoryHarvester(Harvester):
         try:
             return [
                 self.crawler(url, time_range=(self.get_time_range()),
-                             excludes=self.config.get('excludes', None))
+                             include=self.config.get('include', None))
                 for url in self.config['urls']
             ]
         except TypeError as error:
@@ -150,9 +150,8 @@ class FTPHarvester(WebDirectoryHarvester):
                 root_url=url,
                 username=self.config.get('username', None),
                 password=self.config.get('password'),
-                files_suffixes=self.config.get('fileformat', None),
                 time_range=(self.get_time_range()),
-                excludes=self.config.get('excludes', None)
+                include=self.config.get('include', None)
             )
             for url in self.config['urls']
         ]
@@ -200,3 +199,17 @@ class CreodiasEOFinderHarvester(Harvester):
             if parameter_name in self.config:
                 parameters[parameter_name] = self.config[parameter_name]
         return ingesters.CreodiasEOFinderIngester(**parameters)
+
+
+class LOCALHarvester(WebDirectoryHarvester):
+    """ Harvester class for some specific local files """
+    def _create_crawlers(self):
+        return [
+            crawlers.LocalDirectoryCrawler(
+                url,
+                include = self.config.get('include', None),
+                time_range = self.get_time_range()
+                )
+            for url in self.config['paths']
+        ]
+    ingester = ingesters.NansatIngester

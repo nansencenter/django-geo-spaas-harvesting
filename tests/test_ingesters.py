@@ -18,7 +18,8 @@ from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset, DatasetURI
 from geospaas.vocabularies.models import DataCenter, ISOTopicCategory, Parameter
 import geospaas_harvesting.ingesters as ingesters
-
+from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
+                                       LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
 
 class IngesterTestCase(django.test.TransactionTestCase):
     """Test the base ingester class"""
@@ -739,8 +740,8 @@ class CreodiasEOFinderIngesterTestCase(django.test.TestCase):
         """
         dataset_info = {'services': {'download': {'url': 'http://something'}}}
         with mock.patch.object(
-                self.ingester._metadata_handler, 'get_parameters', return_value={'foo': 'bar'}), \
-             mock.patch.object(self.ingester, 'add_url') as mock_add_url:
+            self.ingester._metadata_handler, 'get_parameters', return_value={'foo': 'bar'}), \
+                mock.patch.object(self.ingester, 'add_url') as mock_add_url:
             self.assertDictEqual(
                 self.ingester._get_normalized_attributes(dataset_info),
                 {
@@ -821,21 +822,46 @@ class NansatIngesterTestCase(django.test.TestCase):
         self.mock_param_count = self.patcher_param_count.start()
         self.mock_param_count.return_value = 2
 
+        self.patcher_get_metadata = mock.patch('geospaas_harvesting.ingesters.Nansat')
+        self.mock_get_metadata = self.patcher_get_metadata.start()
+
+        self.mock_get_metadata.return_value.get_border_wkt.return_value = (
+            'POLYGON((24.88 68.08,22.46 68.71,19.96 69.31,17.39 69.87,24.88 68.08))')
+
     def tearDown(self):
         self.patcher_param_count.stop()
+        self.patcher_get_metadata.stop()
 
     def test_normalize_netcdf_attributes_with_nansat(self):
         """Test the ingestion of a netcdf file using nansat"""
+        self.mock_get_metadata.return_value.get_metadata.side_effect = [
+            {'bulletin_type': 'Forecast', 'Conventions': 'CF-1.4', 'field_date': '2017-05-29',
+             'field_type': 'Files based on file type nersc_daily',
+             'filename': '/vsimem/343PBWM116.vrt', 'Forecast_range': '10 days',
+             'history': '20170521:Created by program hyc2proj, version V0.3',
+             'institution': 'MET Norway, Henrik Mohns plass 1, N-0313 Oslo, Norway',
+             'instrument':
+             '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+             '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+             '"Long_Name": "Computer"}',
+             'platform':
+             '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+             '"Long_Name": ""}',
+             'references': 'http://marine.copernicus.eu', 'source': 'NERSC-HYCOM model fields',
+             'time_coverage_end': '2017-05-27T00:00:00', 'time_coverage_start':
+             '2017-05-18T00:00:00',
+             'title':
+             'Arctic Ocean Physics Analysis and Forecast, 12.5km daily mean '
+             '(dataset-topaz4-arc-myoceanv2-be)',
+             'dataset_parameters': '["surface_backwards_scattering_coefficient_of_radar_wave"]'}]
         ingester = ingesters.NansatIngester()
-        normalized_attributes = ingester._get_normalized_attributes(
-            os.path.join(os.path.dirname(__file__), 'data/nansat/arc_metno_dataset.nc'))
-
+        normalized_attributes = ingester._get_normalized_attributes('')
         self.assertEqual(normalized_attributes['entry_title'], 'NONE')
         self.assertEqual(normalized_attributes['summary'], 'NONE')
         self.assertEqual(normalized_attributes['time_coverage_start'], datetime(
-            year=2017, month=5, day=18, hour=0, minute=0, second=0))
+            year=2017, month=5, day=18, hour=0, minute=0, second=0, tzinfo=tzutc()))
         self.assertEqual(normalized_attributes['time_coverage_end'], datetime(
-            year=2017, month=5, day=27, hour=0, minute=0, second=0))
+            year=2017, month=5, day=27, hour=0, minute=0, second=0, tzinfo=tzutc()))
 
         self.assertEqual(normalized_attributes['instrument']['Short_Name'], 'Computer')
         self.assertEqual(normalized_attributes['instrument']['Long_Name'], 'Computer')
@@ -850,16 +876,7 @@ class NansatIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_attributes['platform']['Series_Entity'], '')
 
         expected_geometry = GEOSGeometry((
-            'POLYGON(('
-            '20.7042 89.9999,24.9957 89.9999,28.0373 89.9998,30.2939 89.9998,32.0298 89.9998,'
-            '33.4042 89.9998,34.5181 89.9998,35.4387 89.9997,36.2117 89.9997,36.8699 89.9997,'
-            '37.6088 89.9997,37.6088 89.9997,33.5816 89.9997,29.6653 89.9996,25.8904 89.9996,'
-            '22.28 89.9996,18.8504 89.9996,15.611 89.9996,12.5653 89.9996,9.7123 89.9996,'
-            '7.0469 89.9996,4.1286 89.9995,4.1286 89.9995,1.3791 89.9996,-0.8831 89.9996,'
-            '-3.3327 89.9996,-5.984 89.9996,-8.85 89.9996,-11.9418 89.9996,-15.2668 89.9997,'
-            '-18.8277 89.9997,-22.6199 89.9997,-26.6303 89.9997,-26.6303 89.9997,-24.7751 89.9997,'
-            '-22.9012 89.9997,-20.6677 89.9998,-17.9691 89.9998,-14.6602 89.9998,-10.5392 89.9998,'
-            '-5.3282 89.9998,1.34 89.9999,9.8983 89.9999,20.7042 89.9999))'), srid=4326)
+            'POLYGON((24.88 68.08,22.46 68.71,19.96 69.31,17.39 69.87,24.88 68.08))'), srid=4326)
 
         # This fails, which is why string representations are compared. Any explanation is welcome.
         # self.assertTrue(normalized_attributes['location_geometry'].equals(expected_geometry))
@@ -877,6 +894,24 @@ class NansatIngesterTestCase(django.test.TestCase):
         self.assertEqual(
             normalized_attributes['gcmd_location']['Location_Category'], 'VERTICAL LOCATION')
         self.assertEqual(normalized_attributes['gcmd_location']['Location_Type'], 'SEA SURFACE')
+        self.assertEqual(
+            normalized_attributes['dataset_parameters'],
+            [
+                OrderedDict(
+                    [('standard_name', 'surface_backwards_scattering_coefficient_of_radar_wave'),
+                     ('canonical_units', '1'),
+                        ('grib', ''),
+                        ('amip', ''),
+                        ('description',
+                         'The scattering/absorption/attenuation coefficient is assumed to be an '
+                         'integral over all wavelengths, unless a coordinate of '
+                         'radiation_wavelength is included to specify the wavelength. Scattering of'
+                         ' radiation is its deflection from its incident path without loss of '
+                         'energy. Backwards scattering refers to the sum of scattering into all '
+                         'backward angles i.e. scattering_angle exceeding pi/2 radians. A '
+                         'scattering_angle should not be specified with this quantity.')
+                     ])
+            ])
 
     # TODO: make this work
     # def test_ingest_dataset_twice_different_urls(self):
@@ -893,3 +928,91 @@ class NansatIngesterTestCase(django.test.TestCase):
 
     #     self.assertTrue(logger_cm.records[0].msg.endswith('already exists in the database.'))
     #     self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
+
+    def test_exception_handling_of_bad_development_of_mappers(self):
+        """Test the exception handling of bad development of 'dataset_parameters' of metadata.
+        ANY mapper should return a python list as 'dataset_parameters' of metadata."""
+        self.mock_get_metadata.return_value.get_metadata.side_effect = [
+            {
+            'time_coverage_end': '2017-05-27T00:00:00', 'time_coverage_start':
+                '2017-05-18T00:00:00',
+                'platform':
+                '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+                '"Long_Name": ""}',
+                'instrument':
+                '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+                '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+                '"Long_Name": "Computer"}',
+                'dataset_parameters': "{}"}]
+        ingester = ingesters.NansatIngester()
+        with self.assertRaises(TypeError) as err:
+            normalized_attributes = ingester._get_normalized_attributes('')
+        self.assertEqual(
+            err.exception.args[0],
+            "'dataset_parameters' section of metadata is not a json-dumped python list")
+
+    def test_usage_of_nansat_ingester_with_http_protocol_in_the_OPENDAP_cases(self):
+        """LOCALHarvester(which uses NansatIngester) can be used for `OPENDAP provided` files """
+        ingester = ingesters.NansatIngester()
+        self.mock_get_metadata.return_value.get_metadata.side_effect = [{
+            'time_coverage_end': '2017-05-27T00:00:00', 'time_coverage_start':
+                '2017-05-18T00:00:00',
+                'platform':
+                '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+                '"Long_Name": ""}',
+                'instrument':
+                '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+                '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+                '"Long_Name": "Computer"}',
+        }]
+        normalized_attributes = ingester._get_normalized_attributes('http://')
+        self.assertEqual(normalized_attributes['geospaas_service_name'], DAP_SERVICE_NAME)
+        self.assertEqual(normalized_attributes['geospaas_service'], OPENDAP_SERVICE)
+
+    def test_usage_of_nansat_ingester_with_local_file(self):
+        """LOCALHarvester(which uses NansatIngester) can be used for local files """
+        ingester = ingesters.NansatIngester()
+        self.mock_get_metadata.return_value.get_metadata.side_effect = [{
+            'time_coverage_end': '2017-05-27T00:00:00', 'time_coverage_start':
+                '2017-05-18T00:00:00',
+                'platform':
+                '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+                '"Long_Name": ""}',
+                'instrument':
+                '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+                '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+                '"Long_Name": "Computer"}',
+        }]
+        normalized_attributes = ingester._get_normalized_attributes('/src/blabla')
+        self.assertEqual(normalized_attributes['geospaas_service_name'], FILE_SERVICE_NAME)
+        self.assertEqual(normalized_attributes['geospaas_service'], LOCAL_FILE_SERVICE)
+
+
+    def test_exception_handling_of_bad_inputting_of_nansat_ingester_with_ftp_protocol(self):
+        """LOCALHarvester(which uses NansatIngester) is only for local file addresses"""
+        ingester = ingesters.NansatIngester()
+        self.mock_get_metadata.return_value.get_metadata.side_effect = ['']
+        with self.assertRaises(ValueError) as err:
+            normalized_attributes = ingester._get_normalized_attributes('ftp://')
+        self.assertEqual(
+            err.exception.args[0],
+            "LOCALHarvester (which uses NansatIngester) is only for local file addresses or http "
+            "addresses, not for ftp protocol")
+
+    def test_reprojection_based_on_gcps(self):
+        """Nansat ingester should reproject if there is any GC point in the metadata"""
+        self.mock_get_metadata.return_value.vrt.dataset.GetGCPs.return_value = True
+        self.mock_get_metadata.return_value.get_metadata.side_effect = [{
+            'time_coverage_end': '2017-05-27T00:00:00', 'time_coverage_start':
+                '2017-05-18T00:00:00',
+                'platform':
+                '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+                '"Long_Name": ""}',
+                'instrument':
+                '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+                '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+                '"Long_Name": "Computer"}',
+        }]
+        ingester = ingesters.NansatIngester()
+        normalized_attributes = ingester._get_normalized_attributes('')
+        self.mock_get_metadata.return_value.reproject_gcps.assert_called_once()
