@@ -200,6 +200,7 @@ class CreodiasEOFinderHarvester(Harvester):
                 parameters[parameter_name] = self.config[parameter_name]
         return ingesters.CreodiasEOFinderIngester(**parameters)
 
+
 class LOCALHarvester(WebDirectoryHarvester):
     """ Harvester class for some specific local files """
     def _create_crawlers(self):
