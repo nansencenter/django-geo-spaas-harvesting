@@ -203,24 +203,6 @@ class ChildHarvestersTestCase(unittest.TestCase):
             harvester = harvesters.OSISAFHarvester(
                 urls=[''], max_fetcher_threads=1, max_db_threads=1, include=['ease'])
 
-    def test_excludes_with_and_without_CLASS_EXCLUDE(self):
-        """ shall return the proper excludes in harvester from the class EXCLUDEs of crawler """
-        class TestCrawler(crawlers.WebDirectoryCrawler):
-            EXCLUDE = None
-        class TestHarvester(harvesters.WebDirectoryHarvester):
-            ingester = ingesters.DDXIngester
-            crawler = TestCrawler
-        harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertIsNone(harvester._current_crawler.EXCLUDE)
-
-        class TestCrawler(crawlers.WebDirectoryCrawler):
-            EXCLUDE = re.compile('excluding_criteria')
-        class TestHarvester(harvesters.WebDirectoryHarvester):
-            ingester = ingesters.DDXIngester
-            crawler = TestCrawler
-        harvester = TestHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertEqual(harvester._current_crawler.EXCLUDE, re.compile('excluding_criteria'))
-
 
 class HarvesterExceptTestCase(unittest.TestCase):
     def tearDown(self):
