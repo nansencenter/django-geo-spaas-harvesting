@@ -115,8 +115,12 @@ repository.
 
 The currently available crawlers are:
 
-- OpenDAP (tested on PO.DAAC's OpenDAP repository)
-- OData API (tested on Copernicus Sentinel API Hub)
+- Local files
+- OpenDAP
+- THREDDS
+- FTP
+- Copernicus Scihub's OpenSearch API
+- Creodias REST API
 
 #### Ingesters
 
@@ -141,7 +145,10 @@ To extract the relevant metadata from the raw metadata, most ingesters use the
 The currently available ingesters are:
 
 - DDX ingester: uses the DDX metadata provided by OpenDAP repositories
+- THREDDS ingester: DDX ingester adapted to the particular case of THREDDS repositories
 - Copernicus OData API ingester: specific to the OData API from Copernicus API hub
+- Creodias EO finder API: specific to Creodias' search API
+- URL ingester: returns hard coded metadata for known URLs
 - Nansat ingester: uses [Nansat](https://github.com/nansencenter/nansat) to open a local or remote
   file and get its metadata
 
@@ -160,7 +167,12 @@ The harvester iterates over each of the crawlers and feeds the URLs to the inges
 The currently available harvesters are:
 
 - PO.DAAC harvester: harvests VIIRS and MODIS data from NASA's PO.DAAC repository
+  (maybe more, but these are the only one which are tested)
+- OSISAF harvester: harvests THREDDS repositories
+- FTP harvester: harvests FTP repositories
 - Copernicus Sentinel harvester: harvests Sentinel 1, 2 and 3 data from the Copernicus API Hub
+- Creodias harvester: harvests Sentinel-3 data from Creodias
+- Local harvester: harvests local files using Nansat
 
 #### The `harvest.py` script
 
