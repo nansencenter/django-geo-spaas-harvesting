@@ -8,15 +8,18 @@ import unittest.mock as mock
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from datetime import datetime
-import pythesint as pti
+
 import django.db
 import django.db.utils
 import django.test
+import numpy as np
+import pythesint as pti
 import requests
 from dateutil.tz import tzutc
 from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset, DatasetURI
 from geospaas.vocabularies.models import DataCenter, ISOTopicCategory, Parameter
+
 import geospaas_harvesting.ingesters as ingesters
 from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
@@ -1016,3 +1019,149 @@ class NansatIngesterTestCase(django.test.TestCase):
         ingester = ingesters.NansatIngester()
         normalized_attributes = ingester._get_normalized_attributes('')
         self.mock_get_metadata.return_value.reproject_gcps.assert_called_once()
+
+
+class NetCDFIngesterTestCase(django.test.TestCase):
+    """Test the NetCDFIngester"""
+
+    def  setUp(self):
+        mock.patch('geospaas_harvesting.ingesters.Parameter.objects.count', return_value=2).start()
+        self.addCleanup(mock.patch.stopall)
+
+        self.ingester = ingesters.NetCDFIngester()
+
+    def test_abstract_get_geometry_wkt(self):
+        """_get_geometry_wkt() should raise a NotImplementedError()"""
+        with self.assertRaises(NotImplementedError):
+            self.ingester._get_geometry_wkt(None)
+
+    def test_get_raw_attributes(self):
+        """Test reading raw attributes from a netCDF file"""
+        attributes = {
+            'attr1': 'value1',
+            'attr2': 'value2'
+        }
+
+        # In the netCDF4 lib, the netCDF attributes of a dataset are
+        # accessed using the __dict__ attribute of the Python Dataset
+        # object. This messes with the internal workings of Python
+        # objects and makes mocking quite hard.
+        # Here, it is necessary to mock _get_geometry_wkt() and
+        # _get_geometry_wkt(), because since we are mocking its
+        # __dict__, the mocked dataset does not behave as expected when
+        # calling these methods on it.
+        with mock.patch('netCDF4.Dataset') as mock_dataset, \
+             mock.patch.object(self.ingester, '_get_geometry_wkt', return_value='wkt'), \
+             mock.patch.object(self.ingester, '_get_parameter_names', return_value=['param']):
+            mock_dataset.return_value.__dict__ = attributes
+
+            self.assertDictEqual(
+                self.ingester._get_raw_attributes('/foo/bar'),
+                {
+                    **attributes,
+                    'url': '/foo/bar',
+                    'geometry': 'wkt',
+                    'raw_dataset_parameters': ['param']
+                }
+            )
+
+    def test_get_parameter_names(self):
+        """_get_parameter_names() should return the names of the
+        variables of the dataset
+        """
+        mock_variable1 = mock.Mock()
+        mock_variable1.standard_name = 'standard_name_1'
+
+        mock_dataset = mock.Mock()
+        mock_dataset.variables = {
+            'var1': mock_variable1,
+            'var2': 'variable2' # does not have a "standard_name" attribute
+        }
+
+        self.assertListEqual(self.ingester._get_parameter_names(mock_dataset), ['standard_name_1'])
+
+    def test_get_normalized_attributes(self):
+        """_get_normalized_attributes() should use metanorm to
+        normalize the raw attributes
+        """
+        raw_attributes = {
+            'attr1': 'value1',
+            'attr2': 'value2'
+        }
+        with mock.patch.object(self.ingester, '_get_raw_attributes', return_value=raw_attributes), \
+             mock.patch.object(self.ingester, '_metadata_handler') as mock_metadata_handler:
+            self.ingester._get_normalized_attributes('/foo/bar.nc')
+        mock_metadata_handler.get_parameters.assert_called_with(raw_attributes)
+
+
+class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
+    """Test the OneDimensionNetCDFIngester"""
+
+    def setUp(self):
+        mock.patch('geospaas_harvesting.ingesters.Parameter.objects.count', return_value=2).start()
+        self.addCleanup(mock.patch.stopall)
+
+        self.ingester = ingesters.OneDimensionNetCDFIngester()
+
+    def test_get_trajectory(self):
+        """Test getting a trajectory from a netCDF dataset"""
+        mock_dataset = mock.Mock()
+        mock_dataset.variables = {
+            'LONGITUDE': np.array((1, 3, 5)),
+            'LATITUDE': np.array((2, 4, 6))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'LINESTRING (1 2, 3 4, 5 6)'
+        )
+
+    def test_get_point(self):
+        """Test getting a WKT point when the shape of the latitude and
+        longitude is (1,)"""
+        mock_dataset = mock.Mock()
+        mock_dataset.variables = {
+            'LONGITUDE': np.array((1,)),
+            'LATITUDE': np.array((2,))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POINT (1 2)'
+        )
+
+    def test_get_deduplicated_point(self):
+        """Test getting a WKT point when that point is referenced
+        multiple times in the dataset
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.variables = {
+            'LONGITUDE': np.array((1, 1, 1)),
+            'LATITUDE': np.array((2, 2, 2))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POINT (1 2)'
+        )
+
+    def test_error_on_multidimensional_data(self):
+        """An error should be raised if the dataset is
+        multi-dimensional.
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.variables = {
+            'LONGITUDE': np.array(((1, 2, 3), (4, 5, 6))),
+            'LATITUDE': np.array(((1, 2, 4),  (7, 9, 6)))
+        }
+        with self.assertRaises(ValueError):
+            self.ingester._get_geometry_wkt(mock_dataset)
+
+    def test_error_on_misshaped_lon_lat(self):
+        """An error should be raised if the dataset has longitude and
+        latitude arrays of different lengths.
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.variables = {
+            'LONGITUDE': np.array((1, 2, 3, 4)),
+            'LATITUDE': np.array((1, 2, 4))
+        }
+        with self.assertRaises(ValueError):
+            self.ingester._get_geometry_wkt(mock_dataset)
