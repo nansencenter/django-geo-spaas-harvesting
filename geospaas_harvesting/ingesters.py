@@ -603,7 +603,7 @@ class NansatIngester(Ingester):
         " addresses or http addresses, not for ftp protocol")
 
         # Open file with Nansat
-        nansat_object = Nansat(nansat_filename(dataset_info), **nansat_options)
+        nansat_object = Nansat(nansat_filename(dataset_info), log_level=self.logger.level, **nansat_options)
 
         # get metadata from Nansat and get objects from vocabularies
         n_metadata = nansat_object.get_metadata()
