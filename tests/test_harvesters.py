@@ -203,6 +203,14 @@ class ChildHarvestersTestCase(unittest.TestCase):
             harvester = harvesters.OSISAFHarvester(
                 urls=[''], max_fetcher_threads=1, max_db_threads=1, include=['ease'])
 
+    def test_one_dimension_netcdf_harvester(self):
+        """The OneDimensionNetCDFLocalHarvester harvester should create
+        the correct crawlers and ingesters
+        """
+        harvester = harvesters.OneDimensionNetCDFLocalHarvester(paths=[''])
+        self.assertIsInstance(harvester._current_crawler, crawlers.LocalDirectoryCrawler)
+        self.assertIsInstance(harvester._ingester, ingesters.OneDimensionNetCDFIngester)
+
 
 class HarvesterExceptTestCase(unittest.TestCase):
     def tearDown(self):
