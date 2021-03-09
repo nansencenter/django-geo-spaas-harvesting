@@ -952,7 +952,8 @@ class NansatIngesterTestCase(django.test.TestCase):
             normalized_attributes = ingester._get_normalized_attributes('')
         self.assertEqual(
             err.exception.args[0],
-            "'dataset_parameters' section of metadata is not a json-dumped python list")
+            "Can't ingest '': the 'dataset_parameters' section of the metadata returned by nansat "
+            "is not a JSON list")
 
     def test_usage_of_nansat_ingester_with_http_protocol_in_the_OPENDAP_cases(self):
         """LOCALHarvester(which uses NansatIngester) can be used for `OPENDAP provided` files """
@@ -999,8 +1000,7 @@ class NansatIngesterTestCase(django.test.TestCase):
             normalized_attributes = ingester._get_normalized_attributes('ftp://')
         self.assertEqual(
             err.exception.args[0],
-            "LOCALHarvester (which uses NansatIngester) is only for local file addresses or http "
-            "addresses, not for ftp protocol")
+            "Can't ingest 'ftp://': nansat can't open remote ftp files")
 
     def test_reprojection_based_on_gcps(self):
         """Nansat ingester should reproject if there is any GC point in the metadata"""
