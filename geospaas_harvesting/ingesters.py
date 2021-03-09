@@ -642,9 +642,6 @@ class NansatIngester(Ingester):
                         for dataset_param in json_loads_result
                     ]
             else:
-                self.LOGGER.error(
-                    "'dataset_parameters' section of metadata is not a json-dumped python list",
-                    exc_info=True)
                 raise TypeError(
                     f"Can't ingest '{dataset_info}': the 'dataset_parameters' section of the "
                     "metadata returned by nansat is not a JSON list")
