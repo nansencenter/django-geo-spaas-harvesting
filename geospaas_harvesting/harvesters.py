@@ -213,3 +213,8 @@ class LOCALHarvester(WebDirectoryHarvester):
             for url in self.config['paths']
         ]
     ingester = ingesters.NansatIngester
+
+
+class OneDimensionNetCDFLocalHarvester(LOCALHarvester):
+    """Harvester class for one-dimensional NetCDF file hosted locally"""
+    ingester = ingesters.OneDimensionNetCDFIngester
