@@ -604,7 +604,7 @@ class NansatIngester(Ingester):
 
         # Open file with Nansat
         nansat_object = Nansat(nansat_filename(dataset_info),
-                               log_level=logging.getLogger("geospaas_harvesting").level,
+                               log_level=self.LOGGER.getEffectiveLevel(),
                                **nansat_options)
 
         # get metadata from Nansat and get objects from vocabularies
