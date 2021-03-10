@@ -500,7 +500,7 @@ class CreodiasEOFinderIngester(MetanormIngester):
 
 
 class URLNameIngester(MetanormIngester):
-    """ Ingester class using FTP to read meta-data from the name of the dataset """
+    """Ingester class which associates hard-coded data to known URLs"""
     LOGGER = logging.getLogger(__name__ + '.URLNameIngester')
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
