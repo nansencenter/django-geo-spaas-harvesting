@@ -6,7 +6,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), "r") as fh:
 
 setuptools.setup(
     name="geospaas_harvesting",
-    version="3.0.2",
+    version="3.1.0",
     author="Adrien Perrin",
     author_email="adrien.perrin@nersc.no",
     description="Metadata harvesting tool for GeoSPaaS",
