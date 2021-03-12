@@ -599,8 +599,7 @@ class NansatIngester(Ingester):
             normalized_attributes['geospaas_service_name'] = DAP_SERVICE_NAME
             normalized_attributes['geospaas_service'] = OPENDAP_SERVICE
         elif 'ftp' in url_scheme:
-            raise ValueError("LOCALHarvester (which uses NansatIngester) is only for local file"
-        " addresses or http addresses, not for ftp protocol")
+            raise ValueError(f"Can't ingest '{dataset_info}': nansat can't open remote ftp files")
 
         # Open file with Nansat
         nansat_object = Nansat(nansat_filename(dataset_info), log_level=self.LOGGER.level, **nansat_options)
@@ -643,10 +642,8 @@ class NansatIngester(Ingester):
                         for dataset_param in json_loads_result
                     ]
             else:
-                self.LOGGER.error(
-                    "'dataset_parameters' section of metadata is not a json-dumped python list",
-                    exc_info=True)
                 raise TypeError(
-                    "'dataset_parameters' section of metadata is not a json-dumped python list")
+                    f"Can't ingest '{dataset_info}': the 'dataset_parameters' section of the "
+                    "metadata returned by nansat is not a JSON list")
 
         return normalized_attributes

@@ -270,7 +270,6 @@ class HTMLDirectoryCrawler(WebDirectoryCrawler):
     """Implementation of WebDirectoryCrawler for repositories exposed as HTML pages."""
 
     FOLDERS_SUFFIXES = None
-    FILES_SUFFIXES = None
 
     @staticmethod
     def _strip_folder_page(folder_path):
@@ -319,7 +318,6 @@ class OpenDAPCrawler(HTMLDirectoryCrawler):
     """
     LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
     FOLDERS_SUFFIXES = ('/contents.html',)
-    FILES_SUFFIXES = ('.nc', '.nc.gz')
     EXCLUDE = re.compile(r'\?')
 
 

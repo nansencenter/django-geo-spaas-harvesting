@@ -91,8 +91,11 @@ The properties which are common to every harvester are:
 
 The rest depends on the harvester and will be detailed in each harvester's documentation.
 
-- **time_range** (optional): a two-elements list containing two date strings which define a time
-  range to which the crawler will be limited.
+- **time_range** (optional): for harvesters which inherit from `WebDirectoryHarvester`. A
+  two-elements list containing two date strings which define a time range to which the crawler will
+  be limited.
+- **include** (optional): for harvesters which inherit from `WebDirectoryHarvester`. A regular
+  expression matching the path of the files to include in the harvested repository.
 
 ## Design
 
