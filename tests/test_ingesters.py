@@ -1084,14 +1084,27 @@ class NetCDFIngesterTestCase(django.test.TestCase):
         """_get_normalized_attributes() should use metanorm to
         normalize the raw attributes
         """
-        raw_attributes = {
-            'attr1': 'value1',
-            'attr2': 'value2'
-        }
-        with mock.patch.object(self.ingester, '_get_raw_attributes', return_value=raw_attributes), \
+        with mock.patch.object(self.ingester, '_get_raw_attributes'), \
              mock.patch.object(self.ingester, '_metadata_handler') as mock_metadata_handler:
-            self.ingester._get_normalized_attributes('/foo/bar.nc')
-        mock_metadata_handler.get_parameters.assert_called_with(raw_attributes)
+            mock_metadata_handler.get_parameters.return_value = {'param': 'value'}
+            # Local path
+            self.assertDictEqual(
+                self.ingester._get_normalized_attributes('/foo/bar.nc'),
+                {
+                    'param': 'value',
+                    'geospaas_service': ingesters.LOCAL_FILE_SERVICE,
+                    'geospaas_service_name': ingesters.FILE_SERVICE_NAME
+                }
+            )
+            # HTTP URL
+            self.assertDictEqual(
+                self.ingester._get_normalized_attributes('http://foo/bar.nc'),
+                {
+                    'param': 'value',
+                    'geospaas_service': ingesters.HTTP_SERVICE,
+                    'geospaas_service_name': ingesters.HTTP_SERVICE_NAME
+                }
+            )
 
 
 class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
