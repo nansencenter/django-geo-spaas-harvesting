@@ -24,6 +24,7 @@ import geospaas_harvesting.ingesters as ingesters
 from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
 
+
 class IngesterTestCase(django.test.TransactionTestCase):
     """Test the base ingester class"""
 
