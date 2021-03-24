@@ -521,6 +521,23 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(output_url, ingester.prepare_url(input_url))
 
 
+class ThreddsIngesterTestCase(django.test.TestCase):
+    """Test the ThreddsIngester"""
+
+    def test_prepare_url(self):
+        """Should return a DDX URL from a Thredds URL, or raise a
+        ValueError if the URL is invalid
+        """
+        self.assertEqual(
+            ingesters.ThreddsIngester.prepare_url(
+                'https://foo.com/thredds/fileServer/bar/baz/dataset.nc'),
+            'https://foo.com/thredds/dodsC/bar/baz/dataset.nc.ddx'
+        )
+
+        with self.assertRaises(ValueError):
+            ingesters.ThreddsIngester.prepare_url('Https://foo/bar.nc')
+
+
 class CopernicusODataIngesterTestCase(django.test.TestCase):
     """Test the CopernicusODataIngester"""
     fixtures = [os.path.join(os.path.dirname(__file__), "fixtures", "harvest")]
