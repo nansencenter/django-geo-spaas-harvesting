@@ -215,6 +215,6 @@ class LOCALHarvester(WebDirectoryHarvester):
     ingester = ingesters.NansatIngester
 
 
-class OneDimensionNetCDFLocalHarvester(LOCALHarvester):
+class NetCDFLocalHarvester(LOCALHarvester):
     """Harvester class for one-dimensional NetCDF file hosted locally"""
-    ingester = ingesters.OneDimensionNetCDFIngester
+    ingester = ingesters.NetCDFIngester

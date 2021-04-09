@@ -1048,11 +1048,6 @@ class NetCDFIngesterTestCase(django.test.TestCase):
 
         self.ingester = ingesters.NetCDFIngester()
 
-    def test_abstract_get_geometry_wkt(self):
-        """_get_geometry_wkt() should raise a NotImplementedError()"""
-        with self.assertRaises(NotImplementedError):
-            self.ingester._get_geometry_wkt(None)
-
     def test_get_raw_attributes(self):
         """Test reading raw attributes from a netCDF file"""
         attributes = {
@@ -1124,16 +1119,6 @@ class NetCDFIngesterTestCase(django.test.TestCase):
                 }
             )
 
-
-class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
-    """Test the OneDimensionNetCDFIngester"""
-
-    def setUp(self):
-        mock.patch('geospaas_harvesting.ingesters.Parameter.objects.count', return_value=2).start()
-        self.addCleanup(mock.patch.stopall)
-
-        self.ingester = ingesters.OneDimensionNetCDFIngester()
-
     def test_get_trajectory(self):
         """Test getting a trajectory from a netCDF dataset"""
         mock_dataset = mock.Mock()
@@ -1172,18 +1157,6 @@ class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
             self.ingester._get_geometry_wkt(mock_dataset),
             'POINT (1 2)'
         )
-
-    def test_error_on_multidimensional_data(self):
-        """An error should be raised if the dataset is
-        multi-dimensional.
-        """
-        mock_dataset = mock.Mock()
-        mock_dataset.variables = {
-            'LONGITUDE': np.array(((1, 2, 3), (4, 5, 6))),
-            'LATITUDE': np.array(((1, 2, 4),  (7, 9, 6)))
-        }
-        with self.assertRaises(ValueError):
-            self.ingester._get_geometry_wkt(mock_dataset)
 
     def test_error_on_misshaped_lon_lat(self):
         """An error should be raised if the dataset has longitude and
