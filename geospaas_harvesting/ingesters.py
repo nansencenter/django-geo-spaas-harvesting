@@ -530,24 +530,45 @@ class NetCDFIngester(MetanormIngester):
         longitudes = dataset.variables[self.longitude_attribute]
         latitudes = dataset.variables[self.latitude_attribute]
 
-        if longitudes.shape != latitudes.shape:
-            raise ValueError("The longitude and latitude have different shapes")
+        lonlat_dependent_data = False
+        for nc_variable_name, nc_variable_value in dataset.variables.items():
+            if (nc_variable_name not in dataset.dimensions
+                    and self.longitude_attribute in nc_variable_value.dimensions
+                    and self.latitude_attribute in nc_variable_value.dimensions):
+                lonlat_dependent_data = True
+                break
 
-        points = []
-        for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
-            new_point = Point(float(lon), float(lat), srid=4326)
-            # Don't add duplicate points
-            # Mainly useful for trajectories
-            if not points or new_point != points[-1]:
-                points.append(new_point)
-
-        if len(longitudes.shape) == 1:
-            if len(points) == 1:
-                geometry = points[0]
-            else:
-                geometry = LineString(points, srid=4326)
-        else:
+        # If at least a variable is dependent on latitude and
+        # longitude, the longitude and latitude arrays are combined to
+        # find all the data points
+        if lonlat_dependent_data:
+            points = []
+            for lon in longitudes:
+                for lat in latitudes:
+                    points.append(Point(float(lon), float(lat), srid=4326))
             geometry = MultiPoint(points, srid=4326).convex_hull
+        # If the longitude and latitude variables have the same shape,
+        # we assume that they contain the coordinates for each data
+        # point
+        elif longitudes.shape == latitudes.shape:
+            points = []
+            # in this case numpy.nditer() works like zip() for
+            # multi-dimensional arrays
+            for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
+                new_point = Point(float(lon), float(lat), srid=4326)
+                # Don't add duplicate points in trajectories
+                if not points or new_point != points[-1]:
+                    points.append(new_point)
+
+            if len(longitudes.shape) == 1:
+                if len(points) == 1:
+                    geometry = points[0]
+                else:
+                    geometry = LineString(points, srid=4326)
+            else:
+                geometry = MultiPoint(points, srid=4326).convex_hull
+        else:
+            raise ValueError("Could not determine the spatial coverage")
 
         return geometry.wkt
 
