@@ -500,8 +500,8 @@ class CreodiasEOFinderIngester(MetanormIngester):
 
 
 class URLNameIngester(MetanormIngester):
-    """ Ingester class using FTP to read meta-data from the name of the dataset """
-    LOGGER = logging.getLogger(__name__ + '.FTPIngester')
+    """Ingester class which associates hard-coded data to known URLs"""
+    LOGGER = logging.getLogger(__name__ + '.URLNameIngester')
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Gets dataset attributes using ftp"""
@@ -543,7 +543,16 @@ class NetCDFIngester(MetanormIngester):
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         raw_attributes = self._get_raw_attributes(dataset_info)
-        return self._metadata_handler.get_parameters(raw_attributes)
+        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
+
+        if dataset_info.startswith('http'):
+            normalized_attributes['geospaas_service'] = HTTP_SERVICE
+            normalized_attributes['geospaas_service_name'] = HTTP_SERVICE_NAME
+        else:
+            normalized_attributes['geospaas_service'] = LOCAL_FILE_SERVICE
+            normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
+
+        return normalized_attributes
 
 
 class OneDimensionNetCDFIngester(NetCDFIngester):

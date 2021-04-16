@@ -24,6 +24,7 @@ import geospaas_harvesting.ingesters as ingesters
 from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
 
+
 class IngesterTestCase(django.test.TransactionTestCase):
     """Test the base ingester class"""
 
@@ -518,6 +519,23 @@ class DDXIngesterTestCase(django.test.TestCase):
         output_url = 'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/amsr2_conc/2019/11/ice_conc_nh_polstere-100_amsr2_201911011200.nc.ddx'
         ingester = ingesters.DDXIngester()
         self.assertEqual(output_url, ingester.prepare_url(input_url))
+
+
+class ThreddsIngesterTestCase(django.test.TestCase):
+    """Test the ThreddsIngester"""
+
+    def test_prepare_url(self):
+        """Should return a DDX URL from a Thredds URL, or raise a
+        ValueError if the URL is invalid
+        """
+        self.assertEqual(
+            ingesters.ThreddsIngester.prepare_url(
+                'https://foo.com/thredds/fileServer/bar/baz/dataset.nc'),
+            'https://foo.com/thredds/dodsC/bar/baz/dataset.nc.ddx'
+        )
+
+        with self.assertRaises(ValueError):
+            ingesters.ThreddsIngester.prepare_url('Https://foo/bar.nc')
 
 
 class CopernicusODataIngesterTestCase(django.test.TestCase):
@@ -1084,14 +1102,27 @@ class NetCDFIngesterTestCase(django.test.TestCase):
         """_get_normalized_attributes() should use metanorm to
         normalize the raw attributes
         """
-        raw_attributes = {
-            'attr1': 'value1',
-            'attr2': 'value2'
-        }
-        with mock.patch.object(self.ingester, '_get_raw_attributes', return_value=raw_attributes), \
+        with mock.patch.object(self.ingester, '_get_raw_attributes'), \
              mock.patch.object(self.ingester, '_metadata_handler') as mock_metadata_handler:
-            self.ingester._get_normalized_attributes('/foo/bar.nc')
-        mock_metadata_handler.get_parameters.assert_called_with(raw_attributes)
+            mock_metadata_handler.get_parameters.return_value = {'param': 'value'}
+            # Local path
+            self.assertDictEqual(
+                self.ingester._get_normalized_attributes('/foo/bar.nc'),
+                {
+                    'param': 'value',
+                    'geospaas_service': ingesters.LOCAL_FILE_SERVICE,
+                    'geospaas_service_name': ingesters.FILE_SERVICE_NAME
+                }
+            )
+            # HTTP URL
+            self.assertDictEqual(
+                self.ingester._get_normalized_attributes('http://foo/bar.nc'),
+                {
+                    'param': 'value',
+                    'geospaas_service': ingesters.HTTP_SERVICE,
+                    'geospaas_service_name': ingesters.HTTP_SERVICE_NAME
+                }
+            )
 
 
 class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
