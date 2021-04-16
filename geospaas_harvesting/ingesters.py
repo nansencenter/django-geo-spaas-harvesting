@@ -602,7 +602,9 @@ class NansatIngester(Ingester):
             raise ValueError(f"Can't ingest '{dataset_info}': nansat can't open remote ftp files")
 
         # Open file with Nansat
-        nansat_object = Nansat(nansat_filename(dataset_info), **nansat_options)
+        nansat_object = Nansat(nansat_filename(dataset_info),
+                               log_level=self.LOGGER.getEffectiveLevel(),
+                               **nansat_options)
 
         # get metadata from Nansat and get objects from vocabularies
         n_metadata = nansat_object.get_metadata()
