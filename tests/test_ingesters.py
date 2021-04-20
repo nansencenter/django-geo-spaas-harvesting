@@ -1053,7 +1053,7 @@ class NetCDFIngesterTestCase(django.test.TestCase):
             super().__init__(*args, **kwargs)
             self._data = np.array(data)
             self.shape = self._data.shape
-            self.dimensions = {}
+            self.dimensions = kwargs.get('dimensions', {})
 
         def __iter__(self):
             """Make the class iterable"""
@@ -1180,10 +1180,66 @@ class NetCDFIngesterTestCase(django.test.TestCase):
             'POINT (1 2)'
         )
 
-    def test_error_on_misshaped_lon_lat(self):
+    def test_get_polygon_from_coordinates_lists(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are multi-dimensional and of the same
+        shape
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((
+                (1, 1, 2),
+                (2, 0, 3),
+            )),
+            'LATITUDE': self.MockVariable((
+                (1, 2, 3),
+                (4, 0, 4),
+            ))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((0 0, 2 4, 3 4, 1 1, 0 0))'
+        )
+
+    def test_get_polygon_from_1d_lon_lat(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are one-dimensional and of different
+        shapes
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 2, 3)),
+            'LATITUDE': self.MockVariable((1, 2)),
+            'DATA': self.MockVariable('some_data', dimensions=('LONGITUDE', 'LATITUDE'))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((1 1, 1 2, 3 2, 3 1, 1 1))'
+        )
+
+    def test_get_polygon_from_1d_lon_lat_same_shape(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are one-dimensional and have the same
+        shape
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 2)),
+            'LATITUDE': self.MockVariable((1, 2)),
+            'DATA': self.MockVariable('some_data', dimensions=('LONGITUDE', 'LATITUDE'))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((1 1, 1 2, 2 2, 2 1, 1 1))'
+        )
+
+    def test_error_on_unsupported_case(self):
         """An error should be raised if the dataset has longitude and
-        latitude arrays of different lengths and no variable dependent
-        on latitude and longitude
+        latitude arrays of different lengths and no variable is
+        dependent on latitude and longitude
         """
         mock_dataset = mock.Mock()
         mock_dataset.dimensions = {}
