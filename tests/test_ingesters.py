@@ -1048,6 +1048,25 @@ class NetCDFIngesterTestCase(django.test.TestCase):
 
         self.ingester = ingesters.NetCDFIngester()
 
+    class MockVariable(mock.Mock):
+        def __init__(self, data, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._data = np.array(data)
+            self.shape = self._data.shape
+            self.dimensions = {}
+
+        def __iter__(self):
+            """Make the class iterable"""
+            return iter(self._data)
+
+        def __getitem__(self, i):
+            """Make the class subscriptable"""
+            return self._data[i]
+
+        def __array__(self, *args, **kwargs):
+            """Make the class numpy-array-like"""
+            return self._data
+
     def test_get_raw_attributes(self):
         """Test reading raw attributes from a netCDF file"""
         attributes = {
@@ -1122,9 +1141,10 @@ class NetCDFIngesterTestCase(django.test.TestCase):
     def test_get_trajectory(self):
         """Test getting a trajectory from a netCDF dataset"""
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 3, 5)),
-            'LATITUDE': np.array((2, 4, 6))
+            'LONGITUDE': self.MockVariable((1, 3, 5)),
+            'LATITUDE': self.MockVariable((2, 4, 6))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
@@ -1135,9 +1155,10 @@ class NetCDFIngesterTestCase(django.test.TestCase):
         """Test getting a WKT point when the shape of the latitude and
         longitude is (1,)"""
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1,)),
-            'LATITUDE': np.array((2,))
+            'LONGITUDE': self.MockVariable((1,)),
+            'LATITUDE': self.MockVariable((2,))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
@@ -1149,9 +1170,10 @@ class NetCDFIngesterTestCase(django.test.TestCase):
         multiple times in the dataset
         """
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 1, 1)),
-            'LATITUDE': np.array((2, 2, 2))
+            'LONGITUDE': self.MockVariable((1, 1, 1)),
+            'LATITUDE': self.MockVariable((2, 2, 2))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
@@ -1160,12 +1182,14 @@ class NetCDFIngesterTestCase(django.test.TestCase):
 
     def test_error_on_misshaped_lon_lat(self):
         """An error should be raised if the dataset has longitude and
-        latitude arrays of different lengths.
+        latitude arrays of different lengths and no variable dependent
+        on latitude and longitude
         """
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 2, 3, 4)),
-            'LATITUDE': np.array((1, 2, 4))
+            'LONGITUDE': self.MockVariable((1, 1, 1, 1)),
+            'LATITUDE': self.MockVariable((2, 2, 2))
         }
         with self.assertRaises(ValueError):
             self.ingester._get_geometry_wkt(mock_dataset)
