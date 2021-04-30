@@ -24,15 +24,15 @@ class TrustDomainSession(requests.Session):
             return super().should_strip_auth(old_url, new_url)
 
 
-def http_get(*args, **kwargs):
-    """Wrapper around requests.get() which runs the HTTP request inside
-    a session if authentication is provided. This makes it possible to
-    follow redirections inside the same domain.
+def http_request(http_method, *args, **kwargs):
+    """Wrapper around requests.request() which runs the HTTP request
+    inside a TrustDomainSession if authentication is provided. This
+    makes it possible to follow redirections inside the same domain.
     """
     auth = kwargs.pop('auth', None)
     if auth:
         with TrustDomainSession() as session:
             session.auth = auth
-            return session.get(*args, **kwargs)
+            return session.request(http_method, *args, **kwargs)
     else:
-        return requests.get(*args, **kwargs)
+        return requests.request(http_method, *args, **kwargs)

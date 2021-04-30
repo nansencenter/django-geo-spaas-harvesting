@@ -28,24 +28,24 @@ class UtilsTestCase(unittest.TestCase):
             self.assertTrue(session.should_strip_auth('https://scihub.copernicus.eu/foo/bar',
                                                       'https://foo.com/bar'))
 
-    def test_http_get_with_auth(self):
+    def test_http_request_with_auth(self):
         """If the `auth` argument is provided, the request should be
         executed inside a TrustDomainSession
         """
-        with mock.patch('requests.Session.get', return_value='response') as mock_get:
+        with mock.patch('requests.Session.request', return_value='response') as mock_request:
             self.assertEqual(
-                utils.http_get('url', stream=False, auth=('username', 'password')),
+                utils.http_request('GET', 'url', stream=False, auth=('username', 'password')),
                 'response'
             )
-            mock_get.assert_called_once_with('url', stream=False)
+            mock_request.assert_called_once_with('GET', 'url', stream=False)
 
-    def test_http_get_without_auth(self):
+    def test_http_request_without_auth(self):
         """If the `auth` argument is not provided, the request should
         simply be executed using requests.get()
         """
-        with mock.patch('requests.get', return_value='response') as mock_get:
+        with mock.patch('requests.request', return_value='response') as mock_request:
             self.assertEqual(
-                utils.http_get('url', stream=True),
+                utils.http_request('GET', 'url', stream=True),
                 'response'
             )
-            mock_get.assert_called_once_with('url', stream=True)
+            mock_request.assert_called_once_with('GET', 'url', stream=True)

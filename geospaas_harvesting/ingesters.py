@@ -408,7 +408,7 @@ class DDXIngester(MetanormIngester):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
         prepared_url = self.prepare_url(dataset_info)
         # Get the metadata from the dataset as an XML tree
-        stream = io.BytesIO(utils.http_get(prepared_url, stream=True).content)
+        stream = io.BytesIO(utils.http_request('GET', prepared_url, stream=True).content)
         # Get all the global attributes of the Dataset into a dictionary
         extracted_attributes = self._extract_attributes(
             ET.parse(stream).getroot())
@@ -457,7 +457,8 @@ class CopernicusODataIngester(MetanormIngester):
         """Get the raw JSON metadata from a Copernicus OData URL"""
         try:
             metadata_url = self._build_metadata_url(url)
-            stream = utils.http_get(metadata_url, auth=self._credentials, stream=True).content
+            stream = utils.http_request(
+                'GET', metadata_url, auth=self._credentials, stream=True).content
         except (requests.exceptions.RequestException, ValueError):
             self.LOGGER.error("Could not get metadata for the dataset located at '%s'", url,
                               exc_info=True)
