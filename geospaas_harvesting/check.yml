@@ -3,6 +3,10 @@ scihub:
   url: 'https://scihub.copernicus.eu/'
   username: !ENV 'COPERNICUS_OPEN_HUB_USERNAME'
   password: !ENV 'COPERNICUS_OPEN_HUB_PASSWORD'
+apihub:
+  url: 'https://apihub.copernicus.eu/'
+  username: !ENV 'COPERNICUS_OPEN_HUB_USERNAME'
+  password: !ENV 'COPERNICUS_OPEN_HUB_PASSWORD'
 podaac:
   url: 'https://opendap.jpl.nasa.gov/opendap/'
 cmems:
