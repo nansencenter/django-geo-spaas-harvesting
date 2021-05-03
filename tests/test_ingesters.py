@@ -1048,10 +1048,24 @@ class NetCDFIngesterTestCase(django.test.TestCase):
 
         self.ingester = ingesters.NetCDFIngester()
 
-    def test_abstract_get_geometry_wkt(self):
-        """_get_geometry_wkt() should raise a NotImplementedError()"""
-        with self.assertRaises(NotImplementedError):
-            self.ingester._get_geometry_wkt(None)
+    class MockVariable(mock.Mock):
+        def __init__(self, data, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._data = np.array(data)
+            self.shape = self._data.shape
+            self.dimensions = kwargs.get('dimensions', {})
+
+        def __iter__(self):
+            """Make the class iterable"""
+            return iter(self._data)
+
+        def __getitem__(self, i):
+            """Make the class subscriptable"""
+            return self._data[i]
+
+        def __array__(self, *args, **kwargs):
+            """Make the class numpy-array-like"""
+            return self._data
 
     def test_get_raw_attributes(self):
         """Test reading raw attributes from a netCDF file"""
@@ -1124,22 +1138,13 @@ class NetCDFIngesterTestCase(django.test.TestCase):
                 }
             )
 
-
-class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
-    """Test the OneDimensionNetCDFIngester"""
-
-    def setUp(self):
-        mock.patch('geospaas_harvesting.ingesters.Parameter.objects.count', return_value=2).start()
-        self.addCleanup(mock.patch.stopall)
-
-        self.ingester = ingesters.OneDimensionNetCDFIngester()
-
     def test_get_trajectory(self):
         """Test getting a trajectory from a netCDF dataset"""
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 3, 5)),
-            'LATITUDE': np.array((2, 4, 6))
+            'LONGITUDE': self.MockVariable((1, 3, 5)),
+            'LATITUDE': self.MockVariable((2, 4, 6))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
@@ -1150,9 +1155,10 @@ class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
         """Test getting a WKT point when the shape of the latitude and
         longitude is (1,)"""
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1,)),
-            'LATITUDE': np.array((2,))
+            'LONGITUDE': self.MockVariable((1,)),
+            'LATITUDE': self.MockVariable((2,))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
@@ -1164,35 +1170,82 @@ class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
         multiple times in the dataset
         """
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 1, 1)),
-            'LATITUDE': np.array((2, 2, 2))
+            'LONGITUDE': self.MockVariable((1, 1, 1)),
+            'LATITUDE': self.MockVariable((2, 2, 2))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
             'POINT (1 2)'
         )
 
-    def test_error_on_multidimensional_data(self):
-        """An error should be raised if the dataset is
-        multi-dimensional.
+    def test_get_polygon_from_coordinates_lists(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are multi-dimensional and of the same
+        shape
         """
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array(((1, 2, 3), (4, 5, 6))),
-            'LATITUDE': np.array(((1, 2, 4),  (7, 9, 6)))
+            'LONGITUDE': self.MockVariable((
+                (1, 1, 2),
+                (2, 0, 3),
+            )),
+            'LATITUDE': self.MockVariable((
+                (1, 2, 3),
+                (4, 0, 4),
+            ))
         }
-        with self.assertRaises(ValueError):
-            self.ingester._get_geometry_wkt(mock_dataset)
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((0 0, 2 4, 3 4, 1 1, 0 0))'
+        )
 
-    def test_error_on_misshaped_lon_lat(self):
-        """An error should be raised if the dataset has longitude and
-        latitude arrays of different lengths.
+    def test_get_polygon_from_1d_lon_lat(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are one-dimensional and of different
+        shapes
         """
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 2, 3, 4)),
-            'LATITUDE': np.array((1, 2, 4))
+            'LONGITUDE': self.MockVariable((1, 2, 3)),
+            'LATITUDE': self.MockVariable((1, 2)),
+            'DATA': self.MockVariable('some_data', dimensions=('LONGITUDE', 'LATITUDE'))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((1 1, 1 2, 3 2, 3 1, 1 1))'
+        )
+
+    def test_get_polygon_from_1d_lon_lat_same_shape(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are one-dimensional and have the same
+        shape
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 2)),
+            'LATITUDE': self.MockVariable((1, 2)),
+            'DATA': self.MockVariable('some_data', dimensions=('LONGITUDE', 'LATITUDE'))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((1 1, 1 2, 2 2, 2 1, 1 1))'
+        )
+
+    def test_error_on_unsupported_case(self):
+        """An error should be raised if the dataset has longitude and
+        latitude arrays of different lengths and no variable is
+        dependent on latitude and longitude
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 1, 1, 1)),
+            'LATITUDE': self.MockVariable((2, 2, 2))
         }
         with self.assertRaises(ValueError):
             self.ingester._get_geometry_wkt(mock_dataset)

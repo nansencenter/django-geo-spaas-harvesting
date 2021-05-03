@@ -16,9 +16,10 @@ import dateutil.parser
 import django.db
 import django.db.utils
 import netCDF4
+import numpy as np
 import requests
 from dateutil.tz import tzutc
-from django.contrib.gis.geos import GEOSGeometry, LineString
+from django.contrib.gis.geos import GEOSGeometry, LineString, MultiPoint
 from django.contrib.gis.geos.point import Point
 
 import pythesint as pti
@@ -519,10 +520,57 @@ class NetCDFIngester(MetanormIngester):
     local or remote (if the remote repository supports it).
     """
 
+    def __init__(self, max_fetcher_threads=1, max_db_threads=1,
+                 longitude_attribute='LONGITUDE', latitude_attribute='LATITUDE'):
+        super().__init__(max_fetcher_threads, max_db_threads)
+        self.longitude_attribute = longitude_attribute
+        self.latitude_attribute = latitude_attribute
+
     def _get_geometry_wkt(self, dataset):
-        """Extracts the WKT string for the dataset's spatial coverage
-        """
-        raise NotImplementedError()
+        longitudes = dataset.variables[self.longitude_attribute]
+        latitudes = dataset.variables[self.latitude_attribute]
+
+        lonlat_dependent_data = False
+        for nc_variable_name, nc_variable_value in dataset.variables.items():
+            if (nc_variable_name not in dataset.dimensions
+                    and self.longitude_attribute in nc_variable_value.dimensions
+                    and self.latitude_attribute in nc_variable_value.dimensions):
+                lonlat_dependent_data = True
+                break
+
+        # If at least a variable is dependent on latitude and
+        # longitude, the longitude and latitude arrays are combined to
+        # find all the data points
+        if lonlat_dependent_data:
+            points = []
+            for lon in longitudes:
+                for lat in latitudes:
+                    points.append(Point(float(lon), float(lat), srid=4326))
+            geometry = MultiPoint(points, srid=4326).convex_hull
+        # If the longitude and latitude variables have the same shape,
+        # we assume that they contain the coordinates for each data
+        # point
+        elif longitudes.shape == latitudes.shape:
+            points = []
+            # in this case numpy.nditer() works like zip() for
+            # multi-dimensional arrays
+            for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
+                new_point = Point(float(lon), float(lat), srid=4326)
+                # Don't add duplicate points in trajectories
+                if not points or new_point != points[-1]:
+                    points.append(new_point)
+
+            if len(longitudes.shape) == 1:
+                if len(points) == 1:
+                    geometry = points[0]
+                else:
+                    geometry = LineString(points, srid=4326)
+            else:
+                geometry = MultiPoint(points, srid=4326).convex_hull
+        else:
+            raise ValueError("Could not determine the spatial coverage")
+
+        return geometry.wkt
 
     def _get_raw_attributes(self, dataset_path):
         """Get the raw metadata from the NetCDF file"""
@@ -553,41 +601,6 @@ class NetCDFIngester(MetanormIngester):
             normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
 
         return normalized_attributes
-
-
-class OneDimensionNetCDFIngester(NetCDFIngester):
-    """NetCDF ingester able to extract one-dimensional geographic
-    locations"""
-
-    def __init__(self, max_fetcher_threads=1, max_db_threads=1,
-                 longitude_attribute='LONGITUDE', latitude_attribute='LATITUDE'):
-        super().__init__(max_fetcher_threads, max_db_threads)
-        self.longitude_attribute = longitude_attribute
-        self.latitude_attribute = latitude_attribute
-
-    def _get_geometry_wkt(self, dataset):
-        longitudes = dataset.variables[self.longitude_attribute]
-        latitudes = dataset.variables[self.latitude_attribute]
-
-        if not len(longitudes.shape) == len(latitudes.shape) == 1:
-            raise ValueError("This ingester should only be used for one-dimensional data")
-
-        if longitudes.shape[0] != latitudes.shape[0]:
-            raise ValueError("The longitude and latitude have different shapes")
-
-        points_number = longitudes.shape[0]
-
-        points = []
-        for i in range(points_number):
-            new_point = Point(float(longitudes[i]), float(latitudes[i]))
-            if not points or new_point != points[-1]:
-                points.append(new_point)
-
-        if len(points) == 1:
-            return Point(float(longitudes[0]), float(latitudes[0])).wkt
-        else:
-            trajectory = LineString(points, srid=4326)
-            return trajectory.wkt
 
 
 class NansatIngester(Ingester):
