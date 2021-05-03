@@ -393,8 +393,11 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             'file_path': None}
     }
 
-    def requests_get_side_effect(self, url):
+    def request_side_effect(self, method, url):
         """Side effect function used to mock calls to requests.get().text"""
+        if method != 'GET':
+            return None
+
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
             if url in test_data['urls']:
@@ -417,16 +420,16 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         return response
 
     def setUp(self):
-        # Mock requests.get()
-        self.patcher_requests_get = mock.patch.object(crawlers.requests, 'get')
-        self.mock_requests_get = self.patcher_requests_get.start()
-        self.mock_requests_get.side_effect = self.requests_get_side_effect
+        # Mock requests.request()
+        self.patcher_request = mock.patch.object(crawlers.requests, 'request')
+        self.mock_request = self.patcher_request.start()
+        self.mock_request.side_effect = self.request_side_effect
 
         # Initialize a list of opened files which will be closed in tearDown()
         self.opened_files = []
 
     def tearDown(self):
-        self.patcher_requests_get.stop()
+        self.patcher_request.stop()
         # Close any files opened during the test
         for opened_file in self.opened_files:
             opened_file.close()

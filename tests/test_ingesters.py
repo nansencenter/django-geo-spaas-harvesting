@@ -323,8 +323,10 @@ class DDXIngesterTestCase(django.test.TestCase):
             'file_path': "data/opendap/ddx_no_ns.xml"},
     }
 
-    def requests_get_side_effect(self, url, **kwargs):
+    def request_side_effect(self, method, url, **kwargs):
         """Side effect function used to mock calls to requests.get().text"""
+        if method != 'GET':
+            return None
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
             if url == test_data['url']:
@@ -350,13 +352,13 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.mock_param_count = self.patcher_param_count.start()
         self.mock_param_count.return_value = 2
         # Mock requests.get()
-        self.patcher_requests_get = mock.patch('geospaas_harvesting.ingesters.requests.get')
-        self.mock_requests_get = self.patcher_requests_get.start()
-        self.mock_requests_get.side_effect = self.requests_get_side_effect
+        self.patcher_request = mock.patch('geospaas_harvesting.ingesters.requests.request')
+        self.mock_request = self.patcher_request.start()
+        self.mock_request.side_effect = self.request_side_effect
         self.opened_files = []
 
     def tearDown(self):
-        self.patcher_requests_get.stop()
+        self.patcher_request.stop()
         self.patcher_param_count.stop()
         # Close any files opened during the test
         for opened_file in self.opened_files:
@@ -547,8 +549,10 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
             'file_path': "data/copernicus_opensearch/full.json"}
     }
 
-    def requests_get_side_effect(self, url, **kwargs):  # pylint: disable=unused-argument
+    def request_side_effect(self, method, url, **kwargs):  # pylint: disable=unused-argument
         """Side effect function used to mock calls to requests.get().text"""
+        if method != 'GET':
+            return None
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
             if url == test_data['url']:
@@ -573,9 +577,9 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
     def setUp(self):
         self.ingester = ingesters.CopernicusODataIngester()
         # Mock requests.get()
-        self.patcher_requests_get = mock.patch.object(ingesters.requests, 'get')
-        self.mock_requests_get = self.patcher_requests_get.start()
-        self.mock_requests_get.side_effect = self.requests_get_side_effect
+        self.patcher_request = mock.patch.object(ingesters.requests, 'request')
+        self.mock_request = self.patcher_request.start()
+        self.mock_request.side_effect = self.request_side_effect
         self.opened_files = []
 
         self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
@@ -583,7 +587,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.mock_param_count.return_value = 2
 
     def tearDown(self):
-        self.patcher_requests_get.stop()
+        self.patcher_request.stop()
         self.patcher_param_count.stop()
         # Close any files opened during the test
         for opened_file in self.opened_files:
