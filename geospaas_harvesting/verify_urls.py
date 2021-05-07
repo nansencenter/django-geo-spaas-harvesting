@@ -3,7 +3,6 @@ import argparse
 import concurrent.futures
 import logging
 import os
-import sys
 import time
 from contextlib import closing
 from datetime import datetime
