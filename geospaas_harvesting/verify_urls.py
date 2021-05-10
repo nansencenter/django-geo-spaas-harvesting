@@ -134,7 +134,9 @@ def check_url(dataset_uri, auth, throttle=0, tries=5):
 
 
 def write_stale_url(lock, file_name, dataset_uri, auth, throttle=0, tries=5):
-    """Check the `dataset_uri` and write it to the output file if it is not valid"""
+    """Check the `dataset_uri` and write it to the output file if it is
+    not valid. This is the function that runs in the checking threads.
+    """
     is_valid, status_code, dataset_uri_id, url = check_url(
         dataset_uri, auth, throttle=throttle, tries=tries)
 
