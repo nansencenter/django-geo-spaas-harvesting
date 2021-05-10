@@ -190,6 +190,7 @@ def find_provider(url, providers):
     for provider in providers.values():
         if url.startswith(provider['url']):
             return provider
+    return None
 
 
 def remove_dataset_uri(dataset_uri):
@@ -217,7 +218,7 @@ def delete_stale_urls(urls_file_path, providers, force=False):
     with open(urls_file_path, 'r') as urls_file:
         for line in urls_file:
             _, dataset_uri_id, _ = line.split()
-            dataset_uri = DatasetURI.objects.get(id=dataset_uri_id)
+            dataset_uri = DatasetURI.objects.get(id=int(dataset_uri_id))
             provider = find_provider(dataset_uri.uri, providers)
             is_valid, status_code, *_ = check_url(dataset_uri, provider['auth'])
             if not is_valid and (status_code == 404 or force):
