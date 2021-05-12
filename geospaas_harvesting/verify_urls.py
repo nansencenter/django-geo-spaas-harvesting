@@ -44,7 +44,7 @@ class BoundedThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
         try:
             future = super().submit(fn, *args, **kwargs)
         except:
-            # if anything goes, wrong, we need to release the semaphore
+            # if anything goes wrong, we need to release the semaphore
             self.semaphore.release()
             raise
         else:
