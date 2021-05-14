@@ -22,6 +22,7 @@ from geospaas.catalog.models import DatasetURI
 import geospaas_harvesting.utils as utils
 
 logger = logging.getLogger('geospaas_harvesting.verify_urls')
+logger.setLevel(logging.INFO)
 
 
 class TooManyRequests(Exception):
