@@ -3,6 +3,7 @@ import argparse
 import concurrent.futures
 import logging
 import os
+import re
 import time
 from contextlib import closing
 from datetime import datetime
@@ -24,6 +25,7 @@ import geospaas_harvesting.utils as utils
 logger = logging.getLogger('geospaas_harvesting.verify_urls')
 logger.setLevel(logging.INFO)
 
+FTP_MATCHER = re.compile('^ftp://')
 
 class TooManyRequests(Exception):
     """Exception raised when HTTP error 429 is repeatedly received from
@@ -104,14 +106,20 @@ def check_url(dataset_uri, auth, throttle=0, tries=5):
     """Sends an HTTP HEAD request to the URL and returns whether it is
     valid or not
     """
+    # TODO: This is not a particularly clean way to manage FTP URLs
+    # It would be nice to have a separate function to check FTP URLs
+    # eventually
+    uri = FTP_MATCHER.sub('http://', dataset_uri.uri)
+
+    logger.debug("Sending HEAD request to %s", uri)
     while tries:
         tries -= 1
         with closing(utils.http_request(
-                'HEAD', dataset_uri.uri, allow_redirects=True, auth=auth)) as response:
+                'HEAD', uri, allow_redirects=True, auth=auth)) as response:
             status_code = response.status_code
             headers = response.headers
 
-        logger.debug("%d %s", status_code, dataset_uri.uri)
+        logger.debug("%d %s", status_code, uri)
 
         # Too Many Requests: wait and retry
         if status_code == 429:
