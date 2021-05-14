@@ -151,10 +151,22 @@ def check_provider_urls(file_name, url_prefix, auth, throttle=0):
     logger.info("Starting to check %s URLs", url_prefix)
     lock = Lock()
     max_workers = 1 if throttle else 50
+    futures = {}
     with BoundedThreadPoolExecutor(max_workers=max_workers, queue_limit=2000) as thread_executor:
         for dataset_uri in DatasetURI.objects.filter(uri__startswith=url_prefix).iterator():
-            thread_executor.submit(
-                write_stale_url, lock, file_name, dataset_uri, auth, throttle=throttle)
+            futures[thread_executor.submit(
+                write_stale_url,
+                lock,
+                file_name,
+                dataset_uri,
+                auth,
+                throttle=throttle)] = dataset_uri.uri
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                future.result()
+            finally:
+                del futures[future]
     logger.info("Finished checking %s URLs", url_prefix)
 
 
