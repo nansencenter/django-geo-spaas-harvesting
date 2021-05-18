@@ -268,6 +268,7 @@ class VerifyURLsTestCase(unittest.TestCase):
                 mock.patch(
                     'geospaas_harvesting.verify_urls.BoundedThreadPoolExecutor') as mock_pool, \
                 mock.patch('geospaas_harvesting.verify_urls.DatasetURI.objects') as mock_manager, \
+                mock.patch('concurrent.futures.as_completed'), \
                 mock.patch('geospaas_harvesting.verify_urls.write_stale_url') as mock_write:
             mock_executor = mock_pool.return_value.__enter__.return_value
             mock_dataset_uri = mock.Mock()
@@ -290,6 +291,18 @@ class VerifyURLsTestCase(unittest.TestCase):
             mock_executor.submit.assert_called_once_with(
                 mock_write, mock_lock, 'output.txt', mock_dataset_uri, mock_auth, throttle=1)
             mock_pool.assert_called_once_with(max_workers=1, queue_limit=2000)
+
+    def test_check_provider_urls_thread_error(self):
+        """Exceptions happening in the threads should be raised in the
+        main thread
+        """
+        with mock.patch('geospaas_harvesting.verify_urls.write_stale_url') as mock_write, \
+                mock.patch('geospaas_harvesting.verify_urls.DatasetURI.objects') as mock_manager:
+            mock_write.side_effect = ValueError
+            mock_manager.filter.return_value.iterator.return_value = [mock.Mock()]
+            with self.assertRaises(ValueError), \
+                    self.assertLogs(verify_urls.logger, level=logging.INFO):
+                verify_urls.check_provider_urls('out.txt', 'https://foo', None)
 
     def test_write_stale_url_valid(self):
         """Should not write anything to the output file if the URL is
