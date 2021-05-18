@@ -333,12 +333,10 @@ class VerifyURLsTestCase(unittest.TestCase):
         """
         mock_dataset_uri = mock.Mock(id=1, uri='https://foo')
         mock_response = mock.MagicMock(status_code=200, headers={})
-        with mock.patch('geospaas_harvesting.utils.http_request',
-                        return_value=mock_response) as mock_request:
+        with mock.patch('geospaas_harvesting.utils.http_request', return_value=mock_response):
             self.assertTupleEqual(
                 verify_urls.check_url(mock_dataset_uri, mock.Mock()),
-                (True, 200, 1, 'https://foo')
-            )
+                (True, 200, 1, 'https://foo'))
 
     def test_check_url_404(self):
         """Should send a HEAD request to the URL and return whether the
