@@ -409,6 +409,20 @@ class VerifyURLsTestCase(unittest.TestCase):
                 verify_urls.check_url(mock_dataset_uri, mock.Mock(), tries=1)
             mock_request.assert_called_once()
 
+    def test_check_url_ftp(self):
+        """Should convert FTP URLs to HTTP URLs, then send a HEAD
+        request
+        """
+        mock_dataset_uri = mock.Mock(id=1, uri='ftp://foo')
+        mock_response = mock.MagicMock(status_code=200, headers={})
+        with mock.patch('geospaas_harvesting.utils.http_request',
+                        return_value=mock_response) as mock_http_request:
+            self.assertTupleEqual(
+                verify_urls.check_url(mock_dataset_uri, None),
+                (True, 200, 1, 'ftp://foo'))
+            mock_http_request.assert_called_with(
+                'HEAD', 'http://foo', allow_redirects=True, auth=None)
+
     def test_read_config(self):
         """Should read the provider configuration from a YAML file"""
         config = textwrap.dedent('''---
