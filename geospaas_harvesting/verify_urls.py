@@ -1,4 +1,26 @@
-"""URLs verification module"""
+"""URLs verification module
+Usage: verify_urls.py [-h] [-p PROVIDERS_CONF] {check,delete-stale} ...
+
+Check and cleanup dataset URIs.
+
+positional arguments:
+  {check,delete-stale}
+    check               Check all URIs present in the database. Write the
+                        stale URIs to files in the output directory (one file
+                        per provider).
+    delete-stale        Delete the stale URLs present in the file given as
+                        argument. The file should have the same structure as
+                        one obtained by running this script with the --check
+                        optionBy default, only URLs which return an HTTP error
+                        404 are deleted. To override this behaviour and remove
+                        URLs which return any kind of error, use the --force
+                        option.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PROVIDERS_CONF, --providers-conf PROVIDERS_CONF
+                        Path to the providers configuration file.
+"""
 import argparse
 import concurrent.futures
 import logging
