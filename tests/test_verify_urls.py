@@ -220,12 +220,14 @@ class VerifyURLsTestCase(unittest.TestCase):
         """
         scihub_attributes = {
             'url': 'https://scihub.copernicus.eu/',
-            'auth': ('scihub_user', 'scihub_pass'),
+            'username': 'scihub_user',
+            'password': 'scihub_pass',
             'throttle': 0
         }
         podaac_attributes = {
             'url': 'https://opendap.jpl.nasa.gov/opendap/',
-            'auth': ('podaac_user', 'podaac_pass'),
+            'username': 'podaac_user',
+            'password': 'podaac_pass',
             'throttle': 0
         }
 
@@ -245,15 +247,11 @@ class VerifyURLsTestCase(unittest.TestCase):
                 mock.call(
                     mock_check,
                     os.path.join('foo', 'scihub_stale_urls_time.txt'),
-                    scihub_attributes['url'],
-                    scihub_attributes['auth'],
-                    scihub_attributes['throttle']),
+                    **scihub_attributes),
                 mock.call(
                     mock_check,
                     os.path.join('foo', 'podaac_stale_urls_time.txt'),
-                    podaac_attributes['url'],
-                    podaac_attributes['auth'],
-                    podaac_attributes['throttle'])
+                    **podaac_attributes)
             ), any_order=True)
             self.assertEqual(len(mock_executor.submit.call_args_list), 2)
 
@@ -272,25 +270,42 @@ class VerifyURLsTestCase(unittest.TestCase):
                 mock.patch('geospaas_harvesting.verify_urls.write_stale_url') as mock_write:
             mock_executor = mock_pool.return_value.__enter__.return_value
             mock_dataset_uri = mock.Mock()
-            mock_auth = mock.Mock()
             mock_manager.filter.return_value.iterator.return_value = [mock_dataset_uri]
 
             # call without throttle: 50 workers
             with self.assertLogs(verify_urls.logger, level=logging.INFO):
-                verify_urls.check_provider_urls('output.txt', 'https://foo/', mock_auth)
+                verify_urls.check_provider_urls('output.txt', url='https://foo/')
 
             mock_executor.submit.assert_called_once_with(
-                mock_write, mock_lock, 'output.txt', mock_dataset_uri, mock_auth, throttle=0)
+                mock_write, mock_lock, 'output.txt', mock_dataset_uri, None, throttle=0)
             mock_pool.assert_called_once_with(max_workers=50, queue_limit=2000)
 
             mock_pool.reset_mock()
 
             # call with throttle: 1 worker
             with self.assertLogs(verify_urls.logger, level=logging.INFO):
-                verify_urls.check_provider_urls('output.txt', 'https://foo/', mock_auth, throttle=1)
+                verify_urls.check_provider_urls('output.txt', url='https://foo/', throttle=1)
             mock_executor.submit.assert_called_once_with(
-                mock_write, mock_lock, 'output.txt', mock_dataset_uri, mock_auth, throttle=1)
+                mock_write, mock_lock, 'output.txt', mock_dataset_uri, None, throttle=1)
             mock_pool.assert_called_once_with(max_workers=1, queue_limit=2000)
+
+            mock_pool.reset_mock()
+
+            # test that authentication is renewed
+            with self.assertLogs(verify_urls.logger, level=logging.INFO), \
+                    mock.patch('time.monotonic', side_effect=(1, 3)), \
+                    mock.patch('geospaas_harvesting.verify_urls.get_auth',
+                               side_effect=('auth1', 'auth2')):
+                verify_urls.check_provider_urls(
+                    'output.txt',
+                    url='https://foo/',
+                    username='user',
+                    password='pass',
+                    auth_renew=1,
+                    throttle=1)
+            mock_executor.submit.assert_called_once_with(
+                mock_write, mock_lock, 'output.txt', mock_dataset_uri, 'auth2', throttle=1)
+
 
     def test_check_provider_urls_thread_error(self):
         """Exceptions happening in the threads should be raised in the
@@ -302,7 +317,7 @@ class VerifyURLsTestCase(unittest.TestCase):
             mock_manager.filter.return_value.iterator.return_value = [mock.Mock()]
             with self.assertRaises(ValueError), \
                     self.assertLogs(verify_urls.logger, level=logging.INFO):
-                verify_urls.check_provider_urls('out.txt', 'https://foo', None)
+                verify_urls.check_provider_urls('out.txt', url='https://foo')
 
     def test_write_stale_url_valid(self):
         """Should not write anything to the output file if the URL is
@@ -439,6 +454,7 @@ class VerifyURLsTestCase(unittest.TestCase):
           token_url: 'https://auth.creodias.eu/auth/realms/DIAS/protocol/openid-connect/token'
           client_id: 'CLOUDFERRO_PUBLIC'
           throttle: 1
+          auth_renew: 36000
           ''')
         environment = {
             'COPERNICUS_OPEN_HUB_USERNAME': 'copernicus_user',
@@ -449,38 +465,27 @@ class VerifyURLsTestCase(unittest.TestCase):
         # we check that get_auth() is called with the right arguments
         # by replacing its output by its arguments
         with mock.patch('geospaas_harvesting.verify_urls.open', mock.mock_open(read_data=config)), \
-                mock.patch('geospaas_harvesting.verify_urls.get_auth',
-                           side_effect=lambda args: args), \
                 mock.patch('os.environ', environment):
             providers = verify_urls.read_config('foo.yml')
 
         self.assertDictEqual(providers, {
             'podaac': {
                 'url': 'https://opendap.jpl.nasa.gov/opendap/',
-                'auth': {'url': 'https://opendap.jpl.nasa.gov/opendap/'},
-                'throttle': 0
             },
             'scihub': {
                 'url': 'https://scihub.copernicus.eu/',
-                'auth': {
-                    'url': 'https://scihub.copernicus.eu/',
-                    'username': 'copernicus_user',
-                    'password': 'copernicus_password'
-                },
-                'throttle': 0
+                'username': 'copernicus_user',
+                'password': 'copernicus_password'
             },
             'creodias': {
                 'url': 'https://zipper.creodias.eu/',
-                'auth': {
-                    'url': 'https://zipper.creodias.eu/',
-                    'username': 'creodias_user',
-                    'password': 'creodias_password',
-                    'token_url': 'https://auth.creodias.eu/auth/realms/DIAS/protocol/'
-                                 'openid-connect/token',
-                    'client_id': 'CLOUDFERRO_PUBLIC',
-                    'throttle': 1
-                },
-                'throttle': 1
+                'username': 'creodias_user',
+                'password': 'creodias_password',
+                'token_url': 'https://auth.creodias.eu/auth/realms/DIAS/protocol/'
+                                'openid-connect/token',
+                'client_id': 'CLOUDFERRO_PUBLIC',
+                'throttle': 1,
+                'auth_renew': 36000
             },
         })
 

@@ -25,6 +25,7 @@
 #   token_url: 'https://auth.creodias.eu/auth/realms/DIAS/protocol/openid-connect/token'
 #   client_id: 'CLOUDFERRO_PUBLIC'
 #   throttle: 1
+#   auth_renew: 36000
 # noaa_hycom:
 #   url: 'ftp://ftp.opc.ncep.noaa.gov/'
 # ...
