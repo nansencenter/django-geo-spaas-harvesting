@@ -91,15 +91,7 @@ def read_config(config_path):
     with open(config_path, 'r') as config_file:
         config = yaml.safe_load(config_file)
 
-    providers = {}
-    for provider, attributes in config.items():
-        providers[provider] = {
-            'url': attributes['url'],
-            'auth': get_auth(attributes),
-            'throttle': attributes.get('throttle', 0)
-        }
-
-    return providers
+    return config
 
 
 def check_url(dataset_uri, auth, throttle=0, tries=5):
@@ -154,14 +146,26 @@ def write_stale_url(lock, file_name, dataset_uri, auth, throttle=0, tries=5):
             file_handle.write(f"{status_code} {dataset_uri_id} {url}{os.linesep}")
 
 
-def check_provider_urls(file_name, url_prefix, auth, throttle=0):
+def check_provider_urls(file_name, **provider_config):
     """Check the URLs for one provider"""
-    logger.info("Starting to check %s URLs", url_prefix)
+
+    url_prefix = provider_config['url']
+    throttle = provider_config.get('throttle', 0)
+    auth_start = time.monotonic()
+    auth = get_auth(provider_config)
+    auth_renew = provider_config.get('auth_renew')
     lock = Lock()
     max_workers = 1 if throttle else 50
     futures = {}
+
+    logger.info("Starting to check %s URLs", url_prefix)
+
     with BoundedThreadPoolExecutor(max_workers=max_workers, queue_limit=2000) as thread_executor:
         for dataset_uri in DatasetURI.objects.filter(uri__startswith=url_prefix).iterator():
+            if auth_renew and time.monotonic() - auth_start >= auth_renew:
+                logging.info("Renewing authentication for %s", provider_config['url'])
+                auth = get_auth(provider_config)
+
             futures[thread_executor.submit(
                 write_stale_url,
                 lock,
@@ -190,9 +194,7 @@ def check_providers(output_directory, providers):
             futures[executor.submit(
                 check_provider_urls,
                 results_file_name,
-                attributes['url'],
-                attributes['auth'],
-                attributes['throttle']
+                **attributes
             )] = attributes['url']
 
         success = True
