@@ -454,7 +454,7 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['instrument']['Class'],
                          'Passive Remote Sensing')
 
-        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'SUOMI-NPP')
+        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'Suomi-NPP')
         self.assertEqual(normalized_parameters['platform']['Long_Name'],
                          'Suomi National Polar-orbiting Partnership')
         self.assertEqual(normalized_parameters['platform']['Category'],
@@ -649,11 +649,11 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['instrument']['Subtype'], '')
         self.assertEqual(normalized_parameters['instrument']['Class'], 'Active Remote Sensing')
 
-        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'SENTINEL-1A')
-        self.assertEqual(normalized_parameters['platform']['Long_Name'], 'SENTINEL-1A')
+        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'Sentinel-1A')
+        self.assertEqual(normalized_parameters['platform']['Long_Name'], 'Sentinel-1A')
         self.assertEqual(normalized_parameters['platform']['Category'],
                          'Earth Observation Satellites')
-        self.assertEqual(normalized_parameters['platform']['Series_Entity'], 'SENTINEL-1')
+        self.assertEqual(normalized_parameters['platform']['Series_Entity'], 'Sentinel-1')
 
         self.assertEqual(normalized_parameters['location_geometry'], GEOSGeometry(
             'MULTIPOLYGON(((' +
@@ -925,9 +925,7 @@ class NansatIngesterTestCase(django.test.TestCase):
                 OrderedDict(
                     [('standard_name', 'surface_backwards_scattering_coefficient_of_radar_wave'),
                      ('canonical_units', '1'),
-                        ('grib', ''),
-                        ('amip', ''),
-                        ('description',
+                     ('definition',
                          'The scattering/absorption/attenuation coefficient is assumed to be an '
                          'integral over all wavelengths, unless a coordinate of '
                          'radiation_wavelength is included to specify the wavelength. Scattering of'
