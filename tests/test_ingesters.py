@@ -977,6 +977,25 @@ class NansatIngesterTestCase(django.test.TestCase):
             "Can't ingest '': the 'dataset_parameters' section of the metadata returned by nansat "
             "is not a JSON list")
 
+    def test_no_dataset_parameters(self):
+        """If no "dataset_parameters" attribute is present in the
+        nansat metadata, normalized_attributes['dataset_parameters']
+        should be set to an empty list
+        """
+        self.mock_get_metadata.return_value.get_metadata.return_value = {
+            'time_coverage_end': '2017-05-27T00:00:00',
+            'time_coverage_start': '2017-05-18T00:00:00',
+            'platform':
+                '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+                '"Long_Name": ""}',
+            'instrument':
+                '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+                '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+                '"Long_Name": "Computer"}'
+        }
+        ingester = ingesters.NansatIngester()
+        self.assertListEqual(ingester._get_normalized_attributes('')['dataset_parameters'], [])
+
     def test_usage_of_nansat_ingester_with_http_protocol_in_the_OPENDAP_cases(self):
         """LOCALHarvester(which uses NansatIngester) can be used for `OPENDAP provided` files """
         ingester = ingesters.NansatIngester()
