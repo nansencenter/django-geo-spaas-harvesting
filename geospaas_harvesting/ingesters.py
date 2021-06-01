@@ -671,5 +671,7 @@ class NansatIngester(Ingester):
                 raise TypeError(
                     f"Can't ingest '{dataset_info}': the 'dataset_parameters' section of the "
                     "metadata returned by nansat is not a JSON list")
+        else:
+            normalized_attributes['dataset_parameters'] = []
 
         return normalized_attributes
