@@ -11,8 +11,8 @@ services:
 
 env:
   global:
-    - BASE_IMAGE_NAME="${DOCKER_ORG}/geospaas:2.3.4-slim"
-    - METANORM_VERSION='3.0.0'
+    - BASE_IMAGE_NAME="${DOCKER_ORG}/geospaas:2.4.0-slim"
+    - METANORM_VERSION='3.1.0'
 
 jobs:
   include:
