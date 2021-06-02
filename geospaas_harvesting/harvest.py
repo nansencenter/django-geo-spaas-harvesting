@@ -11,13 +11,14 @@ import signal
 import sys
 import time
 from datetime import datetime
+
 import django
 import django.db
+import django.core.management
 import yaml
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
-from geospaas.vocabularies.management.commands import update_vocabularies
 import geospaas_harvesting.harvesters as harvesters  # pylint: disable=wrong-import-position
 
 
@@ -38,7 +39,8 @@ class Configuration(collections.abc.Mapping):
         'harvesters',
         'poll_interval',
         'update_vocabularies',
-        'update_pythesint'
+        'update_pythesint',
+        'pythesint_versions'
     ])
     HARVESTER_CLASS_KEY = 'class'
 
@@ -237,7 +239,11 @@ def refresh_vocabularies(config):
     """
     if config.get('update_vocabularies', True):
         LOGGER.info('Updating vocabularies...')
-        update_vocabularies.Command().handle(force=config.get('update_pythesint', False))
+        django.core.management.call_command(
+            'update_vocabularies',
+            force=config.get('update_pythesint', False),
+            versions=config.get('pythesint_versions', None)
+        )
 
 
 def main():

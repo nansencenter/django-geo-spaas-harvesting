@@ -216,8 +216,8 @@ class MainTestCase(TemporaryPersistenceDirTestCase):
     @mock.patch.object(sys, 'argv', ['harvest.py'])
     @mock.patch.object(
         harvest.Configuration, 'DEFAULT_CONFIGURATION_PATH', CONFIGURATION_FILES['ok'])
-    @mock.patch('geospaas.vocabularies.management.commands.update_vocabularies.Command')
-    def test_main_ends_on_workers_exceptions(self, mock_update_vocab):
+    @mock.patch('django.core.management.call_command')
+    def test_main_ends_on_workers_exceptions(self, mock_call_command):
         """The main process must end if all workers finished with exceptions"""
         setattr(harvesters, 'TestHarvester', stubs.StubExceptionHarvester)
         with self.assertLogs(harvest.LOGGER_NAME, level=logging.ERROR) as daemon_logs_cm:
@@ -230,32 +230,49 @@ class MainTestCase(TemporaryPersistenceDirTestCase):
         only if the corresponding setting is True
         """
         config = {'update_vocabularies': True}
-        with mock.patch('geospaas_harvesting.harvest.update_vocabularies') as mock_updater:
+        with mock.patch('django.core.management.call_command') as mock_call_command:
             with self.assertLogs(logger= harvest.LOGGER, level=logging.INFO):
                 harvest.refresh_vocabularies(config)
-            mock_updater.Command.return_value.handle.assert_called_with(force=False)
+            mock_call_command.assert_called_with('update_vocabularies', force=False, versions=None)
 
         config = {'update_vocabularies': False}
-        with mock.patch('geospaas_harvesting.harvest.update_vocabularies') as mock_updater:
+        with mock.patch('django.core.management.call_command') as mock_call_command:
             harvest.refresh_vocabularies(config)
-            mock_updater.Command.return_value.handle.assert_not_called()
+            mock_call_command.assert_not_called()
 
     def test_refresh_vocabularies_and_update_pythesint(self):
         """The database vocabulary objects must be updated and
         pythesint's data refreshed only if the corresponding settings
         are both True
         """
+        # Refresh the database but not the pythesint files
         config = {'update_vocabularies': True, 'update_pythesint': False}
-        with mock.patch('geospaas_harvesting.harvest.update_vocabularies') as mock_updater:
+        with mock.patch('django.core.management.call_command') as mock_call_command:
             with self.assertLogs(logger=harvest.LOGGER, level=logging.INFO):
                 harvest.refresh_vocabularies(config)
-            mock_updater.Command.return_value.handle.assert_called_with(force=False)
+            mock_call_command.assert_called_with('update_vocabularies', force=False, versions=None)
 
+        # Refresh both the database and the pythesint files
         config = {'update_vocabularies': True, 'update_pythesint': True}
-        with mock.patch('geospaas_harvesting.harvest.update_vocabularies') as mock_updater:
+        with mock.patch('django.core.management.call_command') as mock_call_command:
             with self.assertLogs(logger=harvest.LOGGER, level=logging.INFO):
                 harvest.refresh_vocabularies(config)
-            mock_updater.Command.return_value.handle.assert_called_with(force=True)
+            mock_call_command.assert_called_with('update_vocabularies', force=True, versions=None)
+
+        # Refresh both the database and the pythesint files,
+        # specifying versions
+        config = {
+            'update_vocabularies': True,
+            'update_pythesint': True,
+            'pythesint_versions': {'gcmd_instrument': '9.1.5'}
+        }
+        with mock.patch('django.core.management.call_command') as mock_call_command:
+            with self.assertLogs(logger=harvest.LOGGER, level=logging.INFO):
+                harvest.refresh_vocabularies(config)
+            mock_call_command.assert_called_with(
+                'update_vocabularies',
+                force=True,
+                versions={'gcmd_instrument': '9.1.5'})
 
     #TODO
     # def test_interrupt_main_process(self):

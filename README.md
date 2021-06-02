@@ -54,6 +54,9 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
 - **update_pythesint** (default: False): update the local pythesint data before harvesting.
   Note that setting this parameter to `True` will have no effect if **update_vocabularies** is set
   to `False`.
+- **pythesint_versions** (default: None): the pythesint vocabularies versions to use.
+  This is a dictionary in which each key is a pythesint vocabulary name and each value is the
+  corresponding version string.
 - **harvesters**: dictionary mapping the harvesters names to a dictionary containing their
   properties.
 
