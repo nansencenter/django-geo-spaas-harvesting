@@ -16,12 +16,14 @@ import dateutil.parser
 import django.db
 import django.db.utils
 import netCDF4
+import numpy as np
 import requests
 from dateutil.tz import tzutc
-from django.contrib.gis.geos import GEOSGeometry, LineString
+from django.contrib.gis.geos import GEOSGeometry, LineString, MultiPoint
 from django.contrib.gis.geos.point import Point
 
 import pythesint as pti
+import geospaas_harvesting.utils as utils
 from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
                                        HTTP_SERVICE, HTTP_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
@@ -407,7 +409,7 @@ class DDXIngester(MetanormIngester):
         """Get normalized metadata from the DDX info of the dataset located at the provided URL"""
         prepared_url = self.prepare_url(dataset_info)
         # Get the metadata from the dataset as an XML tree
-        stream = io.BytesIO(requests.get(prepared_url, stream=True).content)
+        stream = io.BytesIO(utils.http_request('GET', prepared_url, stream=True).content)
         # Get all the global attributes of the Dataset into a dictionary
         extracted_attributes = self._extract_attributes(
             ET.parse(stream).getroot())
@@ -456,7 +458,8 @@ class CopernicusODataIngester(MetanormIngester):
         """Get the raw JSON metadata from a Copernicus OData URL"""
         try:
             metadata_url = self._build_metadata_url(url)
-            stream = requests.get(metadata_url, auth=self._credentials, stream=True).content
+            stream = utils.http_request(
+                'GET', metadata_url, auth=self._credentials, stream=True).content
         except (requests.exceptions.RequestException, ValueError):
             self.LOGGER.error("Could not get metadata for the dataset located at '%s'", url,
                               exc_info=True)
@@ -500,8 +503,8 @@ class CreodiasEOFinderIngester(MetanormIngester):
 
 
 class URLNameIngester(MetanormIngester):
-    """ Ingester class using FTP to read meta-data from the name of the dataset """
-    LOGGER = logging.getLogger(__name__ + '.FTPIngester')
+    """Ingester class which associates hard-coded data to known URLs"""
+    LOGGER = logging.getLogger(__name__ + '.URLNameIngester')
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Gets dataset attributes using ftp"""
@@ -519,10 +522,57 @@ class NetCDFIngester(MetanormIngester):
     local or remote (if the remote repository supports it).
     """
 
+    def __init__(self, max_fetcher_threads=1, max_db_threads=1,
+                 longitude_attribute='LONGITUDE', latitude_attribute='LATITUDE'):
+        super().__init__(max_fetcher_threads, max_db_threads)
+        self.longitude_attribute = longitude_attribute
+        self.latitude_attribute = latitude_attribute
+
     def _get_geometry_wkt(self, dataset):
-        """Extracts the WKT string for the dataset's spatial coverage
-        """
-        raise NotImplementedError()
+        longitudes = dataset.variables[self.longitude_attribute]
+        latitudes = dataset.variables[self.latitude_attribute]
+
+        lonlat_dependent_data = False
+        for nc_variable_name, nc_variable_value in dataset.variables.items():
+            if (nc_variable_name not in dataset.dimensions
+                    and self.longitude_attribute in nc_variable_value.dimensions
+                    and self.latitude_attribute in nc_variable_value.dimensions):
+                lonlat_dependent_data = True
+                break
+
+        # If at least a variable is dependent on latitude and
+        # longitude, the longitude and latitude arrays are combined to
+        # find all the data points
+        if lonlat_dependent_data:
+            points = []
+            for lon in longitudes:
+                for lat in latitudes:
+                    points.append(Point(float(lon), float(lat), srid=4326))
+            geometry = MultiPoint(points, srid=4326).convex_hull
+        # If the longitude and latitude variables have the same shape,
+        # we assume that they contain the coordinates for each data
+        # point
+        elif longitudes.shape == latitudes.shape:
+            points = []
+            # in this case numpy.nditer() works like zip() for
+            # multi-dimensional arrays
+            for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
+                new_point = Point(float(lon), float(lat), srid=4326)
+                # Don't add duplicate points in trajectories
+                if not points or new_point != points[-1]:
+                    points.append(new_point)
+
+            if len(longitudes.shape) == 1:
+                if len(points) == 1:
+                    geometry = points[0]
+                else:
+                    geometry = LineString(points, srid=4326)
+            else:
+                geometry = MultiPoint(points, srid=4326).convex_hull
+        else:
+            raise ValueError("Could not determine the spatial coverage")
+
+        return geometry.wkt
 
     def _get_raw_attributes(self, dataset_path):
         """Get the raw metadata from the NetCDF file"""
@@ -543,42 +593,16 @@ class NetCDFIngester(MetanormIngester):
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         raw_attributes = self._get_raw_attributes(dataset_info)
-        return self._metadata_handler.get_parameters(raw_attributes)
+        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
 
-
-class OneDimensionNetCDFIngester(NetCDFIngester):
-    """NetCDF ingester able to extract one-dimensional geographic
-    locations"""
-
-    def __init__(self, max_fetcher_threads=1, max_db_threads=1,
-                 longitude_attribute='LONGITUDE', latitude_attribute='LATITUDE'):
-        super().__init__(max_fetcher_threads, max_db_threads)
-        self.longitude_attribute = longitude_attribute
-        self.latitude_attribute = latitude_attribute
-
-    def _get_geometry_wkt(self, dataset):
-        longitudes = dataset.variables[self.longitude_attribute]
-        latitudes = dataset.variables[self.latitude_attribute]
-
-        if not len(longitudes.shape) == len(latitudes.shape) == 1:
-            raise ValueError("This ingester should only be used for one-dimensional data")
-
-        if longitudes.shape[0] != latitudes.shape[0]:
-            raise ValueError("The longitude and latitude have different shapes")
-
-        points_number = longitudes.shape[0]
-
-        points = []
-        for i in range(points_number):
-            new_point = Point(float(longitudes[i]), float(latitudes[i]))
-            if not points or new_point != points[-1]:
-                points.append(new_point)
-
-        if len(points) == 1:
-            return Point(float(longitudes[0]), float(latitudes[0])).wkt
+        if dataset_info.startswith('http'):
+            normalized_attributes['geospaas_service'] = HTTP_SERVICE
+            normalized_attributes['geospaas_service_name'] = HTTP_SERVICE_NAME
         else:
-            trajectory = LineString(points, srid=4326)
-            return trajectory.wkt
+            normalized_attributes['geospaas_service'] = LOCAL_FILE_SERVICE
+            normalized_attributes['geospaas_service_name'] = FILE_SERVICE_NAME
+
+        return normalized_attributes
 
 
 class NansatIngester(Ingester):
@@ -602,7 +626,9 @@ class NansatIngester(Ingester):
             raise ValueError(f"Can't ingest '{dataset_info}': nansat can't open remote ftp files")
 
         # Open file with Nansat
-        nansat_object = Nansat(nansat_filename(dataset_info), log_level=self.LOGGER.level, **nansat_options)
+        nansat_object = Nansat(nansat_filename(dataset_info),
+                               log_level=self.LOGGER.getEffectiveLevel(),
+                               **nansat_options)
 
         # get metadata from Nansat and get objects from vocabularies
         n_metadata = nansat_object.get_metadata()
@@ -645,5 +671,7 @@ class NansatIngester(Ingester):
                 raise TypeError(
                     f"Can't ingest '{dataset_info}': the 'dataset_parameters' section of the "
                     "metadata returned by nansat is not a JSON list")
+        else:
+            normalized_attributes['dataset_parameters'] = []
 
         return normalized_attributes

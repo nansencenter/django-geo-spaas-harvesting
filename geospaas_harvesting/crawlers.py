@@ -17,6 +17,8 @@ from urllib.parse import urljoin, urlparse
 import feedparser
 import requests
 
+import geospaas_harvesting.utils as utils
+
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
@@ -41,7 +43,7 @@ class Crawler():
         html_page = ''
         cls.LOGGER.debug("Getting page: '%s'", url)
         try:
-            response = requests.get(url, **request_parameters or {})
+            response = utils.http_request('GET', url, **request_parameters or {})
             response.raise_for_status()
             html_page = response.text
         except requests.exceptions.RequestException:

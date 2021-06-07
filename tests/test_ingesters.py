@@ -24,6 +24,7 @@ import geospaas_harvesting.ingesters as ingesters
 from geospaas.catalog.managers import (DAP_SERVICE_NAME, FILE_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE, OPENDAP_SERVICE)
 
+
 class IngesterTestCase(django.test.TransactionTestCase):
     """Test the base ingester class"""
 
@@ -322,8 +323,10 @@ class DDXIngesterTestCase(django.test.TestCase):
             'file_path': "data/opendap/ddx_no_ns.xml"},
     }
 
-    def requests_get_side_effect(self, url, **kwargs):
+    def request_side_effect(self, method, url, **kwargs):
         """Side effect function used to mock calls to requests.get().text"""
+        if method != 'GET':
+            return None
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
             if url == test_data['url']:
@@ -349,13 +352,13 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.mock_param_count = self.patcher_param_count.start()
         self.mock_param_count.return_value = 2
         # Mock requests.get()
-        self.patcher_requests_get = mock.patch('geospaas_harvesting.ingesters.requests.get')
-        self.mock_requests_get = self.patcher_requests_get.start()
-        self.mock_requests_get.side_effect = self.requests_get_side_effect
+        self.patcher_request = mock.patch('geospaas_harvesting.ingesters.requests.request')
+        self.mock_request = self.patcher_request.start()
+        self.mock_request.side_effect = self.request_side_effect
         self.opened_files = []
 
     def tearDown(self):
-        self.patcher_requests_get.stop()
+        self.patcher_request.stop()
         self.patcher_param_count.stop()
         # Close any files opened during the test
         for opened_file in self.opened_files:
@@ -451,7 +454,7 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['instrument']['Class'],
                          'Passive Remote Sensing')
 
-        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'SUOMI-NPP')
+        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'Suomi-NPP')
         self.assertEqual(normalized_parameters['platform']['Long_Name'],
                          'Suomi National Polar-orbiting Partnership')
         self.assertEqual(normalized_parameters['platform']['Category'],
@@ -520,6 +523,23 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.assertEqual(output_url, ingester.prepare_url(input_url))
 
 
+class ThreddsIngesterTestCase(django.test.TestCase):
+    """Test the ThreddsIngester"""
+
+    def test_prepare_url(self):
+        """Should return a DDX URL from a Thredds URL, or raise a
+        ValueError if the URL is invalid
+        """
+        self.assertEqual(
+            ingesters.ThreddsIngester.prepare_url(
+                'https://foo.com/thredds/fileServer/bar/baz/dataset.nc'),
+            'https://foo.com/thredds/dodsC/bar/baz/dataset.nc.ddx'
+        )
+
+        with self.assertRaises(ValueError):
+            ingesters.ThreddsIngester.prepare_url('Https://foo/bar.nc')
+
+
 class CopernicusODataIngesterTestCase(django.test.TestCase):
     """Test the CopernicusODataIngester"""
     fixtures = [os.path.join(os.path.dirname(__file__), "fixtures", "harvest")]
@@ -529,8 +549,10 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
             'file_path': "data/copernicus_opensearch/full.json"}
     }
 
-    def requests_get_side_effect(self, url, **kwargs):  # pylint: disable=unused-argument
+    def request_side_effect(self, method, url, **kwargs):  # pylint: disable=unused-argument
         """Side effect function used to mock calls to requests.get().text"""
+        if method != 'GET':
+            return None
         data_file_relative_path = None
         for test_data in self.TEST_DATA.values():
             if url == test_data['url']:
@@ -555,9 +577,9 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
     def setUp(self):
         self.ingester = ingesters.CopernicusODataIngester()
         # Mock requests.get()
-        self.patcher_requests_get = mock.patch.object(ingesters.requests, 'get')
-        self.mock_requests_get = self.patcher_requests_get.start()
-        self.mock_requests_get.side_effect = self.requests_get_side_effect
+        self.patcher_request = mock.patch.object(ingesters.requests, 'request')
+        self.mock_request = self.patcher_request.start()
+        self.mock_request.side_effect = self.request_side_effect
         self.opened_files = []
 
         self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
@@ -565,7 +587,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.mock_param_count.return_value = 2
 
     def tearDown(self):
-        self.patcher_requests_get.stop()
+        self.patcher_request.stop()
         self.patcher_param_count.stop()
         # Close any files opened during the test
         for opened_file in self.opened_files:
@@ -627,11 +649,11 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['instrument']['Subtype'], '')
         self.assertEqual(normalized_parameters['instrument']['Class'], 'Active Remote Sensing')
 
-        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'SENTINEL-1A')
-        self.assertEqual(normalized_parameters['platform']['Long_Name'], 'SENTINEL-1A')
+        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'Sentinel-1A')
+        self.assertEqual(normalized_parameters['platform']['Long_Name'], 'Sentinel-1A')
         self.assertEqual(normalized_parameters['platform']['Category'],
                          'Earth Observation Satellites')
-        self.assertEqual(normalized_parameters['platform']['Series_Entity'], 'SENTINEL-1')
+        self.assertEqual(normalized_parameters['platform']['Series_Entity'], 'Sentinel-1')
 
         self.assertEqual(normalized_parameters['location_geometry'], GEOSGeometry(
             'MULTIPOLYGON(((' +
@@ -903,9 +925,7 @@ class NansatIngesterTestCase(django.test.TestCase):
                 OrderedDict(
                     [('standard_name', 'surface_backwards_scattering_coefficient_of_radar_wave'),
                      ('canonical_units', '1'),
-                        ('grib', ''),
-                        ('amip', ''),
-                        ('description',
+                     ('definition',
                          'The scattering/absorption/attenuation coefficient is assumed to be an '
                          'integral over all wavelengths, unless a coordinate of '
                          'radiation_wavelength is included to specify the wavelength. Scattering of'
@@ -954,6 +974,25 @@ class NansatIngesterTestCase(django.test.TestCase):
             err.exception.args[0],
             "Can't ingest '': the 'dataset_parameters' section of the metadata returned by nansat "
             "is not a JSON list")
+
+    def test_no_dataset_parameters(self):
+        """If no "dataset_parameters" attribute is present in the
+        nansat metadata, normalized_attributes['dataset_parameters']
+        should be set to an empty list
+        """
+        self.mock_get_metadata.return_value.get_metadata.return_value = {
+            'time_coverage_end': '2017-05-27T00:00:00',
+            'time_coverage_start': '2017-05-18T00:00:00',
+            'platform':
+                '{"Category": "Models/Analyses", "Series_Entity": "", "Short_Name": "MODELS", '
+                '"Long_Name": ""}',
+            'instrument':
+                '{"Category": "In Situ/Laboratory Instruments", "Class": "Data Analysis", '
+                '"Type": "Environmental Modeling", "Subtype": "", "Short_Name": "Computer", '
+                '"Long_Name": "Computer"}'
+        }
+        ingester = ingesters.NansatIngester()
+        self.assertListEqual(ingester._get_normalized_attributes('')['dataset_parameters'], [])
 
     def test_usage_of_nansat_ingester_with_http_protocol_in_the_OPENDAP_cases(self):
         """LOCALHarvester(which uses NansatIngester) can be used for `OPENDAP provided` files """
@@ -1030,10 +1069,24 @@ class NetCDFIngesterTestCase(django.test.TestCase):
 
         self.ingester = ingesters.NetCDFIngester()
 
-    def test_abstract_get_geometry_wkt(self):
-        """_get_geometry_wkt() should raise a NotImplementedError()"""
-        with self.assertRaises(NotImplementedError):
-            self.ingester._get_geometry_wkt(None)
+    class MockVariable(mock.Mock):
+        def __init__(self, data, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._data = np.array(data)
+            self.shape = self._data.shape
+            self.dimensions = kwargs.get('dimensions', {})
+
+        def __iter__(self):
+            """Make the class iterable"""
+            return iter(self._data)
+
+        def __getitem__(self, i):
+            """Make the class subscriptable"""
+            return self._data[i]
+
+        def __array__(self, *args, **kwargs):
+            """Make the class numpy-array-like"""
+            return self._data
 
     def test_get_raw_attributes(self):
         """Test reading raw attributes from a netCDF file"""
@@ -1084,31 +1137,35 @@ class NetCDFIngesterTestCase(django.test.TestCase):
         """_get_normalized_attributes() should use metanorm to
         normalize the raw attributes
         """
-        raw_attributes = {
-            'attr1': 'value1',
-            'attr2': 'value2'
-        }
-        with mock.patch.object(self.ingester, '_get_raw_attributes', return_value=raw_attributes), \
+        with mock.patch.object(self.ingester, '_get_raw_attributes'), \
              mock.patch.object(self.ingester, '_metadata_handler') as mock_metadata_handler:
-            self.ingester._get_normalized_attributes('/foo/bar.nc')
-        mock_metadata_handler.get_parameters.assert_called_with(raw_attributes)
-
-
-class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
-    """Test the OneDimensionNetCDFIngester"""
-
-    def setUp(self):
-        mock.patch('geospaas_harvesting.ingesters.Parameter.objects.count', return_value=2).start()
-        self.addCleanup(mock.patch.stopall)
-
-        self.ingester = ingesters.OneDimensionNetCDFIngester()
+            mock_metadata_handler.get_parameters.return_value = {'param': 'value'}
+            # Local path
+            self.assertDictEqual(
+                self.ingester._get_normalized_attributes('/foo/bar.nc'),
+                {
+                    'param': 'value',
+                    'geospaas_service': ingesters.LOCAL_FILE_SERVICE,
+                    'geospaas_service_name': ingesters.FILE_SERVICE_NAME
+                }
+            )
+            # HTTP URL
+            self.assertDictEqual(
+                self.ingester._get_normalized_attributes('http://foo/bar.nc'),
+                {
+                    'param': 'value',
+                    'geospaas_service': ingesters.HTTP_SERVICE,
+                    'geospaas_service_name': ingesters.HTTP_SERVICE_NAME
+                }
+            )
 
     def test_get_trajectory(self):
         """Test getting a trajectory from a netCDF dataset"""
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 3, 5)),
-            'LATITUDE': np.array((2, 4, 6))
+            'LONGITUDE': self.MockVariable((1, 3, 5)),
+            'LATITUDE': self.MockVariable((2, 4, 6))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
@@ -1119,9 +1176,10 @@ class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
         """Test getting a WKT point when the shape of the latitude and
         longitude is (1,)"""
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1,)),
-            'LATITUDE': np.array((2,))
+            'LONGITUDE': self.MockVariable((1,)),
+            'LATITUDE': self.MockVariable((2,))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
@@ -1133,35 +1191,82 @@ class OneDimensionNetCDFIngesterTestCase(django.test.TestCase):
         multiple times in the dataset
         """
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 1, 1)),
-            'LATITUDE': np.array((2, 2, 2))
+            'LONGITUDE': self.MockVariable((1, 1, 1)),
+            'LATITUDE': self.MockVariable((2, 2, 2))
         }
         self.assertEqual(
             self.ingester._get_geometry_wkt(mock_dataset),
             'POINT (1 2)'
         )
 
-    def test_error_on_multidimensional_data(self):
-        """An error should be raised if the dataset is
-        multi-dimensional.
+    def test_get_polygon_from_coordinates_lists(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are multi-dimensional and of the same
+        shape
         """
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array(((1, 2, 3), (4, 5, 6))),
-            'LATITUDE': np.array(((1, 2, 4),  (7, 9, 6)))
+            'LONGITUDE': self.MockVariable((
+                (1, 1, 2),
+                (2, 0, 3),
+            )),
+            'LATITUDE': self.MockVariable((
+                (1, 2, 3),
+                (4, 0, 4),
+            ))
         }
-        with self.assertRaises(ValueError):
-            self.ingester._get_geometry_wkt(mock_dataset)
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((0 0, 2 4, 3 4, 1 1, 0 0))'
+        )
 
-    def test_error_on_misshaped_lon_lat(self):
-        """An error should be raised if the dataset has longitude and
-        latitude arrays of different lengths.
+    def test_get_polygon_from_1d_lon_lat(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are one-dimensional and of different
+        shapes
         """
         mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
         mock_dataset.variables = {
-            'LONGITUDE': np.array((1, 2, 3, 4)),
-            'LATITUDE': np.array((1, 2, 4))
+            'LONGITUDE': self.MockVariable((1, 2, 3)),
+            'LATITUDE': self.MockVariable((1, 2)),
+            'DATA': self.MockVariable('some_data', dimensions=('LONGITUDE', 'LATITUDE'))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((1 1, 1 2, 3 2, 3 1, 1 1))'
+        )
+
+    def test_get_polygon_from_1d_lon_lat_same_shape(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are one-dimensional and have the same
+        shape
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 2)),
+            'LATITUDE': self.MockVariable((1, 2)),
+            'DATA': self.MockVariable('some_data', dimensions=('LONGITUDE', 'LATITUDE'))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((1 1, 1 2, 2 2, 2 1, 1 1))'
+        )
+
+    def test_error_on_unsupported_case(self):
+        """An error should be raised if the dataset has longitude and
+        latitude arrays of different lengths and no variable is
+        dependent on latitude and longitude
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 1, 1, 1)),
+            'LATITUDE': self.MockVariable((2, 2, 2))
         }
         with self.assertRaises(ValueError):
             self.ingester._get_geometry_wkt(mock_dataset)

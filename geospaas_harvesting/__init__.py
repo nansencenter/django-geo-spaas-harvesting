@@ -20,5 +20,8 @@ except FileNotFoundError:
     logging_configuration = None  # pylint: disable=invalid-name
 
 if logging_configuration:
+    log_level_value = os.getenv('LOG_LEVEL', default=None)
+    if log_level_value:
+        logging_configuration['loggers']['geospaas_harvesting']['level'] = int(log_level_value)
     logging.config.dictConfig(logging_configuration)
     logging.captureWarnings(True)

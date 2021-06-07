@@ -54,6 +54,9 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
 - **update_pythesint** (default: False): update the local pythesint data before harvesting.
   Note that setting this parameter to `True` will have no effect if **update_vocabularies** is set
   to `False`.
+- **pythesint_versions** (default: None): the pythesint vocabularies versions to use.
+  This is a dictionary in which each key is a pythesint vocabulary name and each value is the
+  corresponding version string.
 - **harvesters**: dictionary mapping the harvesters names to a dictionary containing their
   properties.
 
@@ -94,7 +97,7 @@ The rest depends on the harvester and will be detailed in each harvester's docum
 - **time_range** (optional): for harvesters which inherit from `WebDirectoryHarvester`. A
   two-elements list containing two date strings which define a time range to which the crawler will
   be limited.
-- **include** (optional): for harvesters which inherit from `WebDirectoryHarvester`. A regular
+- **include** (obligatory for harvesters which inherit from `WebDirectoryHarvester`): A regular
   expression matching the path of the files to include in the harvested repository.
 
 ## Design
