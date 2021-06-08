@@ -186,6 +186,7 @@ def check_provider_urls(file_name, **provider_config):
         for dataset_uri in DatasetURI.objects.filter(uri__startswith=url_prefix).iterator():
             if auth_renew and time.monotonic() - auth_start >= auth_renew:
                 logging.info("Renewing authentication for %s", provider_config['url'])
+                auth_start = time.monotonic()
                 auth = get_auth(provider_config)
 
             futures[thread_executor.submit(
@@ -230,12 +231,10 @@ def check_providers(output_directory, providers):
         return success
 
 
-def find_provider(url, providers):
+def find_provider(urls_file_path, providers):
     """Find which provider a given URL comes from"""
-    for provider in providers.values():
-        if url.startswith(provider['url']):
-            return provider
-    return None
+    provider_name = os.path.basename(urls_file_path).split('_')[0]
+    return providers.get(provider_name, None)
 
 
 def remove_dataset_uri(dataset_uri):
@@ -258,14 +257,25 @@ def delete_stale_urls(urls_file_path, providers, force=False):
     """Re-check the URLs contained in a file issued from the checking
     step, then remove them.
     """
+    provider_config = find_provider(urls_file_path, providers)
+    # TODO: find a way to better manage authentication renewal.
+    # There is almost the same code in check_provider_urls.
+    auth_start = time.monotonic()
+    auth = get_auth(provider_config)
+    auth_renew = provider_config.get('auth_renew')
+
     deleted_uris_count = 0
     deleted_datasets_count = 0
     with open(urls_file_path, 'r') as urls_file:
         for line in urls_file:
+            if auth_renew and time.monotonic() - auth_start >= auth_renew:
+                logging.info("Renewing authentication for %s", provider_config['url'])
+                auth_start = time.monotonic()
+                auth = get_auth(provider_config)
+
             _, dataset_uri_id, _ = line.split()
             dataset_uri = DatasetURI.objects.get(id=int(dataset_uri_id))
-            provider = find_provider(dataset_uri.uri, providers)
-            is_valid, status_code, *_ = check_url(dataset_uri, provider['auth'])
+            is_valid, status_code, *_ = check_url(dataset_uri, auth)
             if not is_valid and (status_code == 404 or force):
                 deleted_uris_count += 1
                 if remove_dataset_uri(dataset_uri):
