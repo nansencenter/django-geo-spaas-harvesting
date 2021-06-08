@@ -186,6 +186,7 @@ def check_provider_urls(file_name, **provider_config):
         for dataset_uri in DatasetURI.objects.filter(uri__startswith=url_prefix).iterator():
             if auth_renew and time.monotonic() - auth_start >= auth_renew:
                 logging.info("Renewing authentication for %s", provider_config['url'])
+                auth_start = time.monotonic()
                 auth = get_auth(provider_config)
 
             futures[thread_executor.submit(
