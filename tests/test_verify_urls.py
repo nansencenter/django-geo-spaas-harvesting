@@ -128,7 +128,7 @@ class VerifyURLsTestCase(unittest.TestCase):
     def test_delete_stale_urls(self):
         """404 URLs should be deleted unless the force option is used
         """
-        provider = {'url': 'https://foo', 'auth': ('username', 'password')}
+        provider = {'url': 'https://foo', 'auth': ('username', 'password'), 'auth_renew': -1}
         file_contents = '404 12 https://foo/bar\n500 13 https://foo/baz'
         check_url_results = (
             (False, 404, 12, 'https://foo/bar'),
@@ -204,12 +204,12 @@ class VerifyURLsTestCase(unittest.TestCase):
             'scihub': scihub_attributes,
             'podaac': podaac_attributes
         }
-        self.assertIsNone(verify_urls.find_provider('https://foo', providers))
+        self.assertIsNone(verify_urls.find_provider('foo.txt', providers))
         self.assertDictEqual(
-            verify_urls.find_provider('https://scihub.copernicus.eu/foo', providers),
+            verify_urls.find_provider('scihub_stale_urls_2021-05-25T10:22:27.txt', providers),
             scihub_attributes)
         self.assertDictEqual(
-            verify_urls.find_provider('https://opendap.jpl.nasa.gov/opendap/foo', providers),
+            verify_urls.find_provider('podaac_stale_urls_2021-05-25T10:22:28.txt', providers),
             podaac_attributes)
 
     def test_check_providers(self):
@@ -293,7 +293,7 @@ class VerifyURLsTestCase(unittest.TestCase):
 
             # test that authentication is renewed
             with self.assertLogs(verify_urls.logger, level=logging.INFO), \
-                    mock.patch('time.monotonic', side_effect=(1, 3)), \
+                    mock.patch('time.monotonic', side_effect=(1, 2, 3)), \
                     mock.patch('geospaas_harvesting.verify_urls.get_auth',
                                side_effect=('auth1', 'auth2')):
                 verify_urls.check_provider_urls(
