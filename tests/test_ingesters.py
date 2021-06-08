@@ -634,7 +634,8 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(normalized_parameters['summary'], (
             'Description: Date=2020-03-18T06:23:05.976Z, '
             'Instrument name=Synthetic Aperture Radar (C-band), '
-            'Mode=IW, Satellite=Sentinel-1, Size=1.65 GB;Processing level: 1'))
+            'Mode=IW, Satellite=Sentinel-1, Size=1.65 GB, Timeliness Category=Fast-24h'
+            ';Processing level: 1'))
         self.assertEqual(normalized_parameters['time_coverage_start'], datetime(
             year=2020, month=3, day=18, hour=6, minute=23, second=5,
             tzinfo=tzutc()))
