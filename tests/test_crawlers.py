@@ -158,7 +158,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(
             crawlers.WebDirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/contents.html'),
-            (datetime(2019, 1, 1, 0, 0, 0), datetime(2020, 1, 1, 0, 0, 0))
+            (datetime(2019, 1, 1), datetime(2020, 1, 1))
         )
 
     def test_get_month_folder_coverage(self):
@@ -166,7 +166,12 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(
             crawlers.WebDirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/02/contents.html'),
-            (datetime(2019, 2, 1, 0, 0, 0), datetime(2019, 3, 1, 0, 0, 0))
+            (datetime(2019, 2, 1), datetime(2019, 3, 1))
+        )
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/201902/contents.html'),
+            (datetime(2019, 2, 1), datetime(2019, 3, 1))
         )
 
     def test_get_day_of_month_folder_coverage(self):
@@ -174,7 +179,12 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(
             crawlers.WebDirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/02/14/contents.html'),
-            (datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 15, 0, 0, 0))
+            (datetime(2019, 2, 14), datetime(2019, 2, 15))
+        )
+        self.assertEqual(
+            crawlers.WebDirectoryCrawler._folder_coverage(
+                'https://test-opendap.com/folder/20190214/contents.html'),
+            (datetime(2019, 2, 14), datetime(2019, 2, 15))
         )
 
     def test_get_day_of_year_folder_coverage(self):
@@ -182,7 +192,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(
             crawlers.WebDirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/046/contents.html'),
-            (datetime(2019, 2, 15, 0, 0, 0), datetime(2019, 2, 16, 0, 0, 0))
+            (datetime(2019, 2, 15), datetime(2019, 2, 16))
         )
 
     def test_none_when_no_folder_coverage(self):
