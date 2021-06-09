@@ -167,26 +167,26 @@ class WebDirectoryCrawler(Crawler):
                 if match_day:
                     folder_coverage_start = datetime(
                         int(match_year[1]), int(match_month[2]), int(match_day[3]), 0, 0, 0)
-                    folder_coverage_stop = datetime(
-                        int(match_year[1]), int(match_month[2]), int(match_day[3]), 23, 59, 59)
+                    folder_coverage_stop = folder_coverage_start + timedelta(days=1)
                 else:
                     last_day_of_month = calendar.monthrange(
                         int(match_year[1]), int(match_month[2]))[1]
                     folder_coverage_start = datetime(
                         int(match_year[1]), int(match_month[2]), 1, 0, 0, 0)
                     folder_coverage_stop = datetime(
-                        int(match_year[1]), int(match_month[2]), last_day_of_month, 23, 59, 59)
+                        int(match_year[1]),
+                        int(match_month[2]),
+                        last_day_of_month) + timedelta(days=1)
             else:
                 match_day_of_year = cls.DAY_OF_YEAR_MATCHER.search(folder_path)
                 if match_day_of_year:
                     offset = timedelta(int(match_day_of_year[2]) - 1)
                     folder_coverage_start = (datetime(int(match_year[1]), 1, 1, 0, 0, 0)
                                              + offset)
-                    folder_coverage_stop = (datetime(int(match_year[1]), 1, 1, 23, 59, 59)
-                                            + offset)
+                    folder_coverage_stop = folder_coverage_start + timedelta(days=1)
                 else:
                     folder_coverage_start = datetime(int(match_year[1]), 1, 1, 0, 0, 0)
-                    folder_coverage_stop = datetime(int(match_year[1]), 12, 31, 23, 59, 59)
+                    folder_coverage_stop = datetime(int(match_year[1]) + 1, 1, 1, 0, 0, 0)
         else:
             folder_coverage_start = folder_coverage_stop = None
 

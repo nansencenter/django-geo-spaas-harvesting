@@ -158,7 +158,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(
             crawlers.WebDirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/contents.html'),
-            (datetime(2019, 1, 1, 0, 0, 0), datetime(2019, 12, 31, 23, 59, 59))
+            (datetime(2019, 1, 1, 0, 0, 0), datetime(2020, 1, 1, 0, 0, 0))
         )
 
     def test_get_month_folder_coverage(self):
@@ -166,7 +166,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(
             crawlers.WebDirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/02/contents.html'),
-            (datetime(2019, 2, 1, 0, 0, 0), datetime(2019, 2, 28, 23, 59, 59))
+            (datetime(2019, 2, 1, 0, 0, 0), datetime(2019, 3, 1, 0, 0, 0))
         )
 
     def test_get_day_of_month_folder_coverage(self):
@@ -174,7 +174,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(
             crawlers.WebDirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/02/14/contents.html'),
-            (datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 23, 59, 59))
+            (datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 15, 0, 0, 0))
         )
 
     def test_get_day_of_year_folder_coverage(self):
@@ -182,7 +182,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertEqual(
             crawlers.WebDirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/046/contents.html'),
-            (datetime(2019, 2, 15, 0, 0, 0), datetime(2019, 2, 15, 23, 59, 59))
+            (datetime(2019, 2, 15, 0, 0, 0), datetime(2019, 2, 16, 0, 0, 0))
         )
 
     def test_none_when_no_folder_coverage(self):
