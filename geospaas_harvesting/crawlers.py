@@ -90,15 +90,15 @@ class WebDirectoryCrawler(Crawler):
     LOGGER = None
     EXCLUDE = None
 
-    YEAR_PATTERN = r'y?(\d{4})'
-    MONTH_PATTERN = r'm?(1[0-2]|0[1-9]|[1-9])'
-    DAY_OF_MONTH_PATTERN = r'(3[0-1]|[1-2]\d|0[1-9]|[1-9]| [1-9])'
-    DAY_OF_YEAR_PATTERN = r'(36[0-6]|3[0-5]\d|[1-2]\d\d|0[1-9]\d|00[1-9]|[1-9]\d|0[1-9]|[1-9])'
+    YEAR_PATTERN = r'y?(?P<year>\d{4})'
+    MONTH_PATTERN = r'm?(?P<month>1[0-2]|0[1-9])'
+    DAY_OF_MONTH_PATTERN = r'(?P<day>3[0-1]|[1-2]\d|0[1-9])'
+    DAY_OF_YEAR_PATTERN = (r'(?P<day>36[0-6]|3[0-5]\d|[1-2]\d\d|0[1-9]\d|00[1-9])')
 
     YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}(/.*)?$')
-    MONTH_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}(/.*)?$')
+    MONTH_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/?{MONTH_PATTERN}(/.*)?$')
     DAY_OF_MONTH_MATCHER = re.compile(
-        f'^.*/{YEAR_PATTERN}/{MONTH_PATTERN}/{DAY_OF_MONTH_PATTERN}/.*$')
+        f'^.*/{YEAR_PATTERN}/?{MONTH_PATTERN}/?{DAY_OF_MONTH_PATTERN}(/.*)?$')
     DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}(/.*)?$')
 
     def __init__(self, root_url, time_range=(None, None), include=None):
@@ -151,44 +151,53 @@ class WebDirectoryCrawler(Crawler):
     @classmethod
     def _folder_coverage(cls, folder_path):
         """
-        Find out if the folder has date info in its path. The resolution is one day.
+        Find out if the folder has date info in its path.
+        The maximum resolution is one day.
         For now, it supports the following structures:
-          - .../year/...
-          - .../year/month/...
-          - .../year/month/day/...
-          - .../year/day_of_year/...
+          - .../yyyy/...
+          - .../yyyy/mm/...
+          - .../yyyymm/...
+          - .../yyyy/mm/dd/...
+          - .../yyyymmdd/...
+          - .../yyyy/ddd/... (day of year)
         It will need to be updated to support new structures.
         """
+        folder_coverage_start = folder_coverage_stop = None
+
+        match_day = cls.DAY_OF_MONTH_MATCHER.search(folder_path)
+        if match_day:
+            folder_coverage_start = datetime(
+                int(match_day.group('year')),
+                int(match_day.group('month')),
+                int(match_day.group('day')))
+            folder_coverage_stop = folder_coverage_start + timedelta(days=1)
+            return (folder_coverage_start, folder_coverage_stop)
+
+        match_day_of_year = cls.DAY_OF_YEAR_MATCHER.search(folder_path)
+        if match_day_of_year:
+            offset = timedelta(int(match_day_of_year.group('day')) - 1)
+            folder_coverage_start = datetime(
+                int(match_day_of_year.group('year')), 1, 1) + offset
+            folder_coverage_stop = folder_coverage_start + timedelta(days=1)
+            return (folder_coverage_start, folder_coverage_stop)
+
+        match_month = cls.MONTH_MATCHER.search(folder_path)
+        if match_month:
+            last_day_of_month = calendar.monthrange(
+                int(match_month.group('year')), int(match_month.group('month')))[1]
+            folder_coverage_start = datetime(
+                int(match_month.group('year')), int(match_month.group('month')), 1)
+            folder_coverage_stop = datetime(
+                int(match_month.group('year')),
+                int(match_month.group('month')),
+                last_day_of_month) + timedelta(days=1)
+            return (folder_coverage_start, folder_coverage_stop)
+
         match_year = cls.YEAR_MATCHER.search(folder_path)
         if match_year:
-            match_month = cls.MONTH_MATCHER.search(folder_path)
-            if match_month:
-                match_day = cls.DAY_OF_MONTH_MATCHER.search(folder_path)
-                if match_day:
-                    folder_coverage_start = datetime(
-                        int(match_year[1]), int(match_month[2]), int(match_day[3]), 0, 0, 0)
-                    folder_coverage_stop = datetime(
-                        int(match_year[1]), int(match_month[2]), int(match_day[3]), 23, 59, 59)
-                else:
-                    last_day_of_month = calendar.monthrange(
-                        int(match_year[1]), int(match_month[2]))[1]
-                    folder_coverage_start = datetime(
-                        int(match_year[1]), int(match_month[2]), 1, 0, 0, 0)
-                    folder_coverage_stop = datetime(
-                        int(match_year[1]), int(match_month[2]), last_day_of_month, 23, 59, 59)
-            else:
-                match_day_of_year = cls.DAY_OF_YEAR_MATCHER.search(folder_path)
-                if match_day_of_year:
-                    offset = timedelta(int(match_day_of_year[2]) - 1)
-                    folder_coverage_start = (datetime(int(match_year[1]), 1, 1, 0, 0, 0)
-                                             + offset)
-                    folder_coverage_stop = (datetime(int(match_year[1]), 1, 1, 23, 59, 59)
-                                            + offset)
-                else:
-                    folder_coverage_start = datetime(int(match_year[1]), 1, 1, 0, 0, 0)
-                    folder_coverage_stop = datetime(int(match_year[1]), 12, 31, 23, 59, 59)
-        else:
-            folder_coverage_start = folder_coverage_stop = None
+            folder_coverage_start = datetime(int(match_year.group('year')), 1, 1)
+            folder_coverage_stop = datetime(int(match_year.group('year')) + 1, 1, 1)
+            return (folder_coverage_start, folder_coverage_stop)
 
         return (folder_coverage_start, folder_coverage_stop)
 
