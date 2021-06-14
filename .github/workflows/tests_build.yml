@@ -33,15 +33,19 @@ jobs:
         run: /bin/bash ./scripts/start_test_database.sh
 
       - name: 'Run tests'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >
              docker run --rm
              --network testing
              -v "$(pwd):/src"
-             -e "COVERALLS_REPO_TOKEN=$COVERALLS_REPO_TOKEN"
-             -e "TRAVIS=true"
-             -e "TRAVIS_JOB_ID=$TRAVIS_JOB_ID"
-             -e "TRAVIS_BRANCH=$TRAVIS_BRANCH"
-             -e "TRAVIS_PULL_REQUEST=$TRAVIS_PULL_REQUEST"
+             -e "GITHUB_ACTIONS=$GITHUB_ACTIONS"
+             -e "GITHUB_REF=$GITHUB_REF"
+             -e "GITHUB_SHA=$GITHUB_SHA"
+             -e "GITHUB_HEAD_REF=$GITHUB_HEAD_REF"
+             -e "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+             -e "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+             -e "GITHUB_TOKEN=$GITHUB_TOKEN"
              -e "GEOSPAAS_DB_HOST=$GEOSPAAS_DB_HOST"
              -e "GEOSPAAS_DB_USER=$GEOSPAAS_DB_USER"
              -e "GEOSPAAS_DB_PASSWORD=$GEOSPAAS_DB_PASSWORD"
