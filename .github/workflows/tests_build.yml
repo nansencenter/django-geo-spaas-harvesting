@@ -39,8 +39,8 @@ jobs:
           context: .
           target: base
           build-args: |
-            BASE_IMAGE='${{ env.BASE_IMAGE_NAME }}'
-            METANORM_VERSION='${{ env.METANORM_VERSION }}'
+            BASE_IMAGE=${{ env.BASE_IMAGE_NAME }}
+            METANORM_VERSION=${{ env.METANORM_VERSION }}
           push: false
           tags: ${{ env.IMAGE_NAME }}
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -111,8 +111,8 @@ jobs:
         with:
           context: .
           build-args: |
-            BASE_IMAGE='${{ env.BASE_IMAGE_NAME }}'
-            METANORM_VERSION='${{ env.METANORM_VERSION }}'
+            BASE_IMAGE=${{ env.BASE_IMAGE_NAME }}
+            METANORM_VERSION=${{ env.METANORM_VERSION }}
           push: ${{ github.event_name == 'tag' }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
