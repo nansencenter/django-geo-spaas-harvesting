@@ -48,6 +48,7 @@ jobs:
             BASE_IMAGE=${{ env.BASE_IMAGE_NAME }}
             METANORM_VERSION=${{ env.METANORM_VERSION }}
           push: false
+          load: true
           tags: ${{ env.IMAGE_NAME }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
