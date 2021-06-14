@@ -12,6 +12,7 @@ jobs:
     env:
       GEOSPAAS_DB_HOST: 'db'
       GEOSPAAS_DB_USER: 'test'
+      GEOSPAAS_DB_PASSWORD: ${{ secrets.GEOSPAAS_DB_PASSWORD }}
       IMAGE_NAME: 'harvesting_tests'
     steps:
       - name: 'Checkout repository'
