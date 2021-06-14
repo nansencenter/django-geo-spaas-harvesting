@@ -95,6 +95,9 @@ jobs:
     env:
       IMAGE_NAME: "${{ secrets.DOCKER_ORG }}/geospaas_harvesting"
     steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@v2
+
       - name: "Extract tag name"
         id: get_version
         run: echo "::set-output name=VERSION::${GITHUB_REF#refs/tags/}"
