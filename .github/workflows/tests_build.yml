@@ -91,7 +91,7 @@ jobs:
   build_docker_image:
     runs-on: 'ubuntu-20.04'
     needs: 'tests'
-    if: ${{ github.event_name == 'tag' || github.event_name == 'pull_request' }}
+    if: ${{ (github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')) || github.event_name == 'pull_request' }}
     env:
       IMAGE_NAME: "${{ secrets.DOCKER_ORG }}/geospaas_harvesting"
     steps:
@@ -123,7 +123,7 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.BASE_IMAGE_NAME }}
             METANORM_VERSION=${{ env.METANORM_VERSION }}
-          push: ${{ github.event_name == 'tag' }}
+          push: ${{ github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/') }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ steps.get_version.outputs.VERSION }}
