@@ -1,3 +1,4 @@
+import os
 import os.path
 import setuptools
 
@@ -6,7 +7,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), "r") as fh:
 
 setuptools.setup(
     name="geospaas_harvesting",
-    version="3.3.2",
+    version=os.getenv('GEOSPAAS_HARVESTING_RELEASE', '0.0.0dev'),
     author="Adrien Perrin",
     author_email="adrien.perrin@nersc.no",
     description="Metadata harvesting tool for GeoSPaaS",

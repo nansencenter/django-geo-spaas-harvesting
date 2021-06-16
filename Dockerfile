@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir \
 
 FROM base
 
+ARG GEOSPAAS_HARVESTING_RELEASE '0.0.0dev'
 WORKDIR /tmp/setup
 COPY setup.py README.md ./
 COPY geospaas_harvesting ./geospaas_harvesting
