@@ -130,6 +130,7 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.BASE_IMAGE_NAME }}
             METANORM_VERSION=${{ env.METANORM_VERSION }}
+            GEOSPAAS_HARVESTING_RELEASE=${{ steps.get_version.outputs.VERSION }}
           push: ${{ startsWith(github.event.ref, 'refs/tags/') }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
