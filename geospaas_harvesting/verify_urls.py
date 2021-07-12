@@ -64,10 +64,11 @@ class BoundedThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
         self.semaphore = BoundedSemaphore(kwargs.get('max_workers', 0) + queue_limit)
         super().__init__(*args, **kwargs)
 
-    def submit(self, fn, *args, **kwargs):
+    def submit(self, *args, **kwargs):
+        func, *args = args
         self.semaphore.acquire()
         try:
-            future = super().submit(fn, *args, **kwargs)
+            future = super().submit(func, *args, **kwargs)
         except:
             # if anything goes wrong, we need to release the semaphore
             self.semaphore.release()
