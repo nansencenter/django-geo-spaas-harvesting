@@ -95,6 +95,11 @@ class Provider():
         self.config = config
         self._auth = None
 
+    def __eq__(self, obj):
+        return (isinstance(obj, self.__class__)
+            and obj.name == self.name
+            and obj.config == self.config)
+
     @property
     def auth(self):
         """Returns the right authentication object based on the current
