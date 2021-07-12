@@ -455,6 +455,8 @@ class VerifyURLsTestCase(unittest.TestCase):
           client_id: 'CLOUDFERRO_PUBLIC'
           throttle: 1
           auth_renew: 36000
+        rtofs:
+            url: 'ftp://ftpprd.ncep.noaa.gov/pub/data/nccf/com/rtofs/prod/'
           ''')
         environment = {
             'COPERNICUS_OPEN_HUB_USERNAME': 'copernicus_user',
@@ -468,16 +470,16 @@ class VerifyURLsTestCase(unittest.TestCase):
                 mock.patch('os.environ', environment):
             providers = verify_urls.read_config('foo.yml')
 
-        self.assertDictEqual(providers, {
-            'podaac': {
+        self.assertListEqual(providers, [
+            verify_urls.HTTPProvider('podaac', {
                 'url': 'https://opendap.jpl.nasa.gov/opendap/',
-            },
-            'scihub': {
+            }),
+            verify_urls.HTTPProvider('scihub', {
                 'url': 'https://scihub.copernicus.eu/',
                 'username': 'copernicus_user',
                 'password': 'copernicus_password'
-            },
-            'creodias': {
+            }),
+            verify_urls.HTTPProvider('creodias', {
                 'url': 'https://zipper.creodias.eu/',
                 'username': 'creodias_user',
                 'password': 'creodias_password',
@@ -486,8 +488,11 @@ class VerifyURLsTestCase(unittest.TestCase):
                 'client_id': 'CLOUDFERRO_PUBLIC',
                 'throttle': 1,
                 'auth_renew': 36000
-            },
-        })
+            }),
+            verify_urls.FTPProvider('rtofs', {
+                'url': 'ftp://ftpprd.ncep.noaa.gov/pub/data/nccf/com/rtofs/prod/'
+            })
+        ])
 
     def test_get_auth_oauth2(self):
         """Should return the right authentication object based on the
