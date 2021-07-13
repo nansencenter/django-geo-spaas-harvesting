@@ -3,8 +3,10 @@
 import argparse
 import io
 import logging
+import ftplib
 import os
 import os.path
+import socket
 import textwrap
 import unittest
 import unittest.mock as mock
@@ -304,6 +306,197 @@ class HTTPProviderTestCase(unittest.TestCase):
             with self.assertRaises(ValueError), \
                     self.assertLogs(verify_urls.logger, level=logging.INFO):
                 provider.check_all_urls('out.txt')
+
+
+class FTPProviderTestCase(unittest.TestCase):
+    """Test the FTPProvider class"""
+
+    def test_instantiation(self):
+        """Test that the attributes are correctly initialized"""
+        provider = verify_urls.FTPProvider('test', {'foo': 'bar'})
+        self.assertEqual(provider.name, 'test')
+        self.assertEqual(provider.config, {'foo': 'bar'})
+        self.assertEqual(provider._ftp_client, None)
+
+    def test_auth(self):
+        """Test that the auth property returns a dictionary of
+        arguments for ftplib.FTP.login() if the necessary information
+        is provided
+        """
+        # No authentication
+        provider = verify_urls.FTPProvider('test', {})
+        self.assertEqual(provider.auth, {'user': '', 'passwd': ''})
+
+        # Authentication info provided
+        provider = verify_urls.FTPProvider('test', {'username': 'user', 'password': 'pass'})
+        provider_auth = provider.auth
+        self.assertEqual(provider_auth, {'user': 'user', 'passwd': 'pass'})
+
+        # Return existing auth
+        self.assertIs(provider.auth, provider_auth)
+
+    def test_ftp_client(self):
+        """Test that an FTP client is provided by the ftp_client property"""
+        provider = verify_urls.FTPProvider('test', {})
+        with mock.patch.object(provider, 'ftp_connect') as mock_ftp_connect:
+            ftp_client = provider.ftp_client
+            self.assertIsInstance(provider.ftp_client, ftplib.FTP)
+            mock_ftp_connect.assert_called_once()
+
+            mock_ftp_connect.reset_mock()
+
+            # Check that the client is re-used on following calls
+            self.assertIs(provider.ftp_client, ftp_client)
+            mock_ftp_connect.assert_not_called()
+
+    def test_ftp_connect(self):
+        """Test FTP connection in a standard case"""
+        provider = verify_urls.FTPProvider('test', {'url': 'ftp://foo'})
+        with mock.patch('geospaas_harvesting.verify_urls.FTPProvider.ftp_client',
+                        new_callable=mock.PropertyMock) as mock_ftp_client:
+            provider.ftp_connect()
+            mock_ftp_client.return_value.connect.assert_called_with('foo', timeout=5)
+            mock_ftp_client.return_value.login.assert_called_with(user='', passwd='')
+
+    def test_ftp_connect_with_auth(self):
+        """Test FTP connection with authentication"""
+        provider = verify_urls.FTPProvider('test', {
+            'url': 'ftp://foo',
+            'username': 'user',
+            'password': 'pass'
+        })
+        with mock.patch('geospaas_harvesting.verify_urls.FTPProvider.ftp_client',
+                        new_callable=mock.PropertyMock) as mock_ftp_client:
+            provider.ftp_connect()
+            mock_ftp_client.return_value.connect.assert_called_with('foo', timeout=5)
+            mock_ftp_client.return_value.login.assert_called_with(user='user', passwd='pass')
+
+    def test_ftp_connect_ok_after_retry(self):
+        """Test FTP connection with retries, successful in the end"""
+        provider = verify_urls.FTPProvider('test', {'url': 'ftp://foo'})
+        with mock.patch('geospaas_harvesting.verify_urls.FTPProvider.ftp_client',
+                        new_callable=mock.PropertyMock) as mock_ftp_client, \
+             mock.patch('time.sleep') as mock_sleep:
+            mock_ftp_client.return_value.connect.side_effect = (socket.timeout(),) * 3 + ('220',)
+
+            provider.ftp_connect()
+
+            mock_ftp_client.return_value.connect.assert_called_with('foo', timeout=5)
+            self.assertEqual(mock_ftp_client.return_value.connect.call_count, 4)
+
+            mock_ftp_client.return_value.login.assert_called_once_with(user='', passwd='')
+
+            self.assertListEqual(
+                mock_sleep.call_args_list,
+                [mock.call(5), mock.call(6), mock.call(7)])
+
+    def test_ftp_connect_failing_after_retry(self):
+        """Test FTP connection with retries, failing in the end"""
+        provider = verify_urls.FTPProvider('test', {'url': 'ftp://foo'})
+        with mock.patch('geospaas_harvesting.verify_urls.FTPProvider.ftp_client',
+                        new_callable=mock.PropertyMock) as mock_ftp_client, \
+                mock.patch('time.sleep') as mock_sleep:
+            mock_ftp_client.return_value.connect.side_effect = socket.timeout
+
+            with self.assertRaises(socket.timeout), \
+                 self.assertLogs(verify_urls.logger, level=logging.ERROR):
+                provider.ftp_connect()
+
+            self.assertEqual(mock_ftp_client.return_value.connect.call_count, 5)
+            mock_ftp_client.return_value.login.assert_not_called()
+            self.assertListEqual(
+                mock_sleep.call_args_list,
+                [mock.call(5), mock.call(6), mock.call(7), mock.call(8)])
+
+    def test_check_url_present(self):
+        """Test checking a URL that points to an existing file"""
+        mock_dataset_uri = mock.Mock()
+        mock_dataset_uri.uri = 'ftp://foo/bar/baz.nc'
+        with mock.patch('geospaas_harvesting.verify_urls.FTPProvider.ftp_client',
+                        new_callable=mock.PropertyMock) as mock_ftp_client:
+
+            mock_ftp_client.return_value.nlst.return_value = ['/bar/baz.nc']
+            provider = verify_urls.FTPProvider('test', {'url': 'ftp://foo'})
+
+            self.assertEqual(
+                provider.check_url(mock_dataset_uri),
+                verify_urls.PRESENT)
+
+    def test_check_url_absent(self):
+        """Test checking a URL that points to an non-existing file"""
+        mock_dataset_uri = mock.Mock()
+        mock_dataset_uri.uri = 'ftp://foo/bar/baz.nc'
+        with mock.patch('geospaas_harvesting.verify_urls.FTPProvider.ftp_client',
+                        new_callable=mock.PropertyMock) as mock_ftp_client:
+
+            mock_ftp_client.return_value.nlst.return_value = []
+            provider = verify_urls.FTPProvider('test', {'url': 'ftp://foo'})
+
+            self.assertEqual(
+                provider.check_url(mock_dataset_uri),
+                verify_urls.ABSENT)
+
+    def test_check_url_ok_after_retries(self):
+        """Test checking a URL successfully after some retries"""
+        mock_dataset_uri = mock.Mock()
+        mock_dataset_uri.uri = 'ftp://foo/bar/baz.nc'
+        with mock.patch('geospaas_harvesting.verify_urls.FTPProvider.ftp_client',
+                        new_callable=mock.PropertyMock) as mock_ftp_client, \
+             mock.patch('time.sleep') as mock_sleep:
+
+            mock_ftp_client.return_value.nlst.side_effect = (
+                (ConnectionResetError,) * 3 + (verify_urls.ABSENT,))
+            provider = verify_urls.FTPProvider('test', {'url': 'ftp://foo'})
+
+            self.assertEqual(
+                provider.check_url(mock_dataset_uri),
+                verify_urls.ABSENT)
+
+            self.assertEqual(mock_ftp_client.return_value.nlst.call_count, 4)
+            self.assertEqual(mock_ftp_client.return_value.connect.call_count, 3)
+            self.assertEqual(mock_sleep.call_count, 3)
+
+    def test_check_url_failing_after_retries(self):
+        """Test when checking a URL fails after retries"""
+        mock_dataset_uri = mock.Mock()
+        mock_dataset_uri.uri = 'ftp://foo/bar/baz.nc'
+        with mock.patch('geospaas_harvesting.verify_urls.FTPProvider.ftp_client',
+                        new_callable=mock.PropertyMock) as mock_ftp_client, \
+             mock.patch('time.sleep') as mock_sleep:
+
+            mock_ftp_client.return_value.nlst.side_effect = ConnectionResetError
+            provider = verify_urls.FTPProvider('test', {'url': 'ftp://foo'})
+
+            with self.assertRaises(ConnectionResetError), \
+                 self.assertLogs(verify_urls.logger, level=logging.ERROR):
+                provider.check_url(mock_dataset_uri)
+
+            self.assertEqual(mock_ftp_client.return_value.nlst.call_count, 5)
+            self.assertEqual(mock_ftp_client.return_value.connect.call_count, 4)
+            self.assertEqual(mock_sleep.call_count, 4)
+
+    def test_check_all_urls(self):
+        """Test that the right URLs are written to the output file"""
+        provider = verify_urls.FTPProvider('test', {'url': 'ftp://foo'})
+        with mock.patch('geospaas_harvesting.verify_urls.DatasetURI.objects') as mock_manager, \
+             mock.patch.object(provider, 'check_url') as mock_check_url, \
+             mock.patch.object(provider, 'write_stale_url') as mock_write:
+
+            mock_manager.filter.return_value.iterator.return_value = iter([
+                mock.Mock(id=1, uri='ftp://foo/bar/baz1.nc'),
+                mock.Mock(id=2, uri='ftp://foo/bar/baz2.nc'),
+                mock.Mock(id=3, uri='ftp://foo/bar/baz3.nc'),
+            ])
+
+            mock_check_url.side_effect = (verify_urls.ABSENT, verify_urls.PRESENT, 'http_503')
+
+            with self.assertLogs(verify_urls.logger):
+                provider.check_all_urls('output.txt')
+
+            self.assertListEqual(mock_write.call_args_list, [
+                mock.call('output.txt', verify_urls.ABSENT, 1, 'ftp://foo/bar/baz1.nc'),
+                mock.call('output.txt', 'http_503', 3, 'ftp://foo/bar/baz3.nc'),
+            ])
 
 
 class VerifyURLsTestCase(unittest.TestCase):
