@@ -294,8 +294,12 @@ class FTPProvider(Provider):
                 retries = 0
             except ConnectionResetError:
                 retries -= 1
-                time.sleep(5)
-                self.ftp_connect()
+                if retries <= 0:
+                    logger.error("Could not execute NLST command", exc_info=True)
+                    raise
+                else:
+                    time.sleep(5)
+                    self.ftp_connect()
 
         if path_list and path_list[0] == remote_path:
             return PRESENT
