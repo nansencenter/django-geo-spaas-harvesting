@@ -335,13 +335,14 @@ def find_provider(urls_file_path, providers):
     """Find the provider given the name of a file resulting from the
     'check' action
     """
-    provider_name = re.match(
-        r'^(.*)_stale_urls_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.txt$',
-        os.path.basename(urls_file_path)
-    ).group(1)
-    for provider in providers:
-        if provider.name == provider_name:
-            return provider
+    provider_name_match = re.match(
+        r'^(.*)_stale_urls_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.txt$',
+        os.path.basename(urls_file_path))
+    if provider_name_match:
+        provider_name = provider_name_match.group(1)
+        for provider in providers:
+            if provider.name == provider_name:
+                return provider
     return None
 
 
