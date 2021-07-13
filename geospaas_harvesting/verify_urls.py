@@ -264,7 +264,10 @@ class FTPProvider(Provider):
         return self._ftp_client
 
     def ftp_connect(self, timeout=5, retries=5):
-        """Connect to the remote FTP host"""
+        """Connect to the remote FTP host. This should be used
+        directly only when the connection needs to be re-established
+        after a problem
+        """
         host = urlparse(self.config['url']).netloc
         wait = 5
         while retries > 0:
