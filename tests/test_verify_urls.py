@@ -159,8 +159,8 @@ class HTTPProviderTestCase(unittest.TestCase):
             self.assertEqual(provider.check_url(mock_dataset_uri), verify_urls.PRESENT)
 
     def test_check_url_404(self):
-        """Should send a HEAD request to the URL and return whether the
-        URL is valid or not.
+        """Should send a HEAD request to the URL and return
+        verify_urls.ABSENT if a 404 error is received
         """
         provider = verify_urls.HTTPProvider('test', {})
         mock_dataset_uri = mock.Mock(id=1, uri='https://foo')
@@ -168,6 +168,18 @@ class HTTPProviderTestCase(unittest.TestCase):
         with mock.patch('geospaas_harvesting.utils.http_request',
                         return_value=mock_response) as mock_request:
             self.assertEqual(provider.check_url(mock_dataset_uri), verify_urls.ABSENT)
+            mock_request.assert_called_once()
+
+    def test_check_url_http_error(self):
+        """Should send a HEAD request to the URL and return
+        'http_<error_code>' if an error code other than 404 is received
+        """
+        provider = verify_urls.HTTPProvider('test', {})
+        mock_dataset_uri = mock.Mock(id=1, uri='https://foo')
+        mock_response = mock.MagicMock(status_code=503, headers={})
+        with mock.patch('geospaas_harvesting.utils.http_request',
+                        return_value=mock_response) as mock_request:
+            self.assertEqual(provider.check_url(mock_dataset_uri), 'http_503')
             mock_request.assert_called_once()
 
     def test_check_url_429_no_header(self):
