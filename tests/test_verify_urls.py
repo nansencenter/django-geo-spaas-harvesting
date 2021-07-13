@@ -764,6 +764,7 @@ class VerifyURLsTestCase(unittest.TestCase):
             with self.assertLogs(verify_urls.logger, level=logging.ERROR):
                 self.assertFalse(verify_urls.check_providers('foo', providers))
 
+
     def test_read_config(self):
         """Should read the provider configuration from a YAML file"""
         config = textwrap.dedent('''---
@@ -820,6 +821,31 @@ class VerifyURLsTestCase(unittest.TestCase):
             })
         ])
 
+    def test_get_http_provider(self):
+        """Test that a HTTPProvider is returned when the url starts
+        with 'http'
+        """
+        self.assertIsInstance(
+            verify_urls.get_provider('test', {'url': 'http://foo'}),
+            verify_urls.HTTPProvider)
+        self.assertIsInstance(
+            verify_urls.get_provider('test', {'url': 'https://foo'}),
+            verify_urls.HTTPProvider)
+
+    def test_get_ftp_provider(self):
+        """Test that a FTPProvider is returned when the url starts
+        with 'ftp'
+        """
+        self.assertIsInstance(
+            verify_urls.get_provider('test', {'url': 'ftp://foo'}),
+            verify_urls.FTPProvider)
+
+    def test_get_provider_error(self):
+        """A ValueError should be raised if no type of provider can be
+        chosen
+        """
+        with self.assertRaises(ValueError):
+            verify_urls.get_provider('test', {'url': 'file:///foo/'})
 
     def test_bounded_thread_pool_executor_init(self):
         """The executor should have a semaphore attribute with an
