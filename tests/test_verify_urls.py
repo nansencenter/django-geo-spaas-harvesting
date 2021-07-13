@@ -186,7 +186,7 @@ class HTTPProviderTestCase(unittest.TestCase):
                 self.assertEqual(provider.check_url(mock_dataset_uri),verify_urls.ABSENT)
 
             self.assertEqual(mock_request.call_count, 2)
-            mock_sleep.assert_has_calls((mock.call(60), mock.call(0)))
+            self.assertListEqual(mock_sleep.call_args_list, [mock.call(60), mock.call(0)])
 
     def test_check_url_429_retry_after_header(self):
         """When an error 429 occurs, the URL should be retried after a
@@ -208,7 +208,7 @@ class HTTPProviderTestCase(unittest.TestCase):
                     verify_urls.PRESENT)
 
             self.assertEqual(mock_request.call_count, 2)
-            mock_sleep.assert_has_calls((mock.call(2), mock.call(1)))
+            self.assertListEqual(mock_sleep.call_args_list, [mock.call(2), mock.call(1)])
 
     def test_check_url_429_too_many_retries(self):
         """When there are too many retries, an exception should be
