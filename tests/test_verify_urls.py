@@ -1,4 +1,5 @@
 """ Test the verification code """
+# pylint: disable=protected-access
 import argparse
 import io
 import logging
@@ -24,7 +25,7 @@ class ProviderTestCase(unittest.TestCase):
         provider = verify_urls.Provider(name, config)
         self.assertEqual(provider.name, name)
         self.assertEqual(provider.config, config)
-        self.assertIsNone(provider._auth)  # pylint: disable=protected-access
+        self.assertIsNone(provider._auth)
 
     def test_equality(self):
         """Test the equlity operator between two Provider objects"""
