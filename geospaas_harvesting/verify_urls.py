@@ -306,7 +306,6 @@ class FTPProvider(Provider):
         else:
             return ABSENT
 
-
     def check_all_urls(self, file_name):
         url_prefix = self.config['url']
         logger.info("Starting to check %s URLs", url_prefix)
