@@ -412,12 +412,14 @@ class VerifyURLsTestCase(unittest.TestCase):
     def test_delete_stale_urls(self):
         """404 URLs should be deleted unless the force option is used
         """
-        provider = {'url': 'https://foo', 'auth': ('username', 'password'), 'auth_renew': -1}
-        file_contents = '404 12 https://foo/bar\n500 13 https://foo/baz'
-        check_url_results = (
-            (False, 404, 12, 'https://foo/bar'),
-            (False, 500, 13, 'https://foo/baz')
-        )
+        provider = verify_urls.HTTPProvider('test', {
+            'url': 'https://foo',
+            'username': 'username',
+            'password': 'password',
+            'auth_renew': -1
+        })
+        file_contents = f'{verify_urls.ABSENT} 12 https://foo/bar\nhttp_500 13 https://foo/baz'
+        check_url_results = (verify_urls.ABSENT, 'http_500')
 
         dataset_uris = {12: 'https://foo/bar', 13: 'https://foo/baz'}
         mock_manager = mock.Mock()
@@ -428,10 +430,10 @@ class VerifyURLsTestCase(unittest.TestCase):
 
             buffer = io.StringIO(file_contents)
             with mock.patch('geospaas_harvesting.verify_urls.open', return_value=buffer), \
-                    mock.patch('geospaas_harvesting.verify_urls.check_url',
-                                side_effect=check_url_results), \
+                    mock.patch('geospaas_harvesting.verify_urls.HTTPProvider.check_url',
+                               side_effect=check_url_results), \
                     mock.patch('geospaas_harvesting.verify_urls.remove_dataset_uri',
-                                return_value=True) as mock_remove:
+                               return_value=True) as mock_remove:
                 # force == False, only the URL that returns 404 must be
                 # deleted
                 self.assertEqual(verify_urls.delete_stale_urls('', {}, force=False), (1, 1))
@@ -441,10 +443,10 @@ class VerifyURLsTestCase(unittest.TestCase):
 
             buffer = io.StringIO(file_contents)
             with mock.patch('geospaas_harvesting.verify_urls.open', return_value=buffer), \
-                    mock.patch('geospaas_harvesting.verify_urls.check_url',
-                                side_effect=check_url_results), \
+                    mock.patch('geospaas_harvesting.verify_urls.HTTPProvider.check_url',
+                               side_effect=check_url_results), \
                     mock.patch('geospaas_harvesting.verify_urls.remove_dataset_uri',
-                            return_value=True) as mock_remove:
+                               return_value=True) as mock_remove:
                 # force == True, both URLs must be deleted
                 self.assertEqual(verify_urls.delete_stale_urls('', {}, force=True), (2, 2))
                 self.assertListEqual(
@@ -473,28 +475,27 @@ class VerifyURLsTestCase(unittest.TestCase):
 
     def test_find_provider(self):
         """Should return the right provider given a URL"""
-        scihub_attributes = {
+        scihub_provider = verify_urls.HTTPProvider('scihub', {
             'url': 'https://scihub.copernicus.eu/',
-            'auth': ('scihub_user', 'scihub_pass'),
+            'username': 'scihub_user',
+            'password': 'scihub_pass',
             'throttle': 0
-        }
-        podaac_attributes = {
+        })
+        podaac_provider = verify_urls.HTTPProvider('podaac', {
             'url': 'https://opendap.jpl.nasa.gov/opendap/',
-            'auth': ('podaac_user', 'podaac_pass'),
+            'username': 'podaac_user',
+            'password': 'podaac_pass',
             'throttle': 0
-        }
+        })
+        providers = [scihub_provider, podaac_provider]
 
-        providers = {
-            'scihub': scihub_attributes,
-            'podaac': podaac_attributes
-        }
         self.assertIsNone(verify_urls.find_provider('foo.txt', providers))
-        self.assertDictEqual(
+        self.assertEqual(
             verify_urls.find_provider('scihub_stale_urls_2021-05-25T10:22:27.txt', providers),
-            scihub_attributes)
-        self.assertDictEqual(
+            scihub_provider)
+        self.assertEqual(
             verify_urls.find_provider('podaac_stale_urls_2021-05-25T10:22:28.txt', providers),
-            podaac_attributes)
+            podaac_provider)
 
     def test_check_providers(self):
         """Should run URL checks for each provider in a separate
@@ -502,42 +503,46 @@ class VerifyURLsTestCase(unittest.TestCase):
         check_providers() should return False and the traceback of the
         exception should be logged
         """
-        scihub_attributes = {
-            'url': 'https://scihub.copernicus.eu/',
-            'username': 'scihub_user',
-            'password': 'scihub_pass',
-            'throttle': 0
-        }
-        podaac_attributes = {
-            'url': 'https://opendap.jpl.nasa.gov/opendap/',
-            'username': 'podaac_user',
-            'password': 'podaac_pass',
-            'throttle': 0
-        }
-
-        providers = {
-            'scihub': scihub_attributes,
-            'podaac': podaac_attributes
-        }
+        providers = [
+            verify_urls.HTTPProvider('scihub', {
+                'url': 'https://scihub.copernicus.eu/',
+                'username': 'scihub_user',
+                'password': 'scihub_pass',
+                'throttle': 0
+            }),
+            verify_urls.HTTPProvider('podaac', {
+                'url': 'https://opendap.jpl.nasa.gov/opendap/',
+                'username': 'podaac_user',
+                'password': 'podaac_pass',
+                'throttle': 0
+            }),
+            verify_urls.FTPProvider('rtofs', {
+                'url': 'ftp://ftpprd.ncep.noaa.gov/pub/data/nccf/com/rtofs/prod/'
+            }),
+        ]
 
         with mock.patch('concurrent.futures.ProcessPoolExecutor') as mock_pool, \
                 mock.patch('geospaas_harvesting.verify_urls.datetime') as mock_datetime, \
-                mock.patch('geospaas_harvesting.verify_urls.check_provider_urls') as mock_check, \
+                mock.patch('geospaas_harvesting.verify_urls.'
+                           'HTTPProvider.check_all_urls') as mock_http_check, \
+                mock.patch('geospaas_harvesting.verify_urls.'
+                           'FTPProvider.check_all_urls') as mock_ftp_check, \
                 mock.patch('concurrent.futures.as_completed', iter):
             mock_executor = mock_pool.return_value.__enter__.return_value
             mock_datetime.now.return_value.strftime.return_value = 'time'
             self.assertTrue(verify_urls.check_providers('foo', providers))
             mock_executor.submit.assert_has_calls((
                 mock.call(
-                    mock_check,
-                    os.path.join('foo', 'scihub_stale_urls_time.txt'),
-                    **scihub_attributes),
+                    mock_http_check,
+                    os.path.join('foo', 'scihub_stale_urls_time.txt')),
                 mock.call(
-                    mock_check,
-                    os.path.join('foo', 'podaac_stale_urls_time.txt'),
-                    **podaac_attributes)
+                    mock_http_check,
+                    os.path.join('foo', 'podaac_stale_urls_time.txt')),
+                mock.call(
+                    mock_ftp_check,
+                    os.path.join('foo', 'rtofs_stale_urls_time.txt'))
             ), any_order=True)
-            self.assertEqual(len(mock_executor.submit.call_args_list), 2)
+            self.assertEqual(len(mock_executor.submit.call_args_list), 3)
 
             mock_executor.submit.return_value.result.side_effect = AttributeError
             with self.assertLogs(verify_urls.logger, level=logging.ERROR):
