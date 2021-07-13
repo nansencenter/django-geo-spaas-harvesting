@@ -1,5 +1,5 @@
 """Test suite for crawlers"""
-#pylint: disable=protected-access
+# pylint: disable=protected-access
 
 import ftplib
 import json
@@ -8,7 +8,6 @@ import os
 import re
 import unittest
 import unittest.mock as mock
-from unittest.mock import call
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
