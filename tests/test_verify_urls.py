@@ -14,6 +14,59 @@ import requests_oauthlib
 import geospaas_harvesting.verify_urls as verify_urls
 
 
+class ProviderTestCase(unittest.TestCase):
+    """Test the Provider base class"""
+
+    def test_instantiation(self):
+        """Test the setting of the base properties"""
+        name = 'test'
+        config = {'foo': 'bar', 'baz': 'qux'}
+        provider = verify_urls.Provider(name, config)
+        self.assertEqual(provider.name, name)
+        self.assertEqual(provider.config, config)
+        self.assertIsNone(provider._auth)  # pylint: disable=protected-access
+
+    def test_equality(self):
+        """Test the equlity operator between two Provider objects"""
+        self.assertEqual(
+            verify_urls.Provider('test', {'foo': 'bar'}),
+            verify_urls.Provider('test', {'foo': 'bar'}))
+        self.assertNotEqual(
+            verify_urls.Provider('test', {'foo': 'bar'}),
+            verify_urls.Provider('test2', {'foo': 'bar'}))
+        self.assertNotEqual(
+            verify_urls.Provider('test', {'foo': 'bar'}),
+            verify_urls.Provider('test', {'baz': 'qux'}))
+
+    def test_abstract_auth(self):
+        """The auth property should raise a NotImplementedError"""
+        with self.assertRaises(NotImplementedError):
+            verify_urls.Provider('test', {}).auth
+
+    def test_abstract_check_url(self):
+        """The check_url() method should raise a NotImplementedError"""
+        with self.assertRaises(NotImplementedError):
+            verify_urls.Provider('test', {}).check_url(mock.Mock())
+
+    def test_abstract_check_all_urls(self):
+        """The check_all_urls() method should raise a NotImplementedError"""
+        with self.assertRaises(NotImplementedError):
+            verify_urls.Provider('test', {}).check_all_urls('file')
+
+    def test_write_stale_url(self):
+        """Test writing URL checking information to a file"""
+        with mock.patch('geospaas_harvesting.verify_urls.open') as mock_open:
+            mock_file = mock.MagicMock()
+            mock_open.return_value.__enter__.return_value = mock_file
+            with self.assertLogs(verify_urls.logger, level=logging.DEBUG):
+                verify_urls.Provider('test', {}).write_stale_url(
+                    'file_name',
+                    'absent',
+                    518,
+                    'http://foo/bar.nc')
+            mock_file.write.assert_called_once_with(f"absent 518 http://foo/bar.nc{os.linesep}")
+
+
 class VerifyURLsTestCase(unittest.TestCase):
     """Test the URLs verification module"""
 
