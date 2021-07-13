@@ -277,8 +277,12 @@ class FTPProvider(Provider):
                 retries = 0
             except socket.timeout:
                 retries -= 1
-                time.sleep(wait)
-                wait += 1
+                if retries <= 0:
+                    logger.error("Could not connect to %s", host, exc_info=True)
+                    raise
+                else:
+                    time.sleep(wait)
+                    wait += 1
 
     def check_url(self, dataset_uri, **kwargs):
         logger.debug('Checking %s', dataset_uri.uri)
