@@ -151,8 +151,9 @@ class HTTPProvider(Provider):
     @property
     def auth(self):
         auth_renew = self.config.get('auth_renew')
-        if not self._auth or (auth_renew and time.monotonic() - self._auth_start >= auth_renew):
-            self._auth_start = time.monotonic()
+        current_time = time.monotonic()
+        if not self._auth or (auth_renew and current_time - self._auth_start >= auth_renew):
+            self._auth_start = current_time
             if set(('username', 'password', 'token_url', 'client_id')).issubset(self.config):
                 self._auth = self.build_oauth2(
                     self.config['username'], self.config['password'],
