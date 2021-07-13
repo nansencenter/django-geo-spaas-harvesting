@@ -318,6 +318,9 @@ class VerifyURLsTestCase(unittest.TestCase):
             mock_delete.assert_not_called()
 
     def test_main_delete(self):
+        """Test that the delete_stale_urls() function is called when
+        the 'delete-stale' argument is given on the CLI
+        """
         args = mock.Mock()
         args.action = 'delete-stale'
         with mock.patch('geospaas_harvesting.verify_urls.parse_cli_arguments', return_value=args), \
