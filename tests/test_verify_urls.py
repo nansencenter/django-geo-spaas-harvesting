@@ -71,6 +71,13 @@ class ProviderTestCase(unittest.TestCase):
 class HTTPProviderTestCase(unittest.TestCase):
     """Test the HTTPProvider class"""
 
+    def test_instantiation(self):
+        """Test that the attributes are correctly initialized"""
+        provider = verify_urls.HTTPProvider('test', {'foo': 'bar'})
+        self.assertEqual(provider.name, 'test')
+        self.assertEqual(provider.config, {'foo': 'bar'})
+        self.assertEqual(provider._auth_start, None)
+
     def test_build_oauth2(self):
         """Should return an OAuth2 object usable by `requests`"""
         with mock.patch('requests_oauthlib.OAuth2Session') as mock_oauth2_session:
