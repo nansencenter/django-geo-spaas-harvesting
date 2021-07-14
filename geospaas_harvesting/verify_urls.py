@@ -275,7 +275,7 @@ class FTPProvider(Provider):
                 self.ftp_client.connect(host, timeout=timeout)
                 self.ftp_client.login(**self.auth)
                 retries = 0
-            except socket.timeout:
+            except (ConnectionResetError, socket.timeout):
                 retries -= 1
                 if retries <= 0:
                     logger.error("Could not connect to %s", host, exc_info=True)
@@ -292,7 +292,7 @@ class FTPProvider(Provider):
             try:
                 path_list = self.ftp_client.nlst(remote_path)
                 retries = 0
-            except ConnectionResetError:
+            except (ConnectionResetError, socket.timeout):
                 retries -= 1
                 if retries <= 0:
                     logger.error("Could not execute NLST command", exc_info=True)
