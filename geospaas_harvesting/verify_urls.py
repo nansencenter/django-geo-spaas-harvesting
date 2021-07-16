@@ -35,6 +35,7 @@ from threading import BoundedSemaphore, Lock
 from urllib.parse import urlparse
 
 import django
+import django.db.models
 import oauthlib.oauth2
 import requests
 import requests.auth
@@ -360,16 +361,18 @@ def remove_dataset_uri(dataset_uri):
     """Remove a DatasetURI and the corresponding Dataset, if it has no
     URIs anymore
     """
-    logger.debug("Removing dataset URI %d, %s", dataset_uri.id, dataset_uri.uri)
-    dataset = dataset_uri.dataset
-    dataset_uri.delete()
+    removed_uri = removed_dataset = False
 
+    logger.debug("Removing dataset URI %d, %s", dataset_uri.id, dataset_uri.uri)
+    removed_uri = dataset_uri.delete()[0] == 1
+
+    dataset = dataset_uri.dataset
     remove_dataset = not dataset.dataseturi_set.all()  # .all() is needed to refresh the queryset
     if remove_dataset:
         logger.debug("Removing dataset %d", dataset.id)
-        dataset.delete()
+        removed_dataset = dataset.delete()[0] == 1
 
-    return remove_dataset
+    return (removed_uri, removed_dataset)
 
 
 def delete_stale_urls(urls_file_path, providers, force=False):
@@ -383,12 +386,18 @@ def delete_stale_urls(urls_file_path, providers, force=False):
     with open(urls_file_path, 'r') as urls_file:
         for line in urls_file:
             _, dataset_uri_id, _ = line.split()
-            dataset_uri = DatasetURI.objects.get(id=int(dataset_uri_id))
-            url_state = provider.check_url(dataset_uri)
-            if url_state != PRESENT and (url_state == ABSENT or force):
-                deleted_uris_count += 1
-                if remove_dataset_uri(dataset_uri):
-                    deleted_datasets_count += 1
+            dataset_uri_queryset = DatasetURI.objects.filter(id=int(dataset_uri_id))
+            if dataset_uri_queryset:
+                dataset_uri = dataset_uri_queryset[0]
+                url_state = provider.check_url(dataset_uri)
+                if url_state != PRESENT and (url_state == ABSENT or force):
+                    removed_uri, removed_dataset = remove_dataset_uri(dataset_uri)
+                    if removed_uri:
+                        deleted_uris_count += 1
+                    if removed_dataset:
+                        deleted_datasets_count += 1
+            else:
+                logger.warning("Could not remove DatasetURI with ID %s", exc_info=True)
     return (deleted_uris_count, deleted_datasets_count)
 
 
