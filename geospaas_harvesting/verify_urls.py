@@ -397,7 +397,8 @@ def delete_stale_urls(urls_file_path, providers, force=False):
                     if removed_dataset:
                         deleted_datasets_count += 1
             else:
-                logger.warning("Could not remove DatasetURI with ID %s", exc_info=True)
+                logger.warning("Could not remove DatasetURI with ID %s",
+                               dataset_uri_id, exc_info=True)
     return (deleted_uris_count, deleted_datasets_count)
 
 
