@@ -472,6 +472,7 @@ def main():
         if check_providers(args.output_directory, providers):
             logger.info("Finished checking all URLs")
     elif args.action == 'delete-stale':
+        logger.info("Deleting URLs from %s", args.urls_file)
         deleted_counts = delete_stale_urls(args.urls_file, providers)
         logger.info("Deleted %d URIs and %d datasets", *deleted_counts)
 
