@@ -639,55 +639,85 @@ class VerifyURLsTestCase(unittest.TestCase):
 
         dataset_uris = {12: 'https://foo/bar', 13: 'https://foo/baz'}
         mock_manager = mock.Mock()
-        mock_manager.get.side_effect = lambda id: mock.Mock(uri=dataset_uris[id])
+        mock_manager.filter.side_effect = lambda id: [mock.Mock(uri=dataset_uris.get(id))]
 
         with mock.patch('geospaas_harvesting.verify_urls.find_provider', return_value=provider), \
              mock.patch('geospaas_harvesting.verify_urls.DatasetURI.objects', mock_manager):
 
+            # force == False, only the URL that returns 404 must be
+            # deleted
             buffer = io.StringIO(file_contents)
             with mock.patch('geospaas_harvesting.verify_urls.open', return_value=buffer), \
                     mock.patch('geospaas_harvesting.verify_urls.HTTPProvider.check_url',
                                side_effect=check_url_results), \
                     mock.patch('geospaas_harvesting.verify_urls.remove_dataset_uri',
-                               return_value=True) as mock_remove:
-                # force == False, only the URL that returns 404 must be
-                # deleted
+                               return_value=(True, True)) as mock_remove:
                 self.assertEqual(verify_urls.delete_stale_urls('', {}, force=False), (1, 1))
                 self.assertListEqual(
                     [args[0][0].uri for args in mock_remove.call_args_list],
                     ['https://foo/bar'])
 
+            # force == True, both URLs must be deleted
             buffer = io.StringIO(file_contents)
             with mock.patch('geospaas_harvesting.verify_urls.open', return_value=buffer), \
                     mock.patch('geospaas_harvesting.verify_urls.HTTPProvider.check_url',
                                side_effect=check_url_results), \
                     mock.patch('geospaas_harvesting.verify_urls.remove_dataset_uri',
-                               return_value=True) as mock_remove:
-                # force == True, both URLs must be deleted
+                               return_value=(True, True)) as mock_remove:
                 self.assertEqual(verify_urls.delete_stale_urls('', {}, force=True), (2, 2))
                 self.assertListEqual(
                     [args[0][0].uri for args in mock_remove.call_args_list],
                     ['https://foo/bar', 'https://foo/baz'])
 
-    def test_remove_dataset_uri(self):
+            # The URI does not exist
+            buffer = io.StringIO(file_contents)
+            with mock.patch('geospaas_harvesting.verify_urls.open', return_value=buffer):
+                mock_manager.filter.side_effect = None
+                mock_manager.filter.return_value = []
+                with self.assertLogs(verify_urls.logger, level=logging.WARNING):
+                    self.assertEqual(verify_urls.delete_stale_urls('', {}, force=False), (0, 0))
+
+    def test_remove_dataset_uri_and_dataset(self):
         """The URI should be removed, as well as the corresponding
         dataset if it does not have anymore URIs
         """
         dataset_uri = mock.Mock()
+        dataset_uri.delete.return_value = (1, {'catalog.DatasetURI': 1})
+        dataset_uri.dataset.delete.return_value = (1, {'catalog.Dataset': 1})
 
         # simulate empty queryset
         dataset_uri.dataset.dataseturi_set.all.return_value = []
-        self.assertTrue(verify_urls.remove_dataset_uri(dataset_uri))
+        self.assertTupleEqual(verify_urls.remove_dataset_uri(dataset_uri), (True, True))
         dataset_uri.delete.assert_called_once_with()
         dataset_uri.dataset.delete.assert_called_once_with()
 
-        dataset_uri.reset_mock()
+    def test_remove_dataset_uri_but_not_dataset(self):
+        """The URI should be removed, but not the corresponding
+        dataset if it has more URIs
+        """
+        dataset_uri = mock.Mock()
+        dataset_uri.delete.return_value = (1, {'catalog.DatasetURI': 1})
 
         # simulate queryset with one element
         dataset_uri.dataset.dataseturi_set.all.return_value = [mock.Mock()]
-        self.assertFalse(verify_urls.remove_dataset_uri(dataset_uri))
+        self.assertTupleEqual(verify_urls.remove_dataset_uri(dataset_uri), (True, False))
         dataset_uri.delete.assert_called_once_with()
         dataset_uri.dataset.delete.assert_not_called()
+
+    def test_dataset_uri_and_dataset_not_removed(self):
+        """If the URI and/or dataset are not removed,
+        remove_dataset_uri() should return booleans indicating so.
+        This should not usually happen.
+        """
+        dataset_uri = mock.Mock()
+        dataset_uri.delete.return_value = (0, {'catalog.DatasetURI': 0})
+        dataset_uri.dataset.delete.return_value = (0, {'catalog.Dataset': 0})
+
+        # simulate empty queryset
+        dataset_uri.dataset.dataseturi_set.all.return_value = []
+        self.assertTupleEqual(verify_urls.remove_dataset_uri(dataset_uri), (False, False))
+        dataset_uri.delete.assert_called_once_with()
+        dataset_uri.dataset.delete.assert_called_once_with()
 
     def test_find_provider(self):
         """Should return the right provider given a URL"""
