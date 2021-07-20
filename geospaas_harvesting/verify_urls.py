@@ -241,6 +241,14 @@ class HTTPProvider(Provider):
 class FTPProvider(Provider):
     """Provider class that deals with FTP repositories"""
 
+    network_errors = (
+        ConnectionResetError,
+        socket.gaierror,
+        socket.herror,
+        socket.timeout,
+        EOFError
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ftp_client = None
@@ -276,7 +284,7 @@ class FTPProvider(Provider):
                 self.ftp_client.connect(host, timeout=timeout)
                 self.ftp_client.login(**self.auth)
                 retries = 0
-            except (ConnectionResetError, socket.timeout):
+            except self.network_errors:
                 retries -= 1
                 if retries <= 0:
                     logger.error("Could not connect to %s", host, exc_info=True)
@@ -293,7 +301,7 @@ class FTPProvider(Provider):
             try:
                 path_list = self.ftp_client.nlst(remote_path)
                 retries = 0
-            except (ConnectionResetError, socket.timeout, EOFError):
+            except self.network_errors:
                 retries -= 1
                 if retries <= 0:
                     logger.error("Could not execute NLST command", exc_info=True)
