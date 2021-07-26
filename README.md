@@ -41,13 +41,6 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
 
 **Top-level keys**:
 
-- **endless** (default: False): boolean controlling the endless harvesting mode. If True, the
-  harvesters will be indefinitely re-run after they finish harvesting.
-- **dump_on_interruption** (default: True): boolean controlling the persistence behavior. If True, 
-  the harvesters are dumped on disk in case of unexpected error or interruption. The harvesting 
-  process can then be resumed where it stopped.
-- **poll_interval** (default: 600): the interval in seconds at which the main process checks if the
-  running harvester processes have finished executing.
 - **update_vocabularies** (default: True): update the Vocabulary objects stored in the database
   with the local `pythesint` data. If **update_pythesint** is also set to True, the local data is
   refreshed before the database is updated.
@@ -187,5 +180,4 @@ It takes care of several tasks:
 
 - based on the configuration file, instantiate and run each harvester in a separate process
   so that each data repository can be harvested in parallel.
-- when receiving a SIGTERM or SIGINT signal, shut down the harvesters gracefully and dump their
-  state so that the harvesting can be resumed where it stopped.
+- when receiving a SIGTERM or SIGINT signal, shut down the harvesters gracefully.
