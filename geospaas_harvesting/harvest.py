@@ -6,11 +6,8 @@ import logging
 import multiprocessing
 import os
 import os.path
-import pickle
 import signal
 import sys
-import time
-from datetime import datetime
 
 import django
 import django.db
@@ -34,10 +31,7 @@ class Configuration(collections.abc.Mapping):
 
     DEFAULT_CONFIGURATION_PATH = os.path.join(os.path.dirname(__file__), 'harvest.yml')
     TOP_LEVEL_KEYS = set([
-        'dump_on_interruption',
-        'endless',
         'harvesters',
-        'poll_interval',
         'update_vocabularies',
         'update_pythesint',
         'pythesint_versions'
@@ -113,70 +107,6 @@ def raise_keyboard_interrupt(*args):
     raise KeyboardInterrupt
 
 
-def dump(obj, path):
-    """Convenience function to serialize objects"""
-    try:
-        with open(path, 'wb') as persistence_file_handler:
-            pickle.dump(obj, persistence_file_handler)
-    except (FileNotFoundError, IsADirectoryError):
-        LOGGER.error("Could not dump %s to %s", str(obj), path, exc_info=True)
-    except Exception:  # pylint: disable=broad-except
-        LOGGER.error("An unexpected error occurred while dumping %s to %s",
-                     str(obj), path, exc_info=True)
-
-
-def dump_with_timestamp(obj, suffix=None):
-    """Dump an object in a file named with a timestamp and the object's class name"""
-    LOGGER.info("Dumping current state of %s", str(obj))
-    dump(obj, os.path.join(PERSISTENCE_DIR, (
-        datetime.utcnow().strftime('%Y-%m-%d-%H-%M-%S-%f') + '_' +
-        suffix or obj.__class__.__name__
-    )))
-
-
-def load(path):
-    """Convenience function to deserialize objects"""
-    try:
-        with open(path, 'rb') as persistence_file_handler:
-            return pickle.load(persistence_file_handler)
-    except (FileNotFoundError, IsADirectoryError, TypeError):
-        LOGGER.error("Could not load from %s", path, exc_info=True)
-
-
-def get_persistence_files():
-    """Returns a list containing the names of all persistence files"""
-    files = []
-    try:
-        files = sorted(os.listdir(PERSISTENCE_DIR), key=lambda s: s.split('_')[0], reverse=True)
-    except FileNotFoundError:
-        pass
-    return files
-
-
-def get_harvester_file_name(harvester_name):
-    """Returns the name of the most recent file matching the harvester's name"""
-    harvester_file = None
-    for file_name in get_persistence_files():
-        if file_name.endswith(harvester_name):
-            harvester_file = file_name
-            break
-    return harvester_file
-
-
-def load_last_dumped_harvester(harvester_name):
-    """
-    Returns a harvester unpickled from a persistence file, based on `harvester_name`.
-    """
-    harvester = None
-    harvester_file_name = get_harvester_file_name(harvester_name)
-    if harvester_file_name:
-        harvester_file_path = os.path.join(PERSISTENCE_DIR, harvester_file_name)
-        LOGGER.info("Loading harvester from '%s'", harvester_file_path)
-        harvester = load(harvester_file_path)
-        os.remove(harvester_file_path)
-    return harvester
-
-
 def create_harvester(harvester_config):
     """Instantiate a harvester"""
     harvester_class = getattr(harvesters, harvester_config['class'])
@@ -186,41 +116,16 @@ def create_harvester(harvester_config):
     }))
 
 
-def load_or_create_harvester(harvester_name, harvester_config, load_dumped=True):
-    """
-    Try to load the last dumped harvester. If no havester was found, instantiate one using the
-    configuration
-    """
-    if load_dumped:
-        LOGGER.info('Trying to load last dumped harvester')
-        harvester = load_last_dumped_harvester(harvester_name)
-    else:
-        harvester = None
-
-    if not harvester:
-        LOGGER.info('Instantiating a new harvester')
-        harvester = create_harvester(harvester_config)
-
-    return harvester
-
-
-def launch_harvest(harvester_name, harvester_config, dump_on_interruption=True):
+def launch_harvest(harvester_name, harvester_config):
     """Launch the harvest operation and process errors. Meant to be run in a separate process"""
     # Force the creation of a new database connection for each new process
     django.db.connection.close()
 
     try:
-        harvester = load_or_create_harvester(harvester_name, harvester_config, dump_on_interruption)
+        harvester = create_harvester(harvester_config)
         harvester.harvest()
-    except KeyboardInterrupt:
-        LOGGER.error("The process was killed", exc_info=True)
-        if dump_on_interruption:
-            dump_with_timestamp(harvester, f"{harvester_name}")
-        sys.exit(1)
     except Exception:  # pylint: disable=broad-except
         LOGGER.error("An unexpected error occurred", exc_info=True)
-        if dump_on_interruption:
-            dump_with_timestamp(harvester, f"{harvester_name}")
         raise
     LOGGER.info("%s finished harvesting", harvester_name)
 
@@ -228,7 +133,6 @@ def launch_harvest(harvester_name, harvester_config, dump_on_interruption=True):
 def init_worker():
     """Initialization function for child processes. Defines signals handling."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
-    # signal.signal(signal.SIGTERM, raise_keyboard_interrupt)
 
 
 def refresh_vocabularies(config):
@@ -260,35 +164,18 @@ def main():
 
     LOGGER.info('Finished updating vocabularies')
     processes_number = len(config['harvesters'])
-    endless = config.get('endless', False)
     try:
         with multiprocessing.Pool(processes_number, initializer=init_worker) as pool:
             results = {}
-            # While all the processes do not end in error, launch the harvesters and check
-            # regularly if they are finished.
-            while not (
-                    results and all([r.ready() and not r.successful() for r in results.values()])):
-                # Loop over the harvesters defined in the configuration file
-                for harvester_name, harvester_config in config['harvesters'].items():
-                    # If the harvester has not been launched yet or has finished executing, launch it
-                    # (again). Otherwise it is executing, so do nothing
-                    previous_result = results.get(harvester_name, None)
-                    if (previous_result and previous_result.ready() and previous_result.successful()
-                            or not previous_result):
-                        # Start a new process
-                        results[harvester_name] = pool.apply_async(
-                            launch_harvest, (
-                                harvester_name,
-                                harvester_config,
-                                config.get('dump_on_interruption', True)
-                            )
-                        )
-                if not endless:
-                    break
-                time.sleep(config.get('poll_interval', 600))
-
-            if endless:
-                LOGGER.error("All harvester processes encountered errors")
+            # Loop over the harvesters defined in the configuration file
+            for harvester_name, harvester_config in config['harvesters'].items():
+                # Start a new process
+                results[harvester_name] = pool.apply_async(
+                    launch_harvest, (
+                        harvester_name,
+                        harvester_config
+                    )
+                )
             pool.close()
             pool.join()
     except KeyboardInterrupt:
