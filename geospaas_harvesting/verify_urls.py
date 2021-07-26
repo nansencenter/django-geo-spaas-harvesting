@@ -39,6 +39,7 @@ import django.db.models
 import oauthlib.oauth2
 import requests
 import requests.auth
+import requests.exceptions
 import requests_oauthlib
 import yaml
 
@@ -170,16 +171,25 @@ class HTTPProvider(Provider):
         tries = kwargs.get('tries', 5)
         logger.debug("Sending HEAD request to %s", dataset_uri.uri)
         while tries > 0:
-            tries -= 1
-            with closing(utils.http_request(
-                    'HEAD', dataset_uri.uri, allow_redirects=True, auth=self.auth)) as response:
-                status_code = response.status_code
-                headers = response.headers
+            try:
+                with closing(utils.http_request(
+                        'HEAD', dataset_uri.uri, allow_redirects=True, auth=self.auth)) as response:
+                    status_code = response.status_code
+                    headers = response.headers
+            except requests.exceptions.ConnectionError:
+                tries -= 1
+                if tries <= 0:
+                    raise
+                else:
+                    logger.error("Error when connecting to %s", dataset_uri.uri, exc_info=True)
+                    time.sleep(5)
+                    continue
 
             logger.debug("%d %s", status_code, dataset_uri.uri)
 
             # Too Many Requests: wait and retry
             if status_code == 429:
+                tries -= 1
                 if tries <= 0:
                     raise TooManyRequests(dataset_uri.uri)
                 else:

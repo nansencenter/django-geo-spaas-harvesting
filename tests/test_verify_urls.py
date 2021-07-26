@@ -12,6 +12,7 @@ import unittest
 import unittest.mock as mock
 
 import requests.auth
+import requests.exceptions
 import requests_oauthlib
 
 import geospaas_harvesting.verify_urls as verify_urls
@@ -240,6 +241,41 @@ class HTTPProviderTestCase(unittest.TestCase):
             with self.assertRaises(verify_urls.TooManyRequests):
                 provider.check_url(mock_dataset_uri, tries=1)
             mock_request.assert_called_once()
+
+    def test_check_url_connection_error_retry(self):
+        """The request should be retried if a ConnectionError occurs"""
+        provider = verify_urls.HTTPProvider('test', {})
+        mock_dataset_uri = mock.Mock(id=1, uri='https://foo')
+        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request, \
+             mock.patch('time.sleep') as mock_sleep:
+            mock_request.side_effect = (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ConnectionError,
+                mock.MagicMock(status_code=200, headers={})
+            )
+            with self.assertLogs(verify_urls.logger, level=logging.ERROR):
+                provider.check_url(mock_dataset_uri, tries=5)
+
+        self.assertListEqual(mock_sleep.call_args_list, [mock.call(5), mock.call(5), mock.call(0)])
+
+    def test_check_url_connection_error_too_many_retries(self):
+        """The request should be retried if a ConnectionError occurs
+        and the exception should be raised if the retry limit is
+        reached
+        """
+        provider = verify_urls.HTTPProvider('test', {})
+        mock_dataset_uri = mock.Mock(id=1, uri='https://foo')
+        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request, \
+                mock.patch('time.sleep') as mock_sleep:
+            mock_request.side_effect = (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ConnectionError,
+            )
+            with self.assertLogs(verify_urls.logger, level=logging.ERROR), \
+                 self.assertRaises(requests.exceptions.ConnectionError):
+                provider.check_url(mock_dataset_uri, tries=2)
+
+        self.assertListEqual(mock_sleep.call_args_list, [mock.call(5)])
 
     def test_check_and_write_stale_url_valid(self):
         """Should not write anything to the output file if the URL is
