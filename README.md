@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/nansencenter/django-geo-spaas-harvesting.svg?branch=master)](https://travis-ci.org/nansencenter/django-geo-spaas-harvesting)
+[![Build Status](https://github.com/nansencenter/django-geo-spaas-harvesting/actions/workflows/tests_build.yml/badge.svg)](https://github.com/nansencenter/django-geo-spaas-harvesting/actions/workflows/tests_build.yml)
 [![Coverage Status](https://coveralls.io/repos/github/nansencenter/django-geo-spaas-harvesting/badge.svg?branch=master)](https://coveralls.io/github/nansencenter/django-geo-spaas-harvesting?branch=master)
 
 # Data gathering for GeoSPaaS
