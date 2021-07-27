@@ -218,3 +218,14 @@ class LOCALHarvester(WebDirectoryHarvester):
 class NetCDFLocalHarvester(LOCALHarvester):
     """Harvester class for one-dimensional NetCDF file hosted locally"""
     ingester = ingesters.NetCDFIngester
+
+
+class CustomizedNetCDFLocalHarvester(LOCALHarvester):
+    """Harvester class for customized NetCDF file hosted locally"""
+    def _create_ingester(self):
+        parameters = {}
+        for parameter_name in ['max_fetcher_threads', 'max_db_threads',
+                               'longitude_attribute', 'latitude_attribute']:
+            if parameter_name in self.config:
+                parameters[parameter_name] = self.config[parameter_name]
+        return ingesters.NetCDFIngester(**parameters)

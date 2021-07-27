@@ -554,10 +554,15 @@ class NetCDFIngester(MetanormIngester):
         # point
         elif longitudes.shape == latitudes.shape:
             points = []
+            #read the fill_value just one time for usage in below loop
+            lat_fil_value = latitudes[:].fill_value if np.ma.isMaskedArray(latitudes) else None
+            lon_fil_value = longitudes[:].fill_value if np.ma.isMaskedArray(longitudes) else None
             # in this case numpy.nditer() works like zip() for
             # multi-dimensional arrays
             for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
                 new_point = Point(float(lon), float(lat), srid=4326)
+                if lat_fil_value in new_point.coords or lon_fil_value in new_point.coords:
+                    continue # Don't add the points that have the default value inside them
                 # Don't add duplicate points in trajectories
                 if not points or new_point != points[-1]:
                     points.append(new_point)
