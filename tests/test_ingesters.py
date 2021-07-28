@@ -1253,6 +1253,26 @@ class NetCDFIngesterTestCase(django.test.TestCase):
             'POLYGON ((0 0, 2 4, 3 4, 1 1, 0 0))'
         )
 
+    @mock.patch('geospaas_harvesting.ingesters.np.ma.isMaskedArray', return_value=True)
+    def test_get_polygon_from_coordinates_lists_with_masked_array_1d_case(self, mock_isMaskedArray):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are 1d masked_array as an abstracted version of 2d lon and lat values
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MaskedMockVariable(
+                (1,1e10, 1e10, 2, 0, 3, 1),dimensions=['LONGITUDE','LATITUDE']
+                                                ),
+            'LATITUDE': self.MaskedMockVariable(
+                (1, 1e10, 1e10, 4, 0, 4, 1),dimensions=['LONGITUDE','LATITUDE']
+                                               ),
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((0 0, 0 4, 3 4, 3 0, 0 0))'
+        )
+
     def test_get_polygon_from_1d_lon_lat(self):
         """Test getting a polygonal coverage from a dataset when the
         latitude and longitude are one-dimensional and of different
