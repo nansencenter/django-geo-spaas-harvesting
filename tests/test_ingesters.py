@@ -1094,8 +1094,7 @@ class NetCDFIngesterTestCase(django.test.TestCase):
         def __init__(self, data, *args, **kwargs):
             super().__init__(data, *args, **kwargs)
             self._data = np.ma.masked_values(data, 1e10)
-            self.shape = self._data.shape
-            self.dimensions = kwargs.get('dimensions', {})
+
 
     def test_get_raw_attributes(self):
         """Test reading raw attributes from a netCDF file"""
