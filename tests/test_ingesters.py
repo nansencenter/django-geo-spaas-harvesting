@@ -1089,6 +1089,14 @@ class NetCDFIngesterTestCase(django.test.TestCase):
             """Make the class numpy-array-like"""
             return self._data
 
+
+    class MaskedMockVariable(MockVariable):
+        def __init__(self, data, *args, **kwargs):
+            super().__init__(data, *args, **kwargs)
+            self._data = np.ma.masked_values(data, 1e10)
+            self.shape = self._data.shape
+            self.dimensions = kwargs.get('dimensions', {})
+
     def test_get_raw_attributes(self):
         """Test reading raw attributes from a netCDF file"""
         attributes = {
@@ -1216,6 +1224,28 @@ class NetCDFIngesterTestCase(django.test.TestCase):
             )),
             'LATITUDE': self.MockVariable((
                 (1, 2, 3),
+                (4, 0, 4),
+            ))
+        }
+        self.assertEqual(
+            self.ingester._get_geometry_wkt(mock_dataset),
+            'POLYGON ((0 0, 2 4, 3 4, 1 1, 0 0))'
+        )
+
+    @mock.patch('geospaas_harvesting.ingesters.np.ma.isMaskedArray', return_value=True)
+    def test_get_polygon_from_coordinates_lists_with_masked_array(self, mock_isMaskedArray):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are multi-dimensional masked_array
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MaskedMockVariable((
+                (1, 1e10, 1e10),
+                (2, 0, 3),
+            )),
+            'LATITUDE': self.MaskedMockVariable((
+                (1, 1e10, 1e10),
                 (4, 0, 4),
             ))
         }
