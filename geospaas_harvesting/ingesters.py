@@ -555,8 +555,8 @@ class NetCDFIngester(MetanormIngester):
         elif longitudes.shape == latitudes.shape:
             points = []
             #read the fill_value just one time for usage in below loop
-            lat_fil_value = latitudes[:].fill_value if np.ma.isMaskedArray(latitudes) else None
-            lon_fil_value = longitudes[:].fill_value if np.ma.isMaskedArray(longitudes) else None
+            lat_fil_value = latitudes[:].fill_value if np.ma.isMaskedArray(latitudes[:]) else None
+            lon_fil_value = longitudes[:].fill_value if np.ma.isMaskedArray(longitudes[:]) else None
             # in this case numpy.nditer() works like zip() for
             # multi-dimensional arrays
             for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
