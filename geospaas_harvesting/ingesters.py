@@ -560,9 +560,9 @@ class NetCDFIngester(MetanormIngester):
             # in this case numpy.nditer() works like zip() for
             # multi-dimensional arrays
             for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
-                new_point = Point(float(lon), float(lat), srid=4326)
-                if lat_fil_value in new_point.coords or lon_fil_value in new_point.coords:
+                if lon_fil_value == lon or lat_fil_value == lat:
                     continue # Don't add the points that have the default value inside them
+                new_point = Point(float(lon), float(lat), srid=4326)
                 # Don't add duplicate points in trajectories
                 if not points or new_point != points[-1]:
                     points.append(new_point)
