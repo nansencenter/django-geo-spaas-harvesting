@@ -92,7 +92,7 @@ class WebDirectoryHarvester(Harvester):
     """
     ingester = None
     crawler = None
-    mandatory_config_elements = ['max_fetcher_threads', 'max_db_threads']
+    ingester_config_keys = ['max_fetcher_threads', 'max_db_threads']
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -121,7 +121,7 @@ class WebDirectoryHarvester(Harvester):
             raise HarvesterConfigurationError(
                 "The class of ingester has not been specified properly")
         try:
-            for parameter_name in self.mandatory_config_elements:
+            for parameter_name in self.ingester_config_keys:
                 if parameter_name in self.config:
                     parameters[parameter_name] = self.config[parameter_name]
             return self.ingester(**parameters)
@@ -218,6 +218,6 @@ class LOCALHarvester(WebDirectoryHarvester):
 
 class NetCDFLocalHarvester(LOCALHarvester):
     """Harvester class for NetCDF file hosted locally"""
-    mandatory_config_elements = ['max_fetcher_threads', 'max_db_threads',
-                               'longitude_attribute', 'latitude_attribute']
+    ingester_config_keys = ['max_fetcher_threads', 'max_db_threads',
+                            'longitude_attribute', 'latitude_attribute']
     ingester = ingesters.NetCDFIngester
