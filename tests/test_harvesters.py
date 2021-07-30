@@ -191,6 +191,12 @@ class ChildHarvestersTestCase(unittest.TestCase):
         self.assertIsInstance(harvester._current_crawler, crawlers.CreodiasEOFinderCrawler)
         self.assertIsInstance(harvester._ingester, ingesters.CreodiasEOFinderIngester)
 
+    def test_earthdata_cmr_harvester(self):
+        """The Earthdata CMR harvester should create the correct crawlers and ingesters"""
+        harvester = harvesters.EarthdataCMRHarvester(url='', search_terms=[{}])
+        self.assertIsInstance(harvester._current_crawler, crawlers.EarthdataCMRCrawler)
+        self.assertIsInstance(harvester._ingester, ingesters.EarthdataCMRIngester)
+
     def test_osisaf_harvester_include(self):
         """ include criteria should have passed by the "includes" as a regex in configuration file.
         Otherwise, accossiated error must be raised """
