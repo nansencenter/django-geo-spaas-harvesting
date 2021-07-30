@@ -251,3 +251,14 @@ class HarvesterExceptTestCase(unittest.TestCase):
             pass
         with self.assertRaises(HarvesterConfigurationError):
             TestClassHarvester3()
+
+    def test_config_include_type(self):
+        """The include config key of a WebDirectoryHarvester,
+        if present, should be a string
+        """
+        class TestHarvester(harvesters.WebDirectoryHarvester):
+            crawler = mock.Mock()
+            ingester = mock.Mock()
+
+        with self.assertRaises(HarvesterConfigurationError):
+            TestHarvester(urls=['http://foo'], include=1)
