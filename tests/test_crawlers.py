@@ -607,9 +607,9 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
         def __init__(self, url, search_terms=None, time_range=(None, None),
                      username=None, password=None,
                      page_size=100, initial_offset=None):
-            super().__init__(url, search_terms=None, time_range=(None, None),
-                             username=None, password=None,
-                             page_size=100, initial_offset=None)
+            super().__init__(url, search_terms=search_terms, time_range=time_range,
+                             username=username, password=password,
+                             page_size=page_size, initial_offset=initial_offset)
             self._ran_once = False
 
         def _get_datasets_info(self, page):
@@ -631,6 +631,19 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
             'params': {'size': 100, 'offset': 0}
         })
         self.assertListEqual(self.crawler._results, [])
+
+    def test_get_page_size(self):
+        """Test page_size getter"""
+        self.assertEqual(self.TestCrawler('foo', page_size=10).page_size, 10)
+
+    def test_get_page_offset(self):
+        """Test page_offset getter"""
+        self.assertEqual(self.TestCrawler('foo', initial_offset=10).page_offset, 10)
+
+    def test_set_page_offset(self):
+        """Test page_offset setter"""
+        self.crawler.page_offset = 12
+        self.assertEqual(self.crawler.page_offset, 12)
 
     def test_set_initial_state(self):
         """Test that set_initial_state correctly resets the crawler"""
@@ -679,6 +692,12 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         self.crawler = crawlers.CopernicusOpenSearchAPICrawler(
             url=self.BASE_URL, search_terms=self.SEARCH_TERMS, username='user', password='pass',
             page_size=self.PAGE_SIZE, initial_offset=0)
+
+    def test_increment_offset(self):
+        """The offset should be incremented by the page size"""
+        self.assertEqual(self.crawler.page_offset, 0)
+        self.crawler.increment_offset()
+        self.assertEqual(self.crawler.page_offset, self.PAGE_SIZE)
 
     def test_build_parameters_with_standard_time_range(self):
         """Build the request parameters with a time range composed of two datetime objects"""
