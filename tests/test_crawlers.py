@@ -8,7 +8,6 @@ import os
 import re
 import unittest
 import unittest.mock as mock
-from unittest.mock import call
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -845,6 +844,103 @@ class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
 
         self.crawler._get_datasets_info(page)
         self.assertDictEqual(self.crawler._results[0], expected_result)
+
+
+class EarthdataCMRCrawlerTestCase(unittest.TestCase):
+    """Tests for EarthdataCMRCrawler"""
+    SEARCH_TERMS = {'param1': 'value1', 'param2': 'value2'}
+
+    def setUp(self):
+        self.crawler = crawlers.EarthdataCMRCrawler('foo', self.SEARCH_TERMS)
+
+    def test_build_request_parameters_no_argument(self):
+        """Test building the request parameters without specifying any argument"""
+        self.assertDictEqual(self.crawler._build_request_parameters(), {
+            'params': {
+                'page_size': 100,
+                'page_num': 1,
+                'sort_key': '+start_date',
+            }
+        })
+
+    def test_build_request_parameters_no_time_range(self):
+        """Test building the request parameters without time range"""
+        self.assertDictEqual(self.crawler._build_request_parameters(self.SEARCH_TERMS), {
+            'params': {
+                'param1': 'value1',
+                'param2': 'value2',
+                'page_size': 100,
+                'page_num': 1,
+                'sort_key': '+start_date'
+            }
+        })
+
+    def test_build_request_parameters_with_time_range(self):
+        """Test building the request parameters without time range"""
+        time_range = (
+            datetime(2020, 2, 1, tzinfo=timezone.utc),
+            datetime(2020, 2, 2, tzinfo=timezone.utc)
+        )
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'page_size': 100,
+                    'page_num': 1,
+                    'sort_key': '+start_date',
+                    'temporal': '2020-02-01T00:00:00+00:00,2020-02-02T00:00:00+00:00'
+                }
+            }
+        )
+
+    def test_build_request_parameters_with_time_range_start_only(self):
+        """Test building the request parameters without time range"""
+        time_range = (datetime(2020, 2, 1, tzinfo=timezone.utc), None)
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'page_size': 100,
+                    'page_num': 1,
+                    'sort_key': '+start_date',
+                    'temporal': '2020-02-01T00:00:00+00:00,'
+                }
+            })
+
+    def test_build_request_parameters_with_time_range_end_only(self):
+        """Test building the request parameters without time range"""
+        time_range = (None, datetime(2020, 2, 2, tzinfo=timezone.utc))
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'page_size': 100,
+                    'page_num': 1,
+                    'sort_key': '+start_date',
+                    'temporal': ',2020-02-02T00:00:00+00:00'
+                }
+            })
+
+    def test_get_datasets_info(self):
+        """_get_datasets_info() should extract datasets information
+        from a response page
+        """
+        data_file_path = os.path.join(
+            os.path.dirname(__file__), 'data/earthdata_cmr/result_page.json')
+
+        with open(data_file_path, 'r') as f_h:
+            page = f_h.read()
+
+        expected_entry = json.loads(page)['items'][0]
+
+        self.crawler._get_datasets_info(page)
+        self.assertDictEqual(self.crawler._results[0], expected_entry)
 
 
 class FTPCrawlerTestCase(unittest.TestCase):
