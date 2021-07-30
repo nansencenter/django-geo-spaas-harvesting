@@ -646,9 +646,9 @@ class EarthdataCMRCrawler(HTTPPaginatedAPICrawler):
         # sort by start date, ascending
         request_parameters['params']['sort_key'] = '+start_date'
 
-        if time_range[0] and time_range[1]:
+        if time_range[0] or time_range[1]:
             request_parameters['params']['temporal'] = ','.join(
-                date.isoformat()
+                date.isoformat() if date else ''
                 for date in time_range)
 
         return request_parameters
