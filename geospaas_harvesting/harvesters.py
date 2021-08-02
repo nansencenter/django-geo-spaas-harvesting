@@ -41,9 +41,6 @@ class Harvester():
         except (KeyError, TypeError) as error:
             raise HarvesterConfigurationError("Missing configuration key") from error
 
-        self._crawlers_iterator = iter(self._crawlers)
-        self._current_crawler = next(self._crawlers_iterator)
-
     def get_time_range(self):
         """
         Build a couple representing the time coverage of the harvester based on its configuration
@@ -72,14 +69,8 @@ class Harvester():
         Loop through the crawlers and ingest files for each one.
         Looping by using the iterator explicitly enables to resume after a deserialization
         """
-        while True:
-            try:
-                self._ingester.ingest(self._current_crawler)
-                # When the crawler is done iterating, reset it so that it can be reused
-                self._current_crawler.set_initial_state()
-                self._current_crawler = next(self._crawlers_iterator)
-            except StopIteration:
-                break
+        for crawler in self._crawlers:
+                self._ingester.ingest(crawler)
 
 
 class WebDirectoryHarvester(Harvester):

@@ -166,7 +166,8 @@ class ChildHarvestersTestCase(unittest.TestCase):
     def test_podaac_harvester(self):
         """The PODAAC harvester has the correct crawler and ingester"""
         harvester = harvesters.PODAACHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertIsInstance(harvester._current_crawler, crawlers.OpenDAPCrawler)
+        self.assertIsInstance(harvester._crawlers[0], crawlers.OpenDAPCrawler)
+        self.assertEqual(len(harvester._crawlers), 1)
         self.assertIsInstance(harvester._ingester, ingesters.DDXIngester)
 
     def test_ftp_harvester(self):
@@ -174,7 +175,8 @@ class ChildHarvestersTestCase(unittest.TestCase):
         with mock.patch.object(crawlers.FTPCrawler, '__init__', return_value=None):
             harvester = harvesters.FTPHarvester(
                 urls=['ftp://'], max_fetcher_threads=1, max_db_threads=1)
-        self.assertIsInstance(harvester._current_crawler, crawlers.FTPCrawler)
+        self.assertIsInstance(harvester._crawlers[0], crawlers.FTPCrawler)
+        self.assertEqual(len(harvester._crawlers), 1)
         self.assertIsInstance(harvester._ingester, ingesters.URLNameIngester)
 
     def test_copernicus_sentinel_harvester(self):
@@ -182,13 +184,15 @@ class ChildHarvestersTestCase(unittest.TestCase):
         harvester = harvesters.CopernicusSentinelHarvester(url='', search_terms=[''],
                                                            max_fetcher_threads=1, max_db_threads=1,
                                                            username='test', password='TEST')
-        self.assertIsInstance(harvester._current_crawler, crawlers.CopernicusOpenSearchAPICrawler)
+        self.assertIsInstance(harvester._crawlers[0], crawlers.CopernicusOpenSearchAPICrawler)
+        self.assertEqual(len(harvester._crawlers), 1)
         self.assertIsInstance(harvester._ingester, ingesters.CopernicusODataIngester)
 
     def test_creodias_harvester(self):
         """The Creodias harvester should create the correct crawlers and ingesters"""
         harvester = harvesters.CreodiasEOFinderHarvester(url='', search_terms=[{}])
-        self.assertIsInstance(harvester._current_crawler, crawlers.CreodiasEOFinderCrawler)
+        self.assertIsInstance(harvester._crawlers[0], crawlers.CreodiasEOFinderCrawler)
+        self.assertEqual(len(harvester._crawlers), 1)
         self.assertIsInstance(harvester._ingester, ingesters.CreodiasEOFinderIngester)
 
     def test_osisaf_harvester_include(self):
@@ -196,9 +200,9 @@ class ChildHarvestersTestCase(unittest.TestCase):
         Otherwise, accossiated error must be raised """
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1,
                                                include='ease|_sh_polstere')
-        self.assertEqual(harvester._current_crawler.include, re.compile('ease|_sh_polstere'))
+        self.assertEqual(harvester._crawlers[0].include, re.compile('ease|_sh_polstere'))
         harvester = harvesters.OSISAFHarvester(urls=[''], max_fetcher_threads=1, max_db_threads=1)
-        self.assertIsNone(harvester._current_crawler.include)
+        self.assertIsNone(harvester._crawlers[0].include)
         with self.assertRaises(HarvesterConfigurationError):#incorrectly passsed as a list
             harvester = harvesters.OSISAFHarvester(
                 urls=[''], max_fetcher_threads=1, max_db_threads=1, include=['ease'])
@@ -208,7 +212,8 @@ class ChildHarvestersTestCase(unittest.TestCase):
         the correct crawlers and ingesters
         """
         harvester = harvesters.NetCDFLocalHarvester(paths=[''])
-        self.assertIsInstance(harvester._current_crawler, crawlers.LocalDirectoryCrawler)
+        self.assertIsInstance(harvester._crawlers[0], crawlers.LocalDirectoryCrawler)
+        self.assertEqual(len(harvester._crawlers), 1)
         self.assertIsInstance(harvester._ingester, ingesters.NetCDFIngester)
 
 

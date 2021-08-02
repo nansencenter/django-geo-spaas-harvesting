@@ -1,7 +1,4 @@
 ---
-# endless: False
-# dump_on_interruption: False
-# poll_interval: 600
 # update_vocabularies: True
 # update_pythesint: True
 # pythesint_versions:
