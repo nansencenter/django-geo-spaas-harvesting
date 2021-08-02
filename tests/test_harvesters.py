@@ -198,7 +198,8 @@ class ChildHarvestersTestCase(unittest.TestCase):
     def test_earthdata_cmr_harvester(self):
         """The Earthdata CMR harvester should create the correct crawlers and ingesters"""
         harvester = harvesters.EarthdataCMRHarvester(url='', search_terms=[{}])
-        self.assertIsInstance(harvester._current_crawler, crawlers.EarthdataCMRCrawler)
+        self.assertIsInstance(harvester._crawlers[0], crawlers.EarthdataCMRCrawler)
+        self.assertEqual(len(harvester._crawlers), 1)
         self.assertIsInstance(harvester._ingester, ingesters.EarthdataCMRIngester)
 
     def test_osisaf_harvester_include(self):
