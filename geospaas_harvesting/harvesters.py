@@ -149,48 +149,56 @@ class FTPHarvester(WebDirectoryHarvester):
         ]
 
 
-class CopernicusSentinelHarvester(Harvester):
+class APIHarvester(Harvester):
+    """Base class for harvesters dealing with APIs"""
+
+    ingester = None
+    crawler = None
+
+    def _create_crawlers(self):
+        parameters = {
+            key: self.config[key]
+            for key in ['username', 'password']
+            if key in self.config
+        }
+        parameters['time_range'] = self.get_time_range()
+
+        return [
+            self.crawler(
+                url=self.config['url'],
+                search_terms=search,
+                **parameters)
+            for search in self.config['search_terms']
+        ]
+
+    def _create_ingester(self):
+        parameters = {
+            key: self.config[key]
+            for key in ['username', 'password', 'max_fetcher_threads', 'max_db_threads']
+            if key in self.config
+        }
+        return self.ingester(**parameters)
+
+
+class CopernicusSentinelHarvester(APIHarvester):
     """Harvester class for Copernicus Sentinel data"""
 
-    def _create_crawlers(self):
-        return [
-            crawlers.CopernicusOpenSearchAPICrawler(
-                url=self.config['url'],
-                search_terms=search,
-                username=self.config.get('username', None),
-                password=self.config.get('password'),
-                time_range=(self.get_time_range()))
-            for search in self.config['search_terms']
-        ]
-
-    def _create_ingester(self):
-        parameters = {}
-        for parameter_name in ['username', 'max_fetcher_threads', 'max_db_threads']:
-            if parameter_name in self.config:
-                parameters[parameter_name] = self.config[parameter_name]
-        if 'password' in self.config:
-            parameters['password'] = self.config.get('password')
-        return ingesters.CopernicusODataIngester(**parameters)
+    crawler = crawlers.CopernicusOpenSearchAPICrawler
+    ingester = ingesters.CopernicusODataIngester
 
 
-class CreodiasEOFinderHarvester(Harvester):
+class CreodiasEOFinderHarvester(APIHarvester):
     """Harvester class for Creodias data"""
 
-    def _create_crawlers(self):
-        return [
-            crawlers.CreodiasEOFinderCrawler(
-                url=self.config['url'],
-                search_terms=search,
-                time_range=self.get_time_range())
-            for search in self.config['search_terms']
-        ]
+    crawler = crawlers.CreodiasEOFinderCrawler
+    ingester = ingesters.CreodiasEOFinderIngester
 
-    def _create_ingester(self):
-        parameters = {}
-        for parameter_name in ['max_fetcher_threads', 'max_db_threads']:
-            if parameter_name in self.config:
-                parameters[parameter_name] = self.config[parameter_name]
-        return ingesters.CreodiasEOFinderIngester(**parameters)
+
+class EarthdataCMRHarvester(APIHarvester):
+    """Harvester class for Earthdata CMR"""
+
+    crawler = crawlers.EarthdataCMRCrawler
+    ingester = ingesters.EarthdataCMRIngester
 
 
 class LOCALHarvester(WebDirectoryHarvester):

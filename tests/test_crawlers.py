@@ -607,9 +607,9 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
         def __init__(self, url, search_terms=None, time_range=(None, None),
                      username=None, password=None,
                      page_size=100, initial_offset=None):
-            super().__init__(url, search_terms=None, time_range=(None, None),
-                             username=None, password=None,
-                             page_size=100, initial_offset=None)
+            super().__init__(url, search_terms=search_terms, time_range=time_range,
+                             username=username, password=password,
+                             page_size=page_size, initial_offset=initial_offset)
             self._ran_once = False
 
         def _get_datasets_info(self, page):
@@ -631,6 +631,19 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
             'params': {'size': 100, 'offset': 0}
         })
         self.assertListEqual(self.crawler._results, [])
+
+    def test_get_page_size(self):
+        """Test page_size getter"""
+        self.assertEqual(self.TestCrawler('foo', page_size=10).page_size, 10)
+
+    def test_get_page_offset(self):
+        """Test page_offset getter"""
+        self.assertEqual(self.TestCrawler('foo', initial_offset=10).page_offset, 10)
+
+    def test_set_page_offset(self):
+        """Test page_offset setter"""
+        self.crawler.page_offset = 12
+        self.assertEqual(self.crawler.page_offset, 12)
 
     def test_set_initial_state(self):
         """Test that set_initial_state correctly resets the crawler"""
@@ -679,6 +692,12 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         self.crawler = crawlers.CopernicusOpenSearchAPICrawler(
             url=self.BASE_URL, search_terms=self.SEARCH_TERMS, username='user', password='pass',
             page_size=self.PAGE_SIZE, initial_offset=0)
+
+    def test_increment_offset(self):
+        """The offset should be incremented by the page size"""
+        self.assertEqual(self.crawler.page_offset, 0)
+        self.crawler.increment_offset()
+        self.assertEqual(self.crawler.page_offset, self.PAGE_SIZE)
 
     def test_build_parameters_with_standard_time_range(self):
         """Build the request parameters with a time range composed of two datetime objects"""
@@ -844,6 +863,103 @@ class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
 
         self.crawler._get_datasets_info(page)
         self.assertDictEqual(self.crawler._results[0], expected_result)
+
+
+class EarthdataCMRCrawlerTestCase(unittest.TestCase):
+    """Tests for EarthdataCMRCrawler"""
+    SEARCH_TERMS = {'param1': 'value1', 'param2': 'value2'}
+
+    def setUp(self):
+        self.crawler = crawlers.EarthdataCMRCrawler('foo', self.SEARCH_TERMS)
+
+    def test_build_request_parameters_no_argument(self):
+        """Test building the request parameters without specifying any argument"""
+        self.assertDictEqual(self.crawler._build_request_parameters(), {
+            'params': {
+                'page_size': 100,
+                'page_num': 1,
+                'sort_key': '+start_date',
+            }
+        })
+
+    def test_build_request_parameters_no_time_range(self):
+        """Test building the request parameters without time range"""
+        self.assertDictEqual(self.crawler._build_request_parameters(self.SEARCH_TERMS), {
+            'params': {
+                'param1': 'value1',
+                'param2': 'value2',
+                'page_size': 100,
+                'page_num': 1,
+                'sort_key': '+start_date'
+            }
+        })
+
+    def test_build_request_parameters_with_time_range(self):
+        """Test building the request parameters without time range"""
+        time_range = (
+            datetime(2020, 2, 1, tzinfo=timezone.utc),
+            datetime(2020, 2, 2, tzinfo=timezone.utc)
+        )
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'page_size': 100,
+                    'page_num': 1,
+                    'sort_key': '+start_date',
+                    'temporal': '2020-02-01T00:00:00+00:00,2020-02-02T00:00:00+00:00'
+                }
+            }
+        )
+
+    def test_build_request_parameters_with_time_range_start_only(self):
+        """Test building the request parameters without time range"""
+        time_range = (datetime(2020, 2, 1, tzinfo=timezone.utc), None)
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'page_size': 100,
+                    'page_num': 1,
+                    'sort_key': '+start_date',
+                    'temporal': '2020-02-01T00:00:00+00:00,'
+                }
+            })
+
+    def test_build_request_parameters_with_time_range_end_only(self):
+        """Test building the request parameters without time range"""
+        time_range = (None, datetime(2020, 2, 2, tzinfo=timezone.utc))
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'page_size': 100,
+                    'page_num': 1,
+                    'sort_key': '+start_date',
+                    'temporal': ',2020-02-02T00:00:00+00:00'
+                }
+            })
+
+    def test_get_datasets_info(self):
+        """_get_datasets_info() should extract datasets information
+        from a response page
+        """
+        data_file_path = os.path.join(
+            os.path.dirname(__file__), 'data/earthdata_cmr/result_page.json')
+
+        with open(data_file_path, 'r') as f_h:
+            page = f_h.read()
+
+        expected_entry = json.loads(page)['items'][0]
+
+        self.crawler._get_datasets_info(page)
+        self.assertDictEqual(self.crawler._results[0], expected_entry)
 
 
 class FTPCrawlerTestCase(unittest.TestCase):

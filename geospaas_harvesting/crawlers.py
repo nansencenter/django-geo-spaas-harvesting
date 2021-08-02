@@ -626,3 +626,42 @@ class CreodiasEOFinderCrawler(HTTPPaginatedAPICrawler):
             self._results.append(url)
 
         return bool(entries)
+
+
+class EarthdataCMRCrawler(HTTPPaginatedAPICrawler):
+    """Crawler for the CMR Earthdata search API"""
+
+    PAGE_OFFSET_NAME = 'page_num'
+    PAGE_SIZE_NAME = 'page_size'
+    MIN_OFFSET = 1
+
+    def _build_request_parameters(self, search_terms=None, time_range=(None, None),
+                                  username=None, password=None, page_size=100):
+        request_parameters = super()._build_request_parameters(
+            search_terms, time_range, username, password, page_size)
+
+        if search_terms:
+            request_parameters['params'].update(**search_terms)
+
+        # sort by start date, ascending
+        request_parameters['params']['sort_key'] = '+start_date'
+
+        if time_range[0] or time_range[1]:
+            request_parameters['params']['temporal'] = ','.join(
+                date.isoformat() if date else ''
+                for date in time_range)
+
+        return request_parameters
+
+    def _get_datasets_info(self, page):
+        """Get dataset attributes from the current page and
+        adds them to self._results.
+        Returns True if attributes were found, False otherwise"""
+        entries = json.loads(page)['items']
+
+        for entry in entries:
+            self.LOGGER.debug("Adding '%s' to the list of resources.",
+                              entry['umm']['RelatedUrls'][0]['URL'])
+            self._results.append(entry)
+
+        return bool(entries)

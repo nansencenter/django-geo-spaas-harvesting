@@ -481,13 +481,13 @@ class CopernicusODataIngester(MetanormIngester):
         return normalized_attributes
 
 
-class CreodiasEOFinderIngester(MetanormIngester):
-    """Ingest datasets from the metadata returned by calls to the Creodias finder API"""
-
-    LOGGER = logging.getLogger(__name__ + '.CreodiasEOFinderIngester')
+class APIPayloadIngester(MetanormIngester):
+    """Base class for ingesters used with API crawlers which return a
+    dict of metadata, not simply a URL
+    """
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
-        """Get attributes from the Creodias finder API"""
+        """Get attributes from an API crawler"""
         self.add_url(self.get_download_url(dataset_info), dataset_info)
 
         normalized_attributes = self._metadata_handler.get_parameters(dataset_info)
@@ -496,10 +496,29 @@ class CreodiasEOFinderIngester(MetanormIngester):
 
         return normalized_attributes
 
+
+class CreodiasEOFinderIngester(APIPayloadIngester):
+    """Ingest datasets from the metadata returned by calls to the Creodias finder API"""
+
+    LOGGER = logging.getLogger(__name__ + '.CreodiasEOFinderIngester')
+
     @staticmethod
     def get_download_url(dataset_info):
         """Checks if the dataset's URI already exists in the database"""
         return dataset_info['services']['download']['url']
+
+
+class EarthdataCMRIngester(APIPayloadIngester):
+    """Ingest datasets from the metadata coming from the
+    Earthdata CMR API
+    """
+
+    LOGGER = logging.getLogger(__name__ + '.EarthdataCMRIngester')
+
+    @staticmethod
+    def get_download_url(dataset_info):
+        """Checks if the dataset's URI already exists in the database"""
+        return dataset_info['umm']['RelatedUrls'][0]['URL']
 
 
 class URLNameIngester(MetanormIngester):

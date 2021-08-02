@@ -751,13 +751,13 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         self.assertEqual(created_dataset_uri, False)
 
 
-class CreodiasEOFinderIngesterTestCase(django.test.TestCase):
-    """Test the CreodiasEOFinderIngester"""
+class APIPayloadIngesterTestCase(django.test.TestCase):
+    """Tests for the APIIngester"""
 
     fixtures = [os.path.join(os.path.dirname(__file__), "fixtures", "harvest")]
 
     def setUp(self):
-        self.ingester = ingesters.CreodiasEOFinderIngester()
+        self.ingester = ingesters.APIPayloadIngester()
 
     def test_get_normalized_attributes(self):
         """_get_normalized_attributes() should add the download URL to
@@ -778,10 +778,34 @@ class CreodiasEOFinderIngesterTestCase(django.test.TestCase):
             )
             mock_add_url.assert_called_once()
 
+
+class CreodiasEOFinderIngesterTestCase(django.test.TestCase):
+    """Test the CreodiasEOFinderIngester"""
+
+    fixtures = [os.path.join(os.path.dirname(__file__), "fixtures", "harvest")]
+
+    def setUp(self):
+        self.ingester = ingesters.CreodiasEOFinderIngester()
+
     def test_get_download_url(self):
         """Test that the download URL is correctly extracted from the
         dataset information"""
         dataset_info = {'services': {'download': {'url': 'http://something'}}}
+        self.assertEqual(self.ingester.get_download_url(dataset_info), 'http://something')
+
+
+class EarthdataCMRIngesterTestCase(django.test.TestCase):
+    """Test the EarthdataCMRIngester"""
+
+    fixtures = [os.path.join(os.path.dirname(__file__), "fixtures", "harvest")]
+
+    def setUp(self):
+        self.ingester = ingesters.EarthdataCMRIngester()
+
+    def test_get_download_url(self):
+        """Test that the download URL is correctly extracted from the
+        dataset information"""
+        dataset_info = {'umm': {'RelatedUrls': [{'URL': 'http://something', 'Type': 'GET DATA'}]}}
         self.assertEqual(self.ingester.get_download_url(dataset_info), 'http://something')
 
 
