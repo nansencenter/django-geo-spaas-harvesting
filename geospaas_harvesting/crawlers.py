@@ -552,11 +552,21 @@ class CopernicusOpenSearchAPICrawler(HTTPPaginatedAPICrawler):
 
         request_parameters['params']['orderby'] = 'ingestiondate asc'
 
-        if time_range[0] or time_range[1]:
-            api_date_format = '%Y-%m-%dT%H:%M:%SZ'
-            start = (time_range[0] or self.MIN_DATETIME).strftime(api_date_format)
-            end = time_range[1].strftime(api_date_format) if time_range[1] else 'NOW'
-            time_condition = f"beginposition:[{start} TO {end}]"
+        # build the time condition equivalent to:
+        # start_date <= time_range[1] and end_date >= time_range[0]
+        api_date_format = '%Y-%m-%dT%H:%M:%SZ'
+        time_condition = ''
+        if time_range[1]:
+            min_date = self.MIN_DATETIME.strftime(api_date_format)
+            end_date = time_range[1].strftime(api_date_format)
+            time_condition += f"beginposition:[{min_date} TO {end_date}]"
+        if time_range[0]:
+            start_date = time_range[0].strftime(api_date_format)
+            if time_condition:
+                time_condition += ' AND '
+            time_condition += f"endposition:[{start_date} TO NOW]"
+
+        if time_condition:
             request_parameters['params']['q'] += f" AND ({time_condition})"
 
         if username and password:
