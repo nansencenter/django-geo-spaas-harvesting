@@ -271,7 +271,11 @@ class LocalDirectoryCrawler(WebDirectoryCrawler):
     LOGGER = logging.getLogger(__name__ + '.LocalDirectoryCrawler')
 
     def _list_folder_contents(self, folder_path):
-        return [os.path.join(folder_path, file_path) for file_path in os.listdir(folder_path)]
+        if self._is_folder(folder_path):
+            return [os.path.join(folder_path, file_path) for file_path in os.listdir(folder_path)]
+        else:
+            # if the given path points to a file, just return it
+            return [folder_path]
 
     def _is_folder(self, path):
         return os.path.isdir(path)

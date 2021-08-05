@@ -322,7 +322,8 @@ class LocalDirectoryCrawlerTestCase(unittest.TestCase):
     def test_list_folder_contents(self):
         """_list_folder_contents() should return the absolute
         path of all files contained in the folder"""
-        with mock.patch('os.listdir', return_value=['foo', 'bar', 'baz']):
+        with mock.patch('os.listdir', return_value=['foo', 'bar', 'baz']), \
+                mock.patch.object(self.crawler, '_is_folder', return_value=True):
             base_dir_name = 'base_dir'
             self.assertListEqual(
                 self.crawler._list_folder_contents(base_dir_name),
@@ -331,6 +332,17 @@ class LocalDirectoryCrawlerTestCase(unittest.TestCase):
                     os.path.join(base_dir_name, 'bar'),
                     os.path.join(base_dir_name, 'baz'),
                 ]
+            )
+
+    def test_list_folder_contents_file_path(self):
+        """When given a file path, _list_folder_contents() should
+        return a list containing only this file path
+        """
+        with mock.patch.object(self.crawler, '_is_folder', return_value=False):
+            file_path = '/foo/bar.nc'
+            self.assertListEqual(
+                self.crawler._list_folder_contents(file_path),
+                [file_path]
             )
 
     def test_is_folder(self):
