@@ -33,7 +33,8 @@ from geospaas.utils.utils import nansat_filename
 from geospaas.vocabularies.models import (DataCenter, Instrument,
                                           ISOTopicCategory, Location, Parameter, Platform)
 from nansat import Nansat
-from metanorm.handlers import GeospatialMetadataHandler
+from metanorm.handlers import MetadataHandler
+from metanorm.normalizers.geospaas import GeoSPaaSMetadataNormalizer
 from metanorm.utils import get_cf_or_wkv_standard_name
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -309,27 +310,9 @@ class MetanormIngester(Ingester):
 
     LOGGER = logging.getLogger(__name__ + '.MetanormIngester')
 
-    DATASET_PARAMETER_NAMES = [
-        'entry_title',
-        'entry_id',
-        'summary',
-        'time_coverage_start',
-        'time_coverage_end',
-        'platform',
-        'instrument',
-        'location_geometry',
-        'provider',
-        'iso_topic_category',
-        'gcmd_location',
-    ]
-    DATASET_CUMULATIVE_PARAMETER_NAMES = [
-        'dataset_parameters',
-    ]
-
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
         super().__init__(max_fetcher_threads, max_db_threads)
-        self._metadata_handler = GeospatialMetadataHandler(
-            self.DATASET_PARAMETER_NAMES, self.DATASET_CUMULATIVE_PARAMETER_NAMES)
+        self._metadata_handler = MetadataHandler(GeoSPaaSMetadataNormalizer)
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Returns a dictionary of normalized attribute which characterize a Dataset"""
