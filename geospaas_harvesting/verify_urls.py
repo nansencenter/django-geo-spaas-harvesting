@@ -197,7 +197,7 @@ class HTTPProvider(Provider):
                         "Error 429 received from '%s'; retries left: %d", dataset_uri.uri, tries)
                     time.sleep(headers.get('Retry-After', 60))
             # other errors: return False
-            elif status_code < 200 or status_code > 299:
+            elif status_code != 200:
                 tries = 0
                 if status_code == 404:
                     url_state = ABSENT
