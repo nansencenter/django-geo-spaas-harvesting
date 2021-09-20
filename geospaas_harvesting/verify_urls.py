@@ -94,8 +94,13 @@ class Provider():
 
     def __init__(self, name, config):
         self.name = name
-        self.config = config
         self._auth = None
+        self.config = config
+        # set ABSENT as default invalid status
+        if 'invalid_status' not in self.config:
+            self.config['invalid_status'] = [ABSENT]
+        elif ABSENT not in self.config['invalid_status']:
+            self.config['invalid_status'].append(ABSENT)
 
     def __eq__(self, obj):
         return (isinstance(obj, self.__class__)
@@ -398,6 +403,7 @@ def delete_stale_urls(urls_file_path, providers, force=False):
     step, then remove them.
     """
     provider = find_provider(urls_file_path, providers)
+    invalid_status = provider.config['invalid_status']
 
     deleted_uris_count = 0
     deleted_datasets_count = 0
@@ -408,7 +414,7 @@ def delete_stale_urls(urls_file_path, providers, force=False):
             if dataset_uri_queryset:
                 dataset_uri = dataset_uri_queryset[0]
                 url_state = provider.check_url(dataset_uri)
-                if url_state != PRESENT and (url_state == ABSENT or force):
+                if url_state != PRESENT and (url_state in invalid_status or force):
                     removed_uri, removed_dataset = remove_dataset_uri(dataset_uri)
                     if removed_uri:
                         deleted_uris_count += 1
