@@ -27,7 +27,7 @@ class ProviderTestCase(unittest.TestCase):
         config = {'foo': 'bar', 'baz': 'qux'}
         provider = verify_urls.Provider(name, config)
         self.assertEqual(provider.name, name)
-        self.assertEqual(provider.config, config)
+        self.assertEqual(provider.config, {**config, **{'invalid_status': [verify_urls.ABSENT]}})
         self.assertIsNone(provider._auth)
 
     def test_equality(self):
@@ -78,7 +78,7 @@ class HTTPProviderTestCase(unittest.TestCase):
         """Test that the attributes are correctly initialized"""
         provider = verify_urls.HTTPProvider('test', {'foo': 'bar'})
         self.assertEqual(provider.name, 'test')
-        self.assertEqual(provider.config, {'foo': 'bar'})
+        self.assertEqual(provider.config, {'foo': 'bar', 'invalid_status': [verify_urls.ABSENT]})
         self.assertEqual(provider._auth_start, None)
 
     def test_build_oauth2(self):
@@ -351,6 +351,7 @@ class HTTPProviderTestCase(unittest.TestCase):
                 mock.patch('geospaas_harvesting.verify_urls.DatasetURI.objects') as mock_manager:
             mock_write.side_effect = ValueError
             mock_manager.filter.return_value.iterator.return_value = [mock.Mock()]
+            mock_manager.filter.return_value.count.return_value = 1
             with self.assertRaises(ValueError), \
                     self.assertLogs(verify_urls.logger, level=logging.INFO):
                 provider.check_all_urls('out.txt')
@@ -363,7 +364,7 @@ class FTPProviderTestCase(unittest.TestCase):
         """Test that the attributes are correctly initialized"""
         provider = verify_urls.FTPProvider('test', {'foo': 'bar'})
         self.assertEqual(provider.name, 'test')
-        self.assertEqual(provider.config, {'foo': 'bar'})
+        self.assertDictEqual(provider.config, {'foo': 'bar', 'invalid_status': [verify_urls.ABSENT]})
         self.assertEqual(provider._ftp_client, None)
 
     def test_auth(self):
@@ -678,7 +679,9 @@ class VerifyURLsTestCase(unittest.TestCase):
         mock_manager.filter.side_effect = lambda id: [mock.Mock(uri=dataset_uris.get(id))]
 
         with mock.patch('geospaas_harvesting.verify_urls.find_provider', return_value=provider), \
-             mock.patch('geospaas_harvesting.verify_urls.DatasetURI.objects', mock_manager):
+             mock.patch('geospaas_harvesting.verify_urls.DatasetURI.objects', mock_manager), \
+             mock.patch('geospaas_harvesting.verify_urls.count_lines_in_file') as mock_line_count:
+            mock_line_count.return_value = 2
 
             # force == False, only the URL that returns 404 must be
             # deleted
@@ -688,7 +691,8 @@ class VerifyURLsTestCase(unittest.TestCase):
                                side_effect=check_url_results), \
                     mock.patch('geospaas_harvesting.verify_urls.remove_dataset_uri',
                                return_value=(True, True)) as mock_remove:
-                self.assertEqual(verify_urls.delete_stale_urls('', {}, force=False), (1, 1))
+                with self.assertLogs(verify_urls.logger, level=logging.INFO):
+                    self.assertEqual(verify_urls.delete_stale_urls('', {}, force=False), (1, 1))
                 self.assertListEqual(
                     [args[0][0].uri for args in mock_remove.call_args_list],
                     ['https://foo/bar'])
@@ -700,7 +704,8 @@ class VerifyURLsTestCase(unittest.TestCase):
                                side_effect=check_url_results), \
                     mock.patch('geospaas_harvesting.verify_urls.remove_dataset_uri',
                                return_value=(True, True)) as mock_remove:
-                self.assertEqual(verify_urls.delete_stale_urls('', {}, force=True), (2, 2))
+                with self.assertLogs(verify_urls.logger, level=logging.INFO):
+                    self.assertEqual(verify_urls.delete_stale_urls('', {}, force=True), (2, 2))
                 self.assertListEqual(
                     [args[0][0].uri for args in mock_remove.call_args_list],
                     ['https://foo/bar', 'https://foo/baz'])
