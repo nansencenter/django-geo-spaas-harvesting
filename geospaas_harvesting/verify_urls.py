@@ -236,20 +236,30 @@ class HTTPProvider(Provider):
 
         logger.info("Starting to check %s URLs", url_prefix)
 
+        urls_to_check = DatasetURI.objects.filter(uri__startswith=url_prefix)
+        urls_count = urls_to_check.count()
+
         with BoundedThreadPoolExecutor(max_workers=max_workers,
                                        queue_limit=2000) as thread_executor:
-            for dataset_uri in DatasetURI.objects.filter(uri__startswith=url_prefix).iterator():
+            for dataset_uri in urls_to_check.iterator():
                 futures[thread_executor.submit(
                     self.check_and_write_stale_url,
                     lock,
                     file_name,
                     dataset_uri)] = dataset_uri.uri
 
-            for future in concurrent.futures.as_completed(futures):
+            last_progression = 0
+            for future, progression in progression_generator(
+                    concurrent.futures.as_completed(futures), urls_count):
                 try:
                     future.result()
                 finally:
                     del futures[future]
+
+                if progression - last_progression >= 10:
+                    logger.info("%s%% of the URLs for %s have been checked",
+                                progression, self.name)
+                    last_progression = progression
         logger.info("Finished checking %s URLs", url_prefix)
 
 
@@ -398,6 +408,21 @@ def remove_dataset_uri(dataset_uri):
     return (removed_uri, removed_dataset)
 
 
+def count_lines_in_file(file_path):
+    """Returns the number of lines in a file"""
+    with open(file_path, 'rb') as f_h:
+        return f_h.read().count(bytes(os.linesep, 'utf-8'))
+
+
+def progression_generator(iterable, length):
+    """For each item in an iterable, yields a couple containing this
+    item and the approximate progression through the whole iterable in
+    percent
+    """
+    for index, element in enumerate(iterable):
+        yield (element, round((index / length) * 100))
+
+
 def delete_stale_urls(urls_file_path, providers, force=False):
     """Re-check the URLs contained in a file issued from the checking
     step, then remove them.
@@ -405,10 +430,13 @@ def delete_stale_urls(urls_file_path, providers, force=False):
     provider = find_provider(urls_file_path, providers)
     invalid_status = provider.config['invalid_status']
 
+    lines_count = count_lines_in_file(urls_file_path)
+
+    last_progression = 0
     deleted_uris_count = 0
     deleted_datasets_count = 0
-    with open(urls_file_path, 'r') as urls_file:
-        for line in urls_file:
+    with open(urls_file_path, 'r', encoding='utf-8') as urls_file:
+        for line, progression in progression_generator(urls_file, lines_count):
             _, dataset_uri_id, _ = line.split()
             dataset_uri_queryset = DatasetURI.objects.filter(id=int(dataset_uri_id))
             if dataset_uri_queryset:
@@ -423,6 +451,11 @@ def delete_stale_urls(urls_file_path, providers, force=False):
             else:
                 logger.warning("Could not remove DatasetURI with ID %s",
                                dataset_uri_id, exc_info=True)
+
+            # log a message every time 10% of the total URLs have been processed
+            if progression - last_progression >= 10:
+                logger.info("%s%% of the URLs to delete are processed", progression)
+                last_progression = progression
     return (deleted_uris_count, deleted_datasets_count)
 
 
