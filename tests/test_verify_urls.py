@@ -30,6 +30,13 @@ class ProviderTestCase(unittest.TestCase):
         self.assertEqual(provider.config, {**config, **{'invalid_status': [verify_urls.ABSENT]}})
         self.assertIsNone(provider._auth)
 
+    def test_instantiation_with_invalid_status(self):
+        """Test the setting of the config when a list of invalid_status
+        is given in the config file
+        """
+        provider = verify_urls.Provider('test', {'invalid_status': ['http_202']})
+        self.assertEqual(provider.config, {'invalid_status': ['http_202', verify_urls.ABSENT]})
+
     def test_equality(self):
         """Test the equlity operator between two Provider objects"""
         self.assertEqual(
@@ -308,25 +315,36 @@ class HTTPProviderTestCase(unittest.TestCase):
 
     def test_check_all_urls(self):
         """Should check all the URLs for one provider"""
+        # TODO: this test is quite unreadable,
+        # there is probably a better way to write it
         mock_lock = mock.Mock()
         with mock.patch('geospaas_harvesting.verify_urls.Lock', return_value=mock_lock), \
                 mock.patch(
                     'geospaas_harvesting.verify_urls.BoundedThreadPoolExecutor') as mock_pool, \
                 mock.patch('geospaas_harvesting.verify_urls.DatasetURI.objects') as mock_manager, \
-                mock.patch('concurrent.futures.as_completed'), \
+                mock.patch('concurrent.futures.as_completed') as mock_as_completed, \
                 mock.patch('geospaas_harvesting.verify_urls.HTTPProvider'
                            '.check_and_write_stale_url') as mock_write:
             mock_executor = mock_pool.return_value.__enter__.return_value
-            mock_dataset_uri = mock.Mock()
-            mock_manager.filter.return_value.iterator.return_value = [mock_dataset_uri]
+            # this is necessary to return a new Mock each time
+            mock_executor.submit.side_effect = lambda *args: mock.Mock()
+            dataset_uri_mocks = [mock.Mock(), mock.Mock()]
+            mock_manager.filter.return_value.iterator.return_value = dataset_uri_mocks
+            mock_manager.filter.return_value.count.return_value = len(dataset_uri_mocks)
+            mock_as_completed.side_effect = lambda d: list(d.keys())
 
             # call without throttle: 50 workers
             provider = verify_urls.HTTPProvider('test', {'url': 'https://foo/'})
             with self.assertLogs(verify_urls.logger, level=logging.INFO):
                 provider.check_all_urls('output.txt')
 
-            mock_executor.submit.assert_called_once_with(
-                mock_write, mock_lock, 'output.txt', mock_dataset_uri)
+            self.assertEqual(
+                mock_executor.submit.call_args_list,
+                [
+                    mock.call(mock_write, mock_lock, 'output.txt', mock_dataset_uri)
+                    for mock_dataset_uri in dataset_uri_mocks
+                ]
+            )
             mock_pool.assert_called_once_with(max_workers=50, queue_limit=2000)
 
             mock_pool.reset_mock()
@@ -335,8 +353,15 @@ class HTTPProviderTestCase(unittest.TestCase):
             provider = verify_urls.HTTPProvider('test', {'url': 'https://foo/', 'throttle': 1})
             with self.assertLogs(verify_urls.logger, level=logging.INFO):
                 provider.check_all_urls('output.txt')
-            mock_executor.submit.assert_called_once_with(
-                mock_write, mock_lock, 'output.txt', mock_dataset_uri)
+
+            self.assertEqual(
+                mock_executor.submit.call_args_list,
+                [
+                    mock.call(mock_write, mock_lock, 'output.txt', mock_dataset_uri)
+                    for mock_dataset_uri in dataset_uri_mocks
+                ]
+            )
+
             mock_pool.assert_called_once_with(max_workers=1, queue_limit=2000)
 
             mock_pool.reset_mock()
@@ -949,3 +974,18 @@ class VerifyURLsTestCase(unittest.TestCase):
                     bounded_pool.submit(lambda x: x, 1,)
         bounded_pool.semaphore.acquire.assert_called()
         bounded_pool.semaphore.release.assert_called()
+
+    def test_count_lines_in_file(self):
+        """Test counting the number of lines in a file"""
+        buffer = io.BytesIO(bytes(f"foo{os.linesep}bar{os.linesep}", 'utf-8'))
+        with mock.patch('geospaas_harvesting.verify_urls.open', return_value=buffer):
+            self.assertEqual(verify_urls.count_lines_in_file('bar'), 2)
+
+    def test_progression_generator(self):
+        """Test that the progression generator yields all elements of
+        an iterable as well as the percentage of progress
+        """
+        letters = ['a', 'b', 'c', 'd']
+        self.assertListEqual(
+            list(verify_urls.progression_generator(letters, len(letters))),
+            [('a', 25), ('b', 50), ('c', 75), ('d', 100)])
