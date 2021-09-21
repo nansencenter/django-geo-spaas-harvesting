@@ -420,7 +420,7 @@ def progression_generator(iterable, length):
     percent
     """
     for index, element in enumerate(iterable):
-        yield (element, round((index / length) * 100))
+        yield (element, round(((index + 1) / length) * 100))
 
 
 def delete_stale_urls(urls_file_path, providers, force=False):
