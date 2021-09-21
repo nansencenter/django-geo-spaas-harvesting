@@ -441,8 +441,13 @@ def delete_stale_urls(urls_file_path, providers, force=False):
             dataset_uri_queryset = DatasetURI.objects.filter(id=int(dataset_uri_id))
             if dataset_uri_queryset:
                 dataset_uri = dataset_uri_queryset[0]
-                url_state = provider.check_url(dataset_uri)
-                if url_state != PRESENT and (url_state in invalid_status or force):
+
+                if force:
+                    url_state = ABSENT
+                else:
+                    url_state = provider.check_url(dataset_uri)
+
+                if url_state in invalid_status:
                     removed_uri, removed_dataset = remove_dataset_uri(dataset_uri)
                     if removed_uri:
                         deleted_uris_count += 1
@@ -514,7 +519,7 @@ def parse_cli_arguments():
     delete_parser.add_argument(
         '-f', '--force',
         action='store_true',
-        help='Remove URLs which return any error, not just 404')
+        help='Remove all the URLs in the input file without re-checking')
 
     return parser.parse_args()
 
@@ -531,7 +536,7 @@ def main():
             logger.info("Finished checking all URLs")
     elif args.action == 'delete-stale':
         logger.info("Deleting URLs from %s", args.urls_file)
-        deleted_counts = delete_stale_urls(args.urls_file, providers)
+        deleted_counts = delete_stale_urls(args.urls_file, providers, force=args.force)
         logger.info("Deleted %d URIs and %d datasets", *deleted_counts)
 
 
