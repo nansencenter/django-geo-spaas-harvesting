@@ -80,11 +80,20 @@ jobs:
              -e "GEOSPAAS_DB_USER=$GEOSPAAS_DB_USER"
              -e "GEOSPAAS_DB_PASSWORD=$GEOSPAAS_DB_PASSWORD"
              "${IMAGE_NAME}"
-             bash -c "coverage run --source=./geospaas_harvesting ./runtests.py && coveralls"
+             bash -c "coverage run --source=./geospaas_harvesting ./runtests.py"
 
       - name: 'Stop testing database'
         run: docker stop "$GEOSPAAS_DB_HOST"
 
+      - name: 'Install Python 3.7'
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+
+      - name: 'Upload coverage to coveralls.io'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pip install coveralls && coveralls --service=github
 
   build_docker_image:
     runs-on: 'ubuntu-20.04'
