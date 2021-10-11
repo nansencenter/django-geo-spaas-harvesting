@@ -722,7 +722,8 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         self.assertDictEqual(request_parameters, {
             'params': {
                 'q': f"({self.SEARCH_TERMS}) AND " +
-                     "(beginposition:[2020-02-10T00:00:00Z TO 2020-02-11T00:00:00Z])",
+                     "(beginposition:[1000-01-01T00:00:00Z TO 2020-02-11T00:00:00Z] AND "
+                     "endposition:[2020-02-10T00:00:00Z TO NOW])",
                 'start': 0,
                 'rows': self.PAGE_SIZE,
                 'orderby': 'ingestiondate asc'
@@ -735,7 +736,8 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         request_parameters = self.crawler._build_request_parameters(
             search_terms=self.SEARCH_TERMS, username='user', password='pass',
             page_size=self.PAGE_SIZE, time_range=(None, datetime(2020, 2, 11, tzinfo=timezone.utc)))
-        self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS}) AND " +
+        self.assertEqual(request_parameters['params']['q'],
+                         f"({self.SEARCH_TERMS}) AND " +
                          "(beginposition:[1000-01-01T00:00:00Z TO 2020-02-11T00:00:00Z])")
 
     def test_build_parameters_with_time_range_without_upper_limit(self):
@@ -743,8 +745,9 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         request_parameters = self.crawler._build_request_parameters(
             search_terms=self.SEARCH_TERMS, username='user', password='pass',
             page_size=self.PAGE_SIZE, time_range=(datetime(2020, 2, 10, tzinfo=timezone.utc), None))
-        self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS}) AND " +
-                         "(beginposition:[2020-02-10T00:00:00Z TO NOW])")
+        self.assertEqual(request_parameters['params']['q'],
+                         f"({self.SEARCH_TERMS}) AND " +
+                         "(endposition:[2020-02-10T00:00:00Z TO NOW])")
 
     def test_build_parameters_without_time_range(self):
         """
