@@ -472,11 +472,12 @@ class DDXIngesterTestCase(django.test.TestCase):
         ))
 
         self.assertEqual(normalized_parameters['provider']['Short_Name'],
-                         'The GHRSST Project Office')
+                         'NASA/JPL/PODAAC')
         self.assertEqual(normalized_parameters['provider']['Long_Name'],
-                         'The GHRSST Project Office')
+                         'Physical Oceanography Distributed Active Archive Center,' +
+                         ' Jet Propulsion Laboratory, NASA')
         self.assertEqual(normalized_parameters['provider']['Data_Center_URL'],
-                         'http://www.ghrsst.org')
+                         'https://podaac.jpl.nasa.gov/')
 
         self.assertEqual(normalized_parameters['iso_topic_category']
                          ['iso_topic_category'], 'Oceans')
@@ -545,7 +546,8 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
     fixtures = [os.path.join(os.path.dirname(__file__), "fixtures", "harvest")]
     TEST_DATA = {
         'full': {
-            'url': "https://scihub.copernicus.eu/full?$format=json&$expand=Attributes",
+            'url': "https://scihub.copernicus.eu/apihub/odata/v1/full"
+                   "?$format=json&$expand=Attributes",
             'file_path': "data/copernicus_opensearch/full.json"}
     }
 
@@ -607,7 +609,8 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
 
     def test_get_raw_metadata(self):
         """Test that the raw metadata is correctly fetched"""
-        raw_metadata = self.ingester._get_raw_metadata('https://scihub.copernicus.eu/full/$value')
+        raw_metadata = self.ingester._get_raw_metadata(
+            'https://scihub.copernicus.eu/apihub/odata/v1/full/$value')
         test_file_path = os.path.join(
             os.path.dirname(__file__), self.TEST_DATA['full']['file_path'])
 
@@ -627,7 +630,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
     def test_get_normalized_attributes(self):
         """Test that the correct attributes are extracted from Sentinel-SAFE JSON metadata"""
         normalized_parameters = self.ingester._get_normalized_attributes(
-            'https://scihub.copernicus.eu/full/$value')
+            'https://scihub.copernicus.eu/apihub/odata/v1/full/$value')
 
         self.assertEqual(normalized_parameters['entry_title'],
                          'S1A_IW_GRDH_1SDV_20200318T062305_20200318T062330_031726_03A899_F558')
@@ -727,7 +730,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         }
         duplicate_value_for_testing = value_for_testing.copy()
         created_dataset, created_dataset_uri = self.ingester._ingest_dataset(
-            'https://scihub.copernicus.eu/full/$value', value_for_testing)
+            'https://scihub.copernicus.eu/apihub/odata/v1/full/$value', value_for_testing)
         self.assertEqual(Dataset.objects.count(), 1)
         self.assertEqual(Dataset.objects.first().parameters.count(), 1)
         # the parameter that has added (by above variable of "value_for_testing") to the dataset
@@ -741,7 +744,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         # No parameter or dataset should be added for the second time of executing this command
         # with same normalized attributes (same variable of "value_for_testing")
         created_dataset, created_dataset_uri = self.ingester._ingest_dataset(
-            'https://scihub.copernicus.eu/full/$value', duplicate_value_for_testing)
+            'https://scihub.copernicus.eu/apihub/odata/v1/full/$value', duplicate_value_for_testing)
 
         self.assertEqual(Dataset.objects.count(), 1)
         self.assertEqual(Dataset.objects.first().parameters.count(), 1)
@@ -819,49 +822,6 @@ class URLNameIngesterTestCase(django.test.TestCase):
 
     def tearDown(self):
         self.patcher_param_count.stop()
-
-    def test_function_get_normalized_attributes_ceda(self):
-        """ test the functionality of '_get_normalized_attributes' for a URLNameIngester.
-        Keys must be equal to DATASET_CUMULATIVE_PARAMETER_NAMES plus DATASET_PARAMETER_NAMES plus
-        two additional new keys.
-        Also a "None" value should not be in the resulted normalized attributes. """
-        input_url = 'ftp://anon-ftp.ceda.ac.uk/neodc/esacci/sst/data/CDR_v2/Climatology/L4/v2.1/D365-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc'
-
-        ingester = ingesters.URLNameIngester()
-        normalized_attributes = ingester._get_normalized_attributes(input_url)
-        self.assertCountEqual(list(normalized_attributes.keys()),
-                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
-                              ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service'])
-        self.assertNotIn(None, normalized_attributes.values())
-
-    def test_function_get_normalized_attributes_remss(self):
-        """ test the functionality of '_get_normalized_attributes' for a URLNameIngester.
-        Keys must be equal to DATASET_CUMULATIVE_PARAMETER_NAMES plus DATASET_PARAMETER_NAMES plus
-        two additional new keys.
-        Also a "None" value should not be in the resulted normalized attributes. """
-        input_url = 'ftp://ftp.remss.com/gmi/bmaps_v08.2/y2014/m06/f35_201406v8.2.gz'
-        ingester = ingesters.URLNameIngester()
-        normalized_attributes = ingester._get_normalized_attributes(input_url)
-        self.assertCountEqual(list(normalized_attributes.keys()),
-                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
-                              ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service'])
-        self.assertNotIn(None, normalized_attributes.values())
-
-    def test_function_get_normalized_attributes_jaxa(self):
-        """ test the functionality of '_get_normalized_attributes' for a URLNameIngester.
-        Keys must be equal to DATASET_CUMULATIVE_PARAMETER_NAMES plus DATASET_PARAMETER_NAMES plus
-        two additional new keys.
-        Also a "None" value should not be in the resulted normalized attributes. """
-        input_url = 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3/2015/04/GW1AM2_20150401_01D_EQOD_L3SGSSTLB3300300.h5'
-        ingester = ingesters.URLNameIngester()
-        normalized_attributes = ingester._get_normalized_attributes(input_url)
-        self.assertCountEqual(list(normalized_attributes.keys()),
-                              ingester.DATASET_CUMULATIVE_PARAMETER_NAMES +
-                              ingester.DATASET_PARAMETER_NAMES +
-                              ['geospaas_service_name', 'geospaas_service'])
-        self.assertNotIn(None, normalized_attributes.values())
 
 
 class NansatIngesterTestCase(django.test.TestCase):
