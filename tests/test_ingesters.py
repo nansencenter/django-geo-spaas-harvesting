@@ -380,7 +380,7 @@ class DDXIngesterTestCase(django.test.TestCase):
     @mock.patch('xml.etree.ElementTree.parse')
     @mock.patch('geospaas_harvesting.ingesters.DDXIngester._extract_attributes')
     @mock.patch('metanorm.handlers.MetadataHandler.get_parameters')
-    def test_exsistence_url_in_raw_attributes(self, mock_get_parameters, mock_extatt, mock_etree):
+    def test_existence_url_in_raw_attributes(self, mock_get_parameters, mock_extatt, mock_etree):
         """the 'url' field in the "get_parameters" call of function must be present as an
         input argument. This is a strict need of metanorm for creating the 'entry_id' based
         on this 'url' field for this ingester."""
