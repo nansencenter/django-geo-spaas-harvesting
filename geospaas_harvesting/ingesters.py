@@ -504,9 +504,9 @@ class EarthdataCMRIngester(APIPayloadIngester):
         return dataset_info['umm']['RelatedUrls'][0]['URL']
 
 
-class URLNameIngester(MetanormIngester):
-    """Ingester class which associates hard-coded data to known URLs"""
-    LOGGER = logging.getLogger(__name__ + '.URLNameIngester')
+class FTPIngester(MetanormIngester):
+    """Ingests metadata from FTP URLs"""
+    LOGGER = logging.getLogger(__name__ + '.FTPIngester')
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Gets dataset attributes using ftp"""

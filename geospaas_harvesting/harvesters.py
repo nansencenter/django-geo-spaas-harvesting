@@ -135,7 +135,7 @@ class OSISAFHarvester(WebDirectoryHarvester):
 
 class FTPHarvester(WebDirectoryHarvester):
     """Harvester class for some specific FTP protecol"""
-    ingester = ingesters.URLNameIngester
+    ingester = ingesters.FTPIngester
     def _create_crawlers(self):
         return [
             crawlers.FTPCrawler(

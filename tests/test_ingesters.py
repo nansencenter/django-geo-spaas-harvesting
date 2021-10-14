@@ -812,8 +812,8 @@ class EarthdataCMRIngesterTestCase(django.test.TestCase):
         self.assertEqual(self.ingester.get_download_url(dataset_info), 'http://something')
 
 
-class URLNameIngesterTestCase(django.test.TestCase):
-    """Test the URLNameIngester"""
+class FTPIngesterTestCase(django.test.TestCase):
+    """Test the FTPIngester"""
 
     def setUp(self):
         self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
