@@ -21,7 +21,7 @@ DATABASES = {
 }
 
 if os.getenv('GEOSPAAS_DISABLE_SERVER_SIDE_CURSORS', 'false').lower() == 'true':
-    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True  # pragma: no cover
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/

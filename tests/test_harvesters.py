@@ -177,7 +177,7 @@ class ChildHarvestersTestCase(unittest.TestCase):
                 urls=['ftp://'], max_fetcher_threads=1, max_db_threads=1)
         self.assertIsInstance(harvester._crawlers[0], crawlers.FTPCrawler)
         self.assertEqual(len(harvester._crawlers), 1)
-        self.assertIsInstance(harvester._ingester, ingesters.URLNameIngester)
+        self.assertIsInstance(harvester._ingester, ingesters.FTPIngester)
 
     def test_copernicus_sentinel_harvester(self):
         """The Copernicus Sentinel harvester has the correct crawler and ingester"""
