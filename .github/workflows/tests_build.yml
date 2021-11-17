@@ -3,7 +3,7 @@ name: "Unit tests and docker image build"
 on: push
 env:
   BASE_IMAGE_NAME: "${{ secrets.DOCKER_ORG }}/geospaas:2.4.0-slim"
-  METANORM_VERSION: '4.0.0'
+  METANORM_VERSION: '4.0.1'
 jobs:
   tests:
     runs-on: 'ubuntu-20.04'
