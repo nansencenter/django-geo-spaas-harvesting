@@ -1110,7 +1110,6 @@ class NetCDFIngesterTestCase(django.test.TestCase):
         # __dict__, the mocked dataset does not behave as expected when
         # calling these methods on it.
         with mock.patch('netCDF4.Dataset') as mock_dataset, \
-             mock.patch.object(self.ingester, '_get_geometry_wkt', return_value='wkt'), \
              mock.patch.object(self.ingester, '_get_parameter_names', return_value=['param']):
             mock_dataset.return_value.__dict__ = attributes
 
@@ -1119,7 +1118,6 @@ class NetCDFIngesterTestCase(django.test.TestCase):
                 {
                     **attributes,
                     'url': '/foo/bar',
-                    'geometry': 'wkt',
                     'raw_dataset_parameters': ['param']
                 }
             )
@@ -1144,13 +1142,30 @@ class NetCDFIngesterTestCase(django.test.TestCase):
         normalize the raw attributes
         """
         with mock.patch.object(self.ingester, '_get_raw_attributes'), \
-             mock.patch.object(self.ingester, '_metadata_handler') as mock_metadata_handler:
+             mock.patch.object(self.ingester, '_metadata_handler') as mock_metadata_handler, \
+             mock.patch('netCDF4.Dataset'), \
+             mock.patch.object(self.ingester, '_get_geometry_wkt', return_value='geometry'):
             mock_metadata_handler.get_parameters.return_value = {'param': 'value'}
-            # Local path
+            # Local path with computed geometry
             self.assertDictEqual(
                 self.ingester._get_normalized_attributes('/foo/bar.nc'),
                 {
                     'param': 'value',
+                    'location_geometry': 'geometry',
+                    'geospaas_service': ingesters.LOCAL_FILE_SERVICE,
+                    'geospaas_service_name': ingesters.FILE_SERVICE_NAME
+                }
+            )
+            # Local path with fixed geometry from metanorm
+            mock_metadata_handler.get_parameters.return_value = {
+                'param': 'value',
+                'location_geometry': 'metanorm_geometry'
+            }
+            self.assertDictEqual(
+                self.ingester._get_normalized_attributes('/foo/bar.nc'),
+                {
+                    'param': 'value',
+                    'location_geometry': 'metanorm_geometry',
                     'geospaas_service': ingesters.LOCAL_FILE_SERVICE,
                     'geospaas_service_name': ingesters.FILE_SERVICE_NAME
                 }
@@ -1160,6 +1175,7 @@ class NetCDFIngesterTestCase(django.test.TestCase):
                 self.ingester._get_normalized_attributes('http://foo/bar.nc'),
                 {
                     'param': 'value',
+                    'location_geometry': 'metanorm_geometry',
                     'geospaas_service': ingesters.HTTP_SERVICE,
                     'geospaas_service_name': ingesters.HTTP_SERVICE_NAME
                 }

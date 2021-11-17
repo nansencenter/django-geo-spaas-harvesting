@@ -588,7 +588,6 @@ class NetCDFIngester(MetanormIngester):
         dataset = netCDF4.Dataset(dataset_path)
         raw_attributes = dataset.__dict__
         self.add_url(dataset_path, raw_attributes)
-        raw_attributes['geometry'] = self._get_geometry_wkt(dataset)
         raw_attributes['raw_dataset_parameters'] = self._get_parameter_names(dataset)
         return raw_attributes
 
@@ -603,6 +602,10 @@ class NetCDFIngester(MetanormIngester):
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         raw_attributes = self._get_raw_attributes(dataset_info)
         normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
+
+        if not normalized_attributes.get('location_geometry'):
+            normalized_attributes['location_geometry'] = self._get_geometry_wkt(
+                netCDF4.Dataset(dataset_info))
 
         if dataset_info.startswith('http'):
             normalized_attributes['geospaas_service'] = HTTP_SERVICE
