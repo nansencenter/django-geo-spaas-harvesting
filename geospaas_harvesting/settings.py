@@ -23,6 +23,8 @@ DATABASES = {
 if os.getenv('GEOSPAAS_DISABLE_SERVER_SIDE_CURSORS', 'false').lower() == 'true':
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True  # pragma: no cover
 
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
 LANGUAGE_CODE = 'en-us'
