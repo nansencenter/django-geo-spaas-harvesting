@@ -6,8 +6,11 @@ import concurrent.futures
 import io
 import json
 import logging
+import os
+import pickle
 import queue
 import re
+import threading
 import uuid
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
@@ -17,7 +20,7 @@ import django.db
 import django.db.utils
 import netCDF4
 import numpy as np
-import requests
+from datetime import datetime
 from dateutil.tz import tzutc
 from django.contrib.gis.geos import GEOSGeometry, LineString, MultiPoint
 from django.contrib.gis.geos.point import Point
@@ -36,6 +39,8 @@ from nansat import Nansat
 from metanorm.handlers import MetadataHandler
 from metanorm.normalizers.geospaas import GeoSPaaSMetadataNormalizer
 from metanorm.utils import get_cf_or_wkv_standard_name
+
+
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
@@ -50,6 +55,9 @@ class Ingester():
 
     LOGGER = logging.getLogger(__name__ + '.Ingester')
     QUEUE_SIZE = 500
+    FAILED_INGESTIONS_PATH = os.getenv(
+        'GEOSPAAS_FAILED_INGESTIONS_DIR',
+        os.path.join('/', 'var', 'run', 'geospaas'))
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
         if not (isinstance(max_fetcher_threads, int) and isinstance(max_db_threads, int)):
@@ -57,6 +65,7 @@ class Ingester():
         self.max_fetcher_threads = max_fetcher_threads
         self.max_db_threads = max_db_threads
         self._to_ingest = queue.Queue(self.QUEUE_SIZE)
+        self._failed = queue.Queue(self.QUEUE_SIZE)
         # safety check in order to prevent harvesting process with an empty list of parameters
         if Parameter.objects.count() < 1:
             raise RuntimeError((
@@ -70,13 +79,14 @@ class Ingester():
         The queue cannot be pickled, so its contents are saved as a list.
         """
         state = dict(self.__dict__)
-        state['_to_ingest_state'] = list(state.pop('_to_ingest').queue)
+        del state['_to_ingest']
+        del state['_failed']
         return state
 
     def __setstate__(self, state):
         """Instantiation from a pickled state"""
         state['_to_ingest'] = queue.Queue(self.QUEUE_SIZE)
-        state['_to_ingest'].queue.extend(state.pop('_to_ingest_state'))
+        state['_failed'] = queue.Queue(self.QUEUE_SIZE)
         self.__dict__.update(state)
 
     @staticmethod
@@ -175,17 +185,58 @@ class Ingester():
 
         return (created_dataset, created_dataset_uri)
 
+    def _pickle_list_elements(self, list_to_pickle, pickle_path):
+        """Pickle all the elements in the list, then empty it"""
+        with open(pickle_path, 'ab') as pickle_file:
+            for element_to_pickle in list_to_pickle:
+                pickle.dump(element_to_pickle, pickle_file)
+        list_to_pickle.clear()
+
+    def _thread_manage_failed_ingestions(self):
+        """Watches the `_failed` queue and put the incoming failed
+        elements in a list. When the list reaches its maximum size or
+        when None is received, dump the contents of the list to a file.
+        This method is meant to be run in a thread.
+        """
+        class_name = self.__class__.__name__.lower()
+        date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
+        pickle_path = os.path.join(self.FAILED_INGESTIONS_PATH,
+                                   f'{class_name}_{date}_failed_ingestions.pickle')
+        max_list_size = 500000
+
+        os.makedirs(self.FAILED_INGESTIONS_PATH, exist_ok=True)
+
+        failed_ingestions = [self]
+        while True:
+            element = self._failed.get()
+
+            if element is None:
+                if not (len(failed_ingestions) == 1 and failed_ingestions[0] is self):
+                    self._pickle_list_elements(failed_ingestions, pickle_path)
+                self._failed.task_done()
+                break
+
+            failed_ingestions.append(element)
+            if len(failed_ingestions) >= max_list_size:
+                self._pickle_list_elements(failed_ingestions, pickle_path)
+            self._failed.task_done()
+
     def _thread_get_normalized_attributes(self, download_url, dataset_info, *args, **kwargs):
         """
-        Gets the attributes needed to insert a dataset into the database from its URL, and puts a
-        dictionary containing these attribtues in the queue to be written in the database.
+        Gets the attributes needed to insert a dataset into the
+        database from its URL, and puts a dictionary containing these
+        attribtues in the queue to be written in the database. If an
+        error occurs while retrieving the attributes, the dataset info
+        and the exception are put in the _failed queue for processing
+        by the dedicated thread.
         This method is meant to be run in a thread.
         """
         self.LOGGER.debug("Getting metadata for '%s'", download_url)
         try:
             normalized_attributes = self._get_normalized_attributes(dataset_info, *args, **kwargs)
-        except Exception:  # pylint: disable=broad-except
+        except Exception as error:  # pylint: disable=broad-except
             self.LOGGER.error("Could not get metadata for '%s'", download_url, exc_info=True)
+            self._failed.put((dataset_info, error), block=True)
         else:
             self._to_ingest.put((download_url, normalized_attributes))
 
@@ -249,6 +300,9 @@ class Ingester():
         (e.g. 100 by default for postgresql).
         For the attribute fetchers, the optimal number of threads depends on each ingester
 
+        One thread watches the `_failed` queue and pickles the info about the failed datasets to
+        a file for eventual retries.
+
         How this works: the Ingester's `_to_ingest` attribute is a thread-safe queue. The threads
         which get the datasets' attributes put these attributes in the queue
         (see `_thread_get_normalized_attributes()`). The threads which handle database writing
@@ -259,6 +313,11 @@ class Ingester():
         the currently running fetching threads to finish, then for the database threads to finish
         processing the queue before exiting.
         """
+        # Launch thread which checks the size of the failed ingestions
+        # queue and dumps it to disk when necessary
+        failed_queue_thread = threading.Thread(target=self._thread_manage_failed_ingestions)
+        failed_queue_thread.start()
+
         # Launch threads which read from the queue and create datasets in the database
         with concurrent.futures.ThreadPoolExecutor(
                 max_workers=self.max_db_threads,
@@ -294,12 +353,17 @@ class Ingester():
                 finally:
                     # Wait for running fetching threads to finish
                     concurrent.futures.wait(attr_futures)
+
                     # Wait for all queue elements to be processed and stop database access threads
                     self.LOGGER.debug('Waiting for all the datasets in the queue to be ingested...')
                     self._to_ingest.join()
                     self.LOGGER.debug('Stopping all database access threads')
                     for _ in range(self.max_db_threads):
                         self._to_ingest.put(None)
+
+                    self.LOGGER.debug('Stopping failed queue watcher thread')
+                    self._failed.put(None)
+                    failed_queue_thread.join()
 
 
 class MetanormIngester(Ingester):
