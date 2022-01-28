@@ -23,8 +23,6 @@ LOGGER_NAME = 'geospaas_harvesting.daemon'
 LOGGER = logging.getLogger(LOGGER_NAME)
 LOGGER.addHandler(logging.NullHandler())
 
-PERSISTENCE_DIR = os.getenv('GEOSPAAS_PERSISTENCE_DIR', os.path.join('/', 'var', 'run', 'geospaas'))
-
 
 class Configuration(collections.abc.Mapping):
     """Manages harvesting configuration"""
