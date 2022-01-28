@@ -439,15 +439,10 @@ class CopernicusODataIngester(MetanormIngester):
 
     def _get_raw_metadata(self, url):
         """Get the raw JSON metadata from a Copernicus OData URL"""
-        try:
-            metadata_url = self._build_metadata_url(url)
-            stream = utils.http_request(
-                'GET', metadata_url, auth=self._credentials, stream=True).content
-        except (requests.exceptions.RequestException, ValueError):
-            self.LOGGER.error("Could not get metadata for the dataset located at '%s'", url,
-                              exc_info=True)
-        else:
-            return json.load(io.BytesIO(stream))
+        metadata_url = self._build_metadata_url(url)
+        stream = utils.http_request(
+            'GET', metadata_url, auth=self._credentials, stream=True).content
+        return json.load(io.BytesIO(stream))
 
     def _get_normalized_attributes(self, dataset_info, *args, **kwargs):
         """Get attributes from the Copernicus OData API"""
