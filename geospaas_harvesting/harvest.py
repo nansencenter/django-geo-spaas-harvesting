@@ -17,6 +17,7 @@ import yaml
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
 import geospaas_harvesting.harvesters as harvesters  # pylint: disable=wrong-import-position
+import geospaas_harvesting.retry_ingest as retry_ingest
 
 
 LOGGER_NAME = 'geospaas_harvesting.daemon'
@@ -180,6 +181,9 @@ def main():
         pool.terminate()
         pool.join()
         sys.exit(1)
+
+    # Retry to ingest datasets for which the ingestion failed
+    retry_ingest.main()
 
 
 if __name__ == '__main__':
