@@ -10,6 +10,7 @@ import logging
 import os
 import os.path
 import re
+import time
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
@@ -40,15 +41,33 @@ class Crawler():
     @classmethod
     def _http_get(cls, url, request_parameters=None):
         """Returns the contents of a Web page as a string"""
-        html_page = ''
         cls.LOGGER.debug("Getting page: '%s'", url)
-        try:
-            response = utils.http_request('GET', url, **request_parameters or {})
-            response.raise_for_status()
-            html_page = response.text
-        except requests.exceptions.RequestException:
-            cls.LOGGER.error('Could not get page', exc_info=True)
-        return html_page
+
+        max_tries = 5
+        wait_time = 30
+        for try_index in range(max_tries):
+            try:
+                response = utils.http_request('GET', url, **request_parameters or {})
+                response.raise_for_status()
+                return response.text
+            except (requests.ConnectionError, requests.HTTPError) as error:
+                # retry only for connection errors and HTTP errors 5**
+                if (isinstance(error, requests.HTTPError) and
+                        (error.response.status_code < 500 or error.response.status_code > 599)):
+                    cls.LOGGER.error('Could not get page', exc_info=True)
+                    return None
+                cls.LOGGER.warning('Error while sending request to %s, %d retries left',
+                                    url, max_tries - try_index - 1, exc_info=True)
+            except requests.exceptions.RequestException:
+                # don't retry
+                cls.LOGGER.error('Could not get page', exc_info=True)
+                return None
+
+            time.sleep(wait_time)
+            wait_time *= 2
+
+        cls.LOGGER.error('Max retries reached for %s', url)
+
 
 
 class LinkExtractor(HTMLParser):
