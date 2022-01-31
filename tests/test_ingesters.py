@@ -352,7 +352,7 @@ class DDXIngesterTestCase(django.test.TestCase):
         self.mock_param_count = self.patcher_param_count.start()
         self.mock_param_count.return_value = 2
         # Mock requests.get()
-        self.patcher_request = mock.patch('geospaas_harvesting.ingesters.requests.request')
+        self.patcher_request = mock.patch('geospaas_harvesting.utils.http_request')
         self.mock_request = self.patcher_request.start()
         self.mock_request.side_effect = self.request_side_effect
         self.opened_files = []
@@ -579,7 +579,7 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
     def setUp(self):
         self.ingester = ingesters.CopernicusODataIngester()
         # Mock requests.get()
-        self.patcher_request = mock.patch.object(ingesters.requests, 'request')
+        self.patcher_request = mock.patch('geospaas_harvesting.utils.http_request')
         self.mock_request = self.patcher_request.start()
         self.mock_request.side_effect = self.request_side_effect
         self.opened_files = []
@@ -617,14 +617,18 @@ class CopernicusODataIngesterTestCase(django.test.TestCase):
         with open(test_file_path, 'rb') as test_file_handler:
             self.assertDictEqual(json.load(test_file_handler), raw_metadata)
 
-    def test_log_on_inexistent_metadata_page(self):
-        """An error must be logged in case the metadata URL points to nothing"""
-        with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR):
+    def test_error_on_inexistent_metadata_page(self):
+        """An exception must be raised in case the metadata URL points
+        to nothing
+        """
+        with self.assertRaises(requests.HTTPError):
             self.ingester._get_raw_metadata('http://nothing/$value')
 
     def test_log_on_invalid_dataset_url(self):
-        """An An error must be logged in case the dataset URL does not match the ingester's regex"""
-        with self.assertLogs(self.ingester.LOGGER, level=logging.ERROR):
+        """An exception must be raised in case the dataset URL does not
+        match the ingester's regex
+        """
+        with self.assertRaises(ValueError):
             self.ingester._get_raw_metadata('')
 
     def test_get_normalized_attributes(self):

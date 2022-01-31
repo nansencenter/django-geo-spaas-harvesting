@@ -169,23 +169,7 @@ class ConfigurationTestCase(unittest.TestCase):
             next(config_iterator)
 
 
-class TemporaryPersistenceDirTestCase(unittest.TestCase):
-    """
-    Base class for test cases which need to put persistence files in a temporary directory.
-    Child classes should use super().setUp() and/or super().tearDown()
-    if they need extra pre/post processing.
-    """
-    def setUp(self):
-        self.temp_directory = tempfile.TemporaryDirectory()
-        mock.patch('geospaas_harvesting.harvest.PERSISTENCE_DIR',
-                   self.temp_directory.name).start()
-        self.addCleanup(mock.patch.stopall)
-
-    def tearDown(self):
-        self.temp_directory.cleanup()
-
-
-class MainTestCase(TemporaryPersistenceDirTestCase):
+class MainTestCase(unittest.TestCase):
     """Test the main() function in the daemon script"""
 
     @mock.patch.object(sys, 'argv', ['harvest.py'])
