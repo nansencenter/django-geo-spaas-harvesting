@@ -211,7 +211,8 @@ class Ingester():
             element = self._failed.get()
 
             if element is None:
-                if not (len(failed_ingestions) == 1 and failed_ingestions[0] is self):
+                if (failed_ingestions and
+                        not (len(failed_ingestions) == 1 and failed_ingestions[0] is self)):
                     self._pickle_list_elements(failed_ingestions, pickle_path)
                 self._failed.task_done()
                 break
