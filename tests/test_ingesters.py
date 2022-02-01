@@ -3,11 +3,14 @@
 import json
 import logging
 import os
+import pickle
+import tempfile
 import time
 import unittest.mock as mock
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from datetime import datetime
+from threading import Thread
 
 import django.db
 import django.db.utils
@@ -195,6 +198,77 @@ class IngesterTestCase(django.test.TransactionTestCase):
                 ingester.ingest(range_error_generator(5))
             stop = time.monotonic()
         self.assertLess(stop - start, 2.5)
+
+    def test_pickle_list_elements(self):
+        """Test pickling a list of objects"""
+        objects_to_pickle = [1, 'one', 2.2]
+        reference = list(objects_to_pickle)  # needed because the list will be cleared
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            file_path = os.path.join(tmp_dir, 'random_objects.pickle')
+            # pickle various objects to a temporary file
+            self.ingester._pickle_list_elements(objects_to_pickle, file_path)
+
+            # retrieve the pickled objects and check they are the same
+            # as the ones which were pickled
+            unpickled_objects = []
+            with open(file_path, 'rb') as pickle_file:
+                while True:
+                    try:
+                        unpickled_objects.append(pickle.load(pickle_file))
+                    except EOFError:
+                        break
+
+            self.assertListEqual(unpickled_objects, reference)
+            self.assertFalse(objects_to_pickle) # check that the list has been cleared
+
+    def test_thread_manage_failed_ingestions(self):
+        """"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with mock.patch.object(self.ingester, 'FAILED_INGESTIONS_PATH', tmp_dir), \
+                 mock.patch.object(self.ingester, 'MAX_FAILED', 2):
+                # start the thread
+                thread = Thread(target=self.ingester._thread_manage_failed_ingestions)
+                with self.assertLogs(self.ingester.LOGGER, level=logging.INFO) as log_manager:
+                    thread.start()
+                    # put two items in the failed queue (one more than the
+                    # max number of items per file)
+                    items_to_pickle = [
+                        ('foo', 'bar'),
+                        ('baz', 'qux'),
+                        ('quux', 'quuz')
+                    ]
+                    for item in items_to_pickle:
+                        self.ingester._failed.put(item)
+                    # stop the thread
+                    self.ingester._failed.put(None)
+                    # wait for the thread to stop
+                    thread.join()
+
+                # check thatone file is created
+                failed_dir_contents = os.listdir(tmp_dir)
+                self.assertEqual(len(failed_dir_contents), 1)
+
+                with open(os.path.join(tmp_dir, failed_dir_contents[0]), 'rb') as pickle_file:
+                    ingester = pickle.load(pickle_file)
+                    pickled_objects = [
+                        pickle.load(pickle_file) for _ in range(len(items_to_pickle))
+                    ]
+
+                    with self.assertRaises(EOFError):
+                        pickle.load(pickle_file)
+
+                # check the contents of the file
+                self.assertIsInstance(ingester, ingesters.Ingester)
+                self.assertListEqual(pickled_objects, items_to_pickle)
+
+                # check that the dump method has been called twice
+                # (because the number of items exceeds the max number
+                # of items per file)
+                dump_messages = 0
+                for record in log_manager.records:
+                    if record.getMessage().startswith('Dumping items to'):
+                        dump_messages += 1
+                self.assertEqual(dump_messages, 2)
 
 
 class MetanormIngesterTestCase(django.test.TestCase):
