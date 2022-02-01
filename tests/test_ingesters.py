@@ -97,7 +97,9 @@ class IngesterTestCase(django.test.TransactionTestCase):
             with self.assertLogs(self.ingester.LOGGER, level=logging.INFO) as logger_cm:
                 self.ingester.ingest([uri])
 
-        self.assertTrue(logger_cm.records[0].msg.endswith('is already present in the database'))
+        self.assertTrue(any((
+            record.getMessage().endswith('already present in the database')
+            for record in logger_cm.records)))
         self.assertEqual(Dataset.objects.count(), 1)
         self.assertFalse(mock_ingest_dataset.called)
 
@@ -194,7 +196,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
                                '_thread_get_normalized_attributes',
                                side_effect=lambda x: time.sleep(0.5)):
             start = time.monotonic()
-            with self.assertRaises(KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt), self.assertLogs(ingester.LOGGER):
                 ingester.ingest(range_error_generator(5))
             stop = time.monotonic()
         self.assertLess(stop - start, 2.5)
@@ -203,7 +205,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         """Test pickling a list of objects"""
         objects_to_pickle = [1, 'one', 2.2]
         reference = list(objects_to_pickle)  # needed because the list will be cleared
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir, self.assertLogs(self.ingester.LOGGER):
             file_path = os.path.join(tmp_dir, 'random_objects.pickle')
             # pickle various objects to a temporary file
             self.ingester._pickle_list_elements(objects_to_pickle, file_path)
@@ -244,7 +246,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
                     # wait for the thread to stop
                     thread.join()
 
-                # check thatone file is created
+                # check that one file is created
                 failed_dir_contents = os.listdir(tmp_dir)
                 self.assertEqual(len(failed_dir_contents), 1)
 
@@ -573,7 +575,9 @@ class DDXIngesterTestCase(django.test.TestCase):
         with self.assertLogs(ingester.LOGGER, level=logging.INFO) as logger_cm:
             ingester.ingest(["https://opendap.jpl.nasa.gov/opendap/full_dataset.nc"])
 
-        self.assertTrue(logger_cm.records[0].msg.endswith('already present in the database'))
+        self.assertTrue(any((
+            record.getMessage().endswith('already present in the database')
+            for record in logger_cm.records)))
         self.assertEqual(Dataset.objects.count(), initial_datasets_count + 1)
 
     def test_function_named_prepare_url(self):
