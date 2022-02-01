@@ -1,5 +1,6 @@
 """Daemon script for GeoSPaaS data harvesting"""
 
+import geospaas_harvesting.recovery as recovery
 import argparse
 import collections.abc
 import logging
@@ -17,7 +18,6 @@ import yaml
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
 import geospaas_harvesting.harvesters as harvesters  # pylint: disable=wrong-import-position
-import geospaas_harvesting.retry_ingest as retry_ingest
 
 
 LOGGER_NAME = 'geospaas_harvesting.daemon'
@@ -183,7 +183,7 @@ def main():
         sys.exit(1)
 
     # Retry to ingest datasets for which the ingestion failed
-    retry_ingest.main()
+    recovery.retry_ingest()
 
 
 if __name__ == '__main__':

@@ -40,7 +40,7 @@ def ingest_file(file_path):
     file_path.unlink()
 
 
-def main():
+def retry_ingest():
     """Ingest the contents of all files contained in the failed
     ingestions directory. Some new files might be created if the
     ingestion fails again. In that case, the new files are retried
@@ -66,6 +66,10 @@ def main():
         logger.error("There are still errors. Stopping.")
     else:
         logger.info("All failed datasets have been successfully ingested.")
+
+
+def main():
+    retry_ingest()
 
 
 if __name__ == '__main__':
