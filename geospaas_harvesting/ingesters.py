@@ -188,6 +188,7 @@ class Ingester():
 
     def _pickle_list_elements(self, list_to_pickle, pickle_path):
         """Pickle all the elements in the list, then empty it"""
+        self.LOGGER.info("Dumping items to %s", pickle_path)
         with open(pickle_path, 'ab') as pickle_file:
             for element_to_pickle in list_to_pickle:
                 pickle.dump(element_to_pickle, pickle_file)
@@ -199,6 +200,7 @@ class Ingester():
         when None is received, dump the contents of the list to a file.
         This method is meant to be run in a thread.
         """
+        self.LOGGER.info("Starting failed ingestions management thread")
         class_name = self.__class__.__name__.lower()
         date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
         pickle_path = os.path.join(self.FAILED_INGESTIONS_PATH,
@@ -211,6 +213,7 @@ class Ingester():
             element = self._failed.get()
 
             if element is None:
+                self.LOGGER.info("Stopping failed ingestions management thread")
                 if (failed_ingestions and
                         not (len(failed_ingestions) == 1 and failed_ingestions[0] is self)):
                     self._pickle_list_elements(failed_ingestions, pickle_path)
