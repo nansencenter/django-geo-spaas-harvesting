@@ -31,7 +31,7 @@ RUN python -c 'import pythesint; pythesint.update_all_vocabularies( \
 
 FROM base
 
-ARG GEOSPAAS_HARVESTING_RELEASE '0.0.0dev'
+ARG GEOSPAAS_HARVESTING_RELEASE='0.0.0dev'
 WORKDIR /tmp/setup
 COPY setup.py README.md ./
 COPY geospaas_harvesting ./geospaas_harvesting
