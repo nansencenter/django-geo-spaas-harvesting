@@ -272,6 +272,33 @@ class IngesterTestCase(django.test.TransactionTestCase):
                         dump_messages += 1
                 self.assertEqual(dump_messages, 2)
 
+    def test_thread_get_normalized_attributes(self):
+        """Once the attributes are retrieved, they should be put in the
+        _to_ingest queue
+        """
+        url = 'https://foo'
+        info = {'bar': 'baz'}
+        attributes = {'qux': 'quz'}
+        with mock.patch.object(self.ingester, '_get_normalized_attributes') as mock_get_attributes:
+            mock_get_attributes.return_value = attributes
+            self.ingester._thread_get_normalized_attributes(url, info)
+        self.assertEqual(self.ingester._to_ingest.qsize(), 1)
+        self.assertTupleEqual(self.ingester._to_ingest.get(), (url, attributes))
+
+    def test_thread_get_normalized_attributes_error(self):
+        """When the retrieval of attributes fails, the dataset info and
+        the error should be placed in the _failed queue
+        """
+        url = 'https://foo'
+        info = {'bar': 'baz'}
+        error = requests.ConnectionError('connection refused')
+        with mock.patch.object(self.ingester, '_get_normalized_attributes') as mock_get_attributes:
+            mock_get_attributes.side_effect = error
+            with self.assertLogs(self.ingester.LOGGER, level=logging.INFO):
+                self.ingester._thread_get_normalized_attributes(url, info)
+        self.assertEqual(self.ingester._failed.qsize(), 1)
+        self.assertTupleEqual(self.ingester._failed.get(), (info, error))
+
 
 class MetanormIngesterTestCase(django.test.TestCase):
     """Test the base metadata ingester class"""
