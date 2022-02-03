@@ -1,2 +1,5 @@
 [run]
 relative_files = True
+parallel = True
+concurrency = multiprocessing
+source = geospaas_harvesting

@@ -18,6 +18,6 @@ if __name__ == "__main__":
     test_module = f".{sys.argv[1]}" if len(sys.argv) >= 2 else ''
 
     TestRunner = get_runner(settings)
-    test_runner = TestRunner(interactive=False)
+    test_runner = TestRunner(interactive=False, parallel=2)
     failures = test_runner.run_tests(["tests" + test_module])
     sys.exit(bool(failures))
