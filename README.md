@@ -58,7 +58,7 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
 Generic configuration can be defined using environment variables:
 
 - `GEOSPAAS_HARVESTING_LOG_CONF_PATH`: path to the logging configuration file
-- `GEOSPAAS_PERSISTENCE_DIR`: path to the persistence directory
+- `GEOSPAAS_FAILED_INGESTIONS_DIR`: path to the directory where information about datasets for which errors occurred is stored
 - `SECRET_KEY`: Django secret key
 - `GEOSPAAS_DB_HOST`: database hostname
 - `GEOSPAAS_DB_PORT`: database port
