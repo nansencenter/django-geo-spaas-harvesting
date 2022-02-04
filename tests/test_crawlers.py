@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import requests
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
@@ -33,6 +34,51 @@ class BaseCrawlerTestCase(unittest.TestCase):
         base_crawler = crawlers.Crawler()
         with self.assertRaises(NotImplementedError):
             _ = iter(base_crawler)
+
+    def test_http_get_retry(self):
+        """Test that _http_get retries the request when a connection
+        error or a server error occurs
+        """
+        http_500_error = requests.HTTPError()
+        http_500_error.response = mock.MagicMock(status_code=500)
+
+        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request, \
+                mock.patch('time.sleep') as mock_sleep:
+            mock_request.side_effect=(
+                requests.ConnectionError,
+                requests.ConnectTimeout,
+                requests.ReadTimeout,
+                http_500_error,
+                mock.Mock())
+            with self.assertLogs(crawlers.Crawler.LOGGER, level=logging.WARNING):
+                crawlers.Crawler._http_get('url')
+
+            self.assertEqual(len(mock_request.mock_calls), 5)
+            self.assertListEqual(mock_sleep.mock_calls, [mock.call(30 * (2**i)) for i in range(4)])
+
+    def test_http_get_fails_eventually(self):
+        """Test that _http_get retries the request when a connection
+        error or a server error occurs, then logs an error and returns None
+        if the problem persists
+        """
+        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request, \
+                mock.patch('time.sleep') as mock_sleep:
+            mock_request.side_effect = requests.ConnectionError
+
+            with self.assertLogs(crawlers.Crawler.LOGGER, level=logging.ERROR):
+                self.assertIsNone(crawlers.Crawler._http_get('url'))
+
+            self.assertEqual(len(mock_request.mock_calls), 5)
+            self.assertEqual(len(mock_sleep.mock_calls), 5)
+
+    def test_http_get_no_retry_error(self):
+        """_http_get should not retry the request if the error is not a
+        connection error or a server error
+        """
+        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
+            mock_request.side_effect = requests.TooManyRedirects
+            with self.assertLogs(crawlers.Crawler.LOGGER, level=logging.ERROR):
+                self.assertIsNone(crawlers.Crawler._http_get('url'))
 
 
 class WebDirectoryCrawlerTestCase(unittest.TestCase):
