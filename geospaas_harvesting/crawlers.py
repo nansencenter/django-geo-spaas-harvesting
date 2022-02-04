@@ -67,6 +67,7 @@ class Crawler():
             wait_time *= 2
 
         cls.LOGGER.error('Max retries reached for %s', url)
+        return None
 
 
 
