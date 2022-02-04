@@ -50,7 +50,7 @@ class Crawler():
                 response = utils.http_request('GET', url, **request_parameters or {})
                 response.raise_for_status()
                 return response.text
-            except (requests.ConnectionError, requests.HTTPError) as error:
+            except (requests.ConnectionError, requests.HTTPError, requests.Timeout) as error:
                 # retry only for connection errors and HTTP errors 5**
                 if (isinstance(error, requests.HTTPError) and
                         (error.response.status_code < 500 or error.response.status_code > 599)):
