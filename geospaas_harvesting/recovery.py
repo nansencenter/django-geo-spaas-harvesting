@@ -69,6 +69,9 @@ def retry_ingest():
 
 
 def main():
+    """Call recovery functions. For now only ingestion recovery is
+    implemented
+    """
     retry_ingest()
 
 
