@@ -1,0 +1,163 @@
+"""Tests for the recovery module"""
+import logging
+import os
+import tempfile
+import unittest.mock as mock
+from pathlib import Path
+
+import django.test
+import requests
+
+import geospaas_harvesting.ingesters as ingesters
+import geospaas_harvesting.recovery as recovery
+
+
+class PickableMock(mock.MagicMock):
+    """MagicMock class that can be pickled"""
+    def __reduce__(self):
+        return (mock.MagicMock, ())
+
+
+class IngestionRecoveryTestCase(django.test.TestCase):
+    """Tests for the ingestion recovery functions"""
+
+    def setUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        mock.patch(
+            'geospaas_harvesting.ingesters.Ingester.FAILED_INGESTIONS_PATH',
+            self.tmp_dir.name
+        ).start()
+
+    def tearDown(self):
+        self.addCleanup(mock.patch.stopall)
+        self.tmp_dir = None
+
+    def generate_recovery_file(self, errors_count=1):
+        """Generate recovery file"""
+        with mock.patch('geospaas.catalog.models.Parameter.objects.count', return_value=2):
+            ingester = ingesters.Ingester()
+
+        with mock.patch.object(ingester, '_get_normalized_attributes',
+                               new_callable=PickableMock,
+                               side_effect=requests.ConnectionError()):
+            datasets = [(f'http://foo{i}', f'bar{i}') for i in range(errors_count)]
+            # put errors in the queue
+            with self.assertLogs(ingester.LOGGER):
+                for url, info in datasets:
+                    ingester._thread_get_normalized_attributes(url, info)
+                ingester._failed.put(None)  # need to satisfy the stop condition
+                # read errors from the queue
+                ingester._thread_manage_failed_ingestions()
+
+    def test_ingest_file(self):
+        """Test ingesting a recovery file"""
+        self.generate_recovery_file(errors_count=2)
+
+        recovery_files = list(Path(self.tmp_dir.name).iterdir())
+        if len(recovery_files) != 1:
+            raise RuntimeError('One recovery file should have been generated')
+        recovery_file = recovery_files[0]
+
+        with mock.patch('geospaas_harvesting.ingesters.Ingester.ingest') as mock_ingest:
+            with self.assertLogs(recovery.logger, level=logging.INFO):
+                recovery.ingest_file(recovery_file)
+
+        mock_ingest.assert_called_once_with([f'bar{i}' for i in range(2)])
+        self.assertFalse(recovery_file.exists())
+
+    def test_retry_ingest(self):
+        """Test ingesting all recovery files in the failed ingestions
+        folder
+        """
+        self.generate_recovery_file(errors_count=2)
+        self.generate_recovery_file(errors_count=2)
+
+        recovery_files = list(Path(self.tmp_dir.name).iterdir())
+        if len(recovery_files) != 2:
+            raise RuntimeError('Two recovery files should have been generated')
+
+        with mock.patch('geospaas_harvesting.recovery.ingest_file') as mock_ingest_file:
+            # remove recovery files, simulating a best case scenario
+            mock_ingest_file.side_effect = lambda path: path.unlink()
+            with self.assertLogs(recovery.logger, level=logging.INFO):
+                recovery.retry_ingest()
+
+        self.assertListEqual(
+            mock_ingest_file.call_args_list,
+            [mock.call(path) for path in recovery_files])
+
+    def test_retry_ingest_with_failure(self):
+        """Test ingesting all recovery files in the failed ingestions
+        folder, with failures during the first re-ingestion
+        """
+        def generate_ingest_file_side_effect(test_case):
+            """Returns a callable class which creates a recovery file
+            the first time it is called. It also removes the file given
+            as argument (not just the first time).
+            """
+            class Inner():
+                def __init__(self, test_case):
+                    self.test_case = test_case
+                    self.called_once = False
+
+                def __call__(self, file_path):
+                    if not self.called_once:
+                        self.test_case.generate_recovery_file(errors_count=1)
+                        self.called_once = True
+                    file_path.unlink()
+            return Inner(test_case)
+
+        self.generate_recovery_file(errors_count=1)
+
+        recovery_files = list(Path(self.tmp_dir.name).iterdir())
+        if len(recovery_files) != 1:
+            raise RuntimeError('One recovery file should have been generated')
+
+        with mock.patch('geospaas_harvesting.recovery.ingest_file') as mock_ingest_file, \
+                mock.patch('time.sleep') as mock_sleep:
+            mock_ingest_file.side_effect = generate_ingest_file_side_effect(self)
+            with self.assertLogs(recovery.logger):
+                recovery.retry_ingest()
+
+        # check that retry_ingest() has been called once with the first
+        # recovery file, and once with the recovery file that was
+        # generated when processing the first one
+        self.assertEqual(len(mock_ingest_file.call_args_list), 2)
+        self.assertTrue(all([
+            call[1][0].name.endswith(ingesters.Ingester.RECOVERY_SUFFIX)
+            for call in mock_ingest_file.mock_calls]))
+        mock_sleep.assert_called_once_with(60)
+
+    def test_retry_ingest_with_persistent_failure(self):
+        """Test ingesting all recovery files in the failed ingestions
+        folder, with persistent failures during re-ingestion resulting
+        in files not being ingested
+        """
+
+        self.generate_recovery_file(errors_count=1)
+
+        recovery_files = list(Path(self.tmp_dir.name).iterdir())
+        if len(recovery_files) != 1:
+            raise RuntimeError('One recovery file should have been generated')
+
+        with mock.patch('geospaas_harvesting.recovery.ingest_file') as mock_ingest_file, \
+                mock.patch('time.sleep') as mock_sleep:
+            with self.assertLogs(recovery.logger):
+                recovery.retry_ingest()
+
+        # check that retry_ingest() has been called five times
+        self.assertEqual(len(mock_ingest_file.call_args_list), 5)
+        # check that the wait time increases for each failure
+        # wait_times == (60, 60*2, 60*4, 60*8, ...)
+        initial_wait_time = 60
+        wait_times = (initial_wait_time * i for i in (2**j for j in range(5)))
+        mock_sleep.assert_has_calls((mock.call(t) for t in wait_times))
+
+
+class RecoveryTestCase(django.test.TestCase):
+    """Tests for generic recovery functions"""
+    def test_main(self):
+        """Test that the recovery functions are called"""
+        with mock.patch('geospaas_harvesting.recovery.retry_ingest') as mock_ingest:
+            recovery.main()
+        mock_ingest.assert_called_once()
