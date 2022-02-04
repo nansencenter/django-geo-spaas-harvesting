@@ -59,6 +59,7 @@ class Ingester():
         'GEOSPAAS_FAILED_INGESTIONS_DIR',
         os.path.join('/', 'var', 'run', 'geospaas'))
     MAX_FAILED = 500000  # max number of failed objects per recovery file
+    RECOVERY_SUFFIX = 'failed_ingestions.pickle'
 
     def __init__(self, max_fetcher_threads=1, max_db_threads=1):
         if not (isinstance(max_fetcher_threads, int) and isinstance(max_db_threads, int)):
@@ -204,7 +205,7 @@ class Ingester():
         class_name = self.__class__.__name__.lower()
         date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
         pickle_path = os.path.join(self.FAILED_INGESTIONS_PATH,
-                                   f'{class_name}_{date}_failed_ingestions.pickle')
+                                   f'{class_name}_{date}_{self.RECOVERY_SUFFIX}')
 
         os.makedirs(self.FAILED_INGESTIONS_PATH, exist_ok=True)
 

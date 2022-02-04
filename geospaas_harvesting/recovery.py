@@ -47,7 +47,7 @@ def retry_ingest():
     after waiting for a while. Maximum 5 tries.
     """
     base_path = Path(ingesters.Ingester.FAILED_INGESTIONS_PATH)
-    glob_pattern = '*_failed_ingestions.pickle'
+    glob_pattern = f'*{ingesters.Ingester.RECOVERY_SUFFIX}'
     wait_time = 60  # seconds
 
     for _ in range(5):  # try maximum 5 times, i.e. wait in total 31 minutes
