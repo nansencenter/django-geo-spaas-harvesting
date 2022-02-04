@@ -150,7 +150,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
         # check that the wait time increases for each failure
         # wait_times == (60, 60*2, 60*4, 60*8, ...)
         initial_wait_time = 60
-        wait_times = (initial_wait_time * i for i in (2**j for j in range(5)))
+        wait_times = (initial_wait_time * (2**i) for i in range(5))
         mock_sleep.assert_has_calls((mock.call(t) for t in wait_times))
 
 
