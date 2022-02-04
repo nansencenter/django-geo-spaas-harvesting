@@ -30,6 +30,7 @@ def ingest_file(file_path):
             try:
                 dataset_info, error = pickle.load(pickle_file)
                 if (isinstance(error, requests.ConnectionError) or
+                        isinstance(error, requests.Timeout) or
                         isinstance(error, requests.HTTPError and
                         error.response.status_code >= 500 and
                         error.response.status_code <= 599)):
