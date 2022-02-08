@@ -13,7 +13,7 @@ django.setup()
 import geospaas_harvesting.ingesters as ingesters  # pylint: disable=wrong-import-position
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('geospaas_harvesting.recovery')
 
 
 def ingest_file(file_path):
@@ -22,7 +22,7 @@ def ingest_file(file_path):
     containing the dataset information required by the ingester and the
     error which happened when trying the first ingestion.
     """
-    logger.info("Ingesting datasets from %s", file_path)
+    logger.info("Getting failed ingestions from %s", file_path)
     with open(file_path, 'rb') as pickle_file:
         ingester = pickle.load(pickle_file)
         dataset_infos = []
@@ -31,14 +31,18 @@ def ingest_file(file_path):
                 dataset_info, error = pickle.load(pickle_file)
                 if (isinstance(error, requests.ConnectionError) or
                         isinstance(error, requests.Timeout) or
-                        isinstance(error, requests.HTTPError and
+                        (isinstance(error, requests.HTTPError) and
                         error.response.status_code >= 500 and
                         error.response.status_code <= 599)):
                     dataset_infos.append(dataset_info)
             except EOFError:
                 break
-    ingester.ingest(dataset_infos)
-    file_path.unlink()
+        if dataset_infos:
+            logger.info("Ingesting datasets from %s", file_path)
+            ingester.ingest(dataset_infos)
+        else:
+            logger.info("Nothing to ingest in %s", file_path)
+        file_path.unlink()
 
 
 def retry_ingest():
@@ -53,7 +57,11 @@ def retry_ingest():
 
     for _ in range(5):  # try maximum 5 times, i.e. wait in total 31 minutes
         for file_path in base_path.glob(glob_pattern):
-            ingest_file(file_path)
+            try:
+                ingest_file(file_path)
+            except Exception:  # pylint: disable=broad-except
+                # do not interrupt recovery process in case of error for one file
+                logger.error("Did not manage to ingest %s", file_path, exc_info=True)
 
         if tuple(base_path.glob(glob_pattern)):
             logger.warning("There were errors while ingesting previous failures. "
