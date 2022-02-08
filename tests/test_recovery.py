@@ -1,6 +1,5 @@
 """Tests for the recovery module"""
 import logging
-import os
 import tempfile
 import unittest.mock as mock
 from pathlib import Path
