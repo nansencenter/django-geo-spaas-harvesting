@@ -31,14 +31,14 @@ class IngestionRecoveryTestCase(django.test.TestCase):
         self.addCleanup(mock.patch.stopall)
         self.tmp_dir = None
 
-    def generate_recovery_file(self, errors_count=1):
+    def generate_recovery_file(self, exception_type, errors_count=1):
         """Generate recovery file"""
         with mock.patch('geospaas.catalog.models.Parameter.objects.count', return_value=2):
             ingester = ingesters.Ingester()
 
         with mock.patch.object(ingester, '_get_normalized_attributes',
                                new_callable=PickableMock,
-                               side_effect=requests.ConnectionError()):
+                               side_effect=exception_type()):
             datasets = [(f'http://foo{i}', f'bar{i}') for i in range(errors_count)]
             # put errors in the queue
             with self.assertLogs(ingester.LOGGER):
@@ -50,7 +50,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
 
     def test_ingest_file(self):
         """Test ingesting a recovery file"""
-        self.generate_recovery_file(errors_count=2)
+        self.generate_recovery_file(requests.ConnectionError, errors_count=2)
 
         recovery_files = list(Path(self.tmp_dir.name).iterdir())
         if len(recovery_files) != 1:
@@ -64,12 +64,30 @@ class IngestionRecoveryTestCase(django.test.TestCase):
         mock_ingest.assert_called_once_with([f'bar{i}' for i in range(2)])
         self.assertFalse(recovery_file.exists())
 
+    def test_ingest_file_nothing_to_ingest(self):
+        """Test that no ingestion is triggered if the pickled exception
+        are not of the supported types
+        """
+        self.generate_recovery_file(ValueError, errors_count=1)
+
+        recovery_files = list(Path(self.tmp_dir.name).iterdir())
+        if len(recovery_files) != 1:
+            raise RuntimeError('One recovery file should have been generated')
+        recovery_file = recovery_files[0]
+
+        with mock.patch('geospaas_harvesting.ingesters.Ingester.ingest') as mock_ingest:
+            with self.assertLogs(recovery.logger, level=logging.INFO):
+                recovery.ingest_file(recovery_file)
+
+        mock_ingest.assert_not_called()
+        self.assertFalse(recovery_file.exists())
+
     def test_retry_ingest(self):
         """Test ingesting all recovery files in the failed ingestions
         folder
         """
-        self.generate_recovery_file(errors_count=2)
-        self.generate_recovery_file(errors_count=2)
+        self.generate_recovery_file(requests.ConnectionError, errors_count=2)
+        self.generate_recovery_file(requests.ConnectionError, errors_count=2)
 
         recovery_files = list(Path(self.tmp_dir.name).iterdir())
         if len(recovery_files) != 2:
@@ -101,12 +119,13 @@ class IngestionRecoveryTestCase(django.test.TestCase):
 
                 def __call__(self, file_path):
                     if not self.called_once:
-                        self.test_case.generate_recovery_file(errors_count=1)
+                        self.test_case.generate_recovery_file(
+                            requests.ConnectionError, errors_count=1)
                         self.called_once = True
                     file_path.unlink()
             return Inner(test_case)
 
-        self.generate_recovery_file(errors_count=1)
+        self.generate_recovery_file(requests.ConnectionError, errors_count=1)
 
         recovery_files = list(Path(self.tmp_dir.name).iterdir())
         if len(recovery_files) != 1:
@@ -133,7 +152,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
         in files not being ingested
         """
 
-        self.generate_recovery_file(errors_count=1)
+        self.generate_recovery_file(requests.ConnectionError, errors_count=1)
 
         recovery_files = list(Path(self.tmp_dir.name).iterdir())
         if len(recovery_files) != 1:
@@ -151,6 +170,25 @@ class IngestionRecoveryTestCase(django.test.TestCase):
         initial_wait_time = 60
         wait_times = (initial_wait_time * (2**i) for i in range(5))
         mock_sleep.assert_has_calls((mock.call(t) for t in wait_times))
+
+    def test_retry_ingest_error(self):
+        """Check that exception happening during re-ingestion of a file
+        do not stop the re-ingestion process for other files
+        """
+        self.generate_recovery_file(requests.ConnectionError, errors_count=2)
+
+        recovery_files = list(Path(self.tmp_dir.name).iterdir())
+        if len(recovery_files) != 1:
+            raise RuntimeError('One recovery file should have been generated')
+        recovery_file = recovery_files[0]
+
+        with mock.patch('geospaas_harvesting.recovery.ingest_file') as mock_ingest_file, \
+                mock.patch('time.sleep'):
+            mock_ingest_file.side_effect = RuntimeError
+            with self.assertLogs(recovery.logger, level=logging.ERROR):
+                recovery.retry_ingest()
+
+        self.assertEqual(len(mock_ingest_file.mock_calls), 5)
 
 
 class RecoveryTestCase(django.test.TestCase):
