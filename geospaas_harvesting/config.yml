@@ -1,0 +1,69 @@
+# default configuration file
+---
+update_vocabularies: False
+update_pythesint: False
+pythesint_versions:
+  gcmd_instrument: '9.1.5'
+  gcmd_science_keyword: '9.1.5'
+  gcmd_provider: '9.1.5'
+  gcmd_platform: '9.1.5'
+  gcmd_location: '9.1.5'
+  gcmd_horizontalresolutionrange: '9.1.5'
+  gcmd_verticalresolutionrange: '9.1.5'
+  gcmd_temporalresolutionrange: '9.1.5'
+  gcmd_project: '9.1.5'
+  gcmd_rucontenttype: '9.1.5'
+  mmd_access_constraints: 'v3.2'
+  mmd_activity_type: 'v3.2'
+  mmd_areas: 'v3.2'
+  mmd_operstatus: 'v3.2'
+  mmd_platform_type: 'v3.2'
+  mmd_use_constraint_type: 'v3.2'
+providers:
+  ceda:
+    type: 'ceda'
+    username: 'anonymous'
+    password: ''
+  cmems:
+    type: 'cmems_ftp'
+    username: !ENV CMEMS_USERNAME
+    password: !ENV CMEMS_PASSWORD
+  cmems_in_situ:
+    type: 'netcdf'
+    longitude_attribute: 'LONGITUDE'
+    latitude_attribute: 'LATITUDE'
+  scihub:
+    type: 'copernicus_scihub'
+    username: !ENV COPERNICUS_OPEN_HUB_USERNAME
+    password: !ENV COPERNICUS_OPEN_HUB_PASSWORD
+  creodias:
+    type: 'creodias'
+  earthdata_cmr:
+    type: 'earthdata_cmr'
+  gportal:
+    type: 'gportal_ftp'
+    username: !ENV JAXA_USERNAME
+    password: !ENV JAXA_PASSWORD
+  sla_aviso:
+    type: 'netcdf'
+    longitude_attribute: 'longitude'
+    latitude_attribute: 'latitude'
+  metno:
+    type: 'metno'
+  noaa:
+    type: 'noaa'
+    username: !ENV JAXA_USERNAME
+    password: !ENV JAXA_PASSWORD
+  podaac:
+    type: 'podaac'
+  cpom:
+    type: 'netcdf'
+    longitude_attribute: 'lon'
+    latitude_attribute: 'lat'
+  nansat:
+    type: 'nansat'
+  nextsim:
+    type: 'netcdf'
+    longitude_attribute: 'longitude'
+    latitude_attribute: 'latitude'
+...
