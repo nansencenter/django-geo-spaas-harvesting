@@ -1,4 +1,4 @@
-"""Settings for the harvesting daemon"""
+"""Django settings"""
 import os
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'fake-key')
