@@ -1,6 +1,7 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=no-member
 """CLI for interacting with geospaas_harvesting"""
+# TODO: manage URL checks and recovery
 import argparse
 import logging
 import multiprocessing
