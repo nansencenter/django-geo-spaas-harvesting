@@ -10,6 +10,8 @@ import requests
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
+
+import geospaas_harvesting.crawlers as crawlers  # pylint: disable=wrong-import-position
 import geospaas_harvesting.ingesters as ingesters  # pylint: disable=wrong-import-position
 
 
@@ -23,8 +25,8 @@ def ingest_file(file_path):
     error which happened when trying the first ingestion.
     """
     logger.info("Getting failed ingestions from %s", file_path)
+    ingester = ingesters.Ingester()
     with open(file_path, 'rb') as pickle_file:
-        ingester = pickle.load(pickle_file)
         dataset_infos = []
         while True:
             try:
@@ -51,8 +53,8 @@ def retry_ingest():
     ingestion fails again. In that case, the new files are retried
     after waiting for a while. Maximum 5 tries.
     """
-    base_path = Path(ingesters.Ingester.FAILED_INGESTIONS_PATH)
-    glob_pattern = f'*{ingesters.Ingester.RECOVERY_SUFFIX}'
+    base_path = Path(crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH)
+    glob_pattern = f'*{crawlers.CrawlerIterator.RECOVERY_SUFFIX}'
     wait_time = 60  # seconds
 
     for _ in range(5):  # try maximum 5 times, i.e. wait in total 31 minutes
