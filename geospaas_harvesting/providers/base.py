@@ -62,7 +62,7 @@ class Provider(FilterMixin):
     """
 
     def __init__(self, *args, **kwargs):
-        self.name = kwargs['name']
+        self.name = kwargs.get('name', 'unknown')
         self.username = kwargs.get('username')
         self.password = kwargs.get('password')
 
