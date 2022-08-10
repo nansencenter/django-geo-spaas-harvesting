@@ -729,6 +729,18 @@ class FTPCrawler(DirectoryCrawler):
 
         super().__init__(root_url, time_range, include, max_threads=1)
 
+    def __getstate__(self):
+        """Method used to pickle the crawler"""
+        state = self.__dict__
+        if isinstance(state['ftp'], ftplib.FTP):
+            state['ftp'] = None
+        return state
+
+    def __setstate__(self, state):
+        """Method used to unpickle the crawler"""
+        self.__dict__.update(state)
+        self.connect()
+
     # ------------- crawl ------------
     def set_initial_state(self):
         """
