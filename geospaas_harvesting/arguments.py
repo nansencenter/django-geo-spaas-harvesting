@@ -20,23 +20,16 @@ class ArgumentParser():
         in the parameters being validated. Otherwise, extra parameters
         are allowed
         """
-        self._check_arguments(arguments)
-        self.arguments = arguments
+        self.arguments = {}
+        self.add_arguments(arguments)
         self.strict = strict
 
     def add_arguments(self, arguments):
-        """Adds an Argument to the list of valid arguments"""
-        self._check_arguments(arguments)
-        self.arguments.extend(arguments)
-
-    @staticmethod
-    def _check_arguments(list_to_check):
-        """Checks that a list contains only Argument objects"""
-        if not isinstance(list_to_check, list):
-            raise ValueError(f"{list_to_check} should be a list")
-        for arg in list_to_check:
+        """Adds or updates Arguments in the valid arguments"""
+        for arg in arguments:
             if not isinstance(arg, Argument):
                 raise ValueError(f"{arg} should be an Argument object")
+            self.arguments[arg.name] = arg
 
     def parse(self, parameters):
         """Makes sure the right arguments are passed and parses them.
@@ -44,7 +37,7 @@ class ArgumentParser():
         validated.
         """
         parsed_parameters = {}
-        recursion_stack = self.arguments.copy()
+        recursion_stack = [arg for arg in self.arguments.values()]
         max_stack_size = 10000
 
         # Loop through the argument definitions and check that the
@@ -68,7 +61,7 @@ class ArgumentParser():
                     parsed_parameters[argument.name] = argument.default
 
         if self.strict and parameters:
-            raise ValueError(f"Unknown argument {list(parameters)}")
+            raise ValueError(f"Unknown argument(s) {parameters}")
 
         return parsed_parameters
 
@@ -102,6 +95,12 @@ class Argument():
         If the input is not correct, should raise an exception
         """
         raise NotImplementedError()
+
+
+class AnyArgument(Argument):
+    """Passthrough argument with no validation"""
+    def parse(self, value):
+        return value
 
 
 class BooleanArgument(Argument):
@@ -140,6 +139,8 @@ class DatetimeArgument(Argument):
     """
 
     def parse(self, value):
+        if value is None:
+            return None
         _datetime = dateutil.parser.parse(value)
         if _datetime.tzinfo is None:
             _datetime = _datetime.replace(tzinfo=timezone.utc)
@@ -149,11 +150,17 @@ class DatetimeArgument(Argument):
 class DictArgument(Argument):
     """Dictionary argument"""
 
+    def __init__(self, name, **kwargs):
+        self.valid_keys = set(kwargs.pop('valid_keys', []))
+        super().__init__(name, **kwargs)
+
     def parse(self, value):
-        if isinstance(value, dict):
-            return value
-        else:
+        if not isinstance(value, dict):
             raise ValueError(f"{self.name} should be a dictionary")
+        keys = set(value.keys())
+        if self.valid_keys and not keys.issubset(self.valid_keys):
+            raise ValueError(f"Invalid keys {keys.difference(self.valid_keys)}")
+        return value
 
 
 class IntegerArgument(Argument):
