@@ -3,8 +3,8 @@
 """CLI for interacting with geospaas_harvesting"""
 # TODO: manage URL checks and recovery
 import argparse
+import concurrent.futures
 import logging
-import multiprocessing
 import os
 import signal
 from pathlib import Path
@@ -57,18 +57,21 @@ def refresh_vocabularies(config):
 
 def save_results(searches_results):
     """Ingests the results of each search in a separate process"""
-    processes_number = len(searches_results)
-    try:
-        with multiprocessing.Pool(processes_number, initializer=init_worker) as pool:
+    with concurrent.futures.ProcessPoolExecutor(initializer=init_worker) as executor:
+        try:
+            futures = []
             for search_results in searches_results:
-                # Start a new process
-                pool.apply_async(search_results.save)
-            pool.close()
-            pool.join()
-    except KeyboardInterrupt:
-        pool.terminate()
-        pool.join()
-        raise
+                futures.append(executor.submit(search_results.save))
+
+            for future in concurrent.futures.as_completed(futures):
+                exception = future.exception()
+                if exception:
+                    logger.error(
+                        "An exception happened during harvesting process",
+                        exc_info=exception)
+        except KeyboardInterrupt:
+            executor.shutdown(wait=False)
+            raise
 
 
 def harvest(cli_arguments):
