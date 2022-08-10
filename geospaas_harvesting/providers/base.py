@@ -24,18 +24,26 @@ class TimeFilterMixin(FilterMixin):
     finely.
     """
 
+    def _time_coverage_end_gt(self, dataset_info):
+        """Compares a DatasetInfo's time coverage to the stored value"""
+        return dataset_info.metadata['time_coverage_end'] > self._mixin_start_time
+
+    def _time_coverage_start_lte(self, dataset_info):
+        """Compares a DatasetInfo's time coverage to the stored value"""
+        return dataset_info.metadata['time_coverage_start'] <= self._mixin_end_time
+
     def _make_filters(self, parsed_parameters):
         """Check that the search parameters' time range and the
         dataset's time range intersect.
         """
         filters = []
-        start_time = parsed_parameters.get('start_time')
-        if start_time is not None:
+        self._mixin_start_time = parsed_parameters.get('start_time')
+        if self._mixin_start_time is not None:
             # di is a DatasetInfo object
-            filters.append(lambda di: di.metadata['time_coverage_end'] >= start_time)
-        end_time = parsed_parameters.get('end_time')
-        if end_time is not None:
-            filters.append(lambda di: di.metadata['time_coverage_start'] <= end_time)
+            filters.append(self._time_coverage_end_gt)
+        self._mixin_end_time = parsed_parameters.get('end_time')
+        if self._mixin_end_time is not None:
+            filters.append(self._time_coverage_start_lte)
         return filters
 
 
