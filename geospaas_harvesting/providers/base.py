@@ -1,8 +1,10 @@
 """Base classes for use by providers"""
 import logging
 
+from shapely.geometry.polygon import Polygon
+
 import geospaas_harvesting.ingesters as ingesters
-from ..arguments import ArgumentParser, DatetimeArgument
+from ..arguments import ArgumentParser, DatetimeArgument, WKTArgument
 
 
 logger = logging.getLogger(__name__)
@@ -60,8 +62,9 @@ class Provider(FilterMixin):
         self.password = kwargs.get('password')
 
         self.search_parameters_parser = ArgumentParser([
-            DatetimeArgument('start_time', required=False, default=None),
-            DatetimeArgument('end_time', required=False, default=None),
+            DatetimeArgument('start_time', default=None),
+            DatetimeArgument('end_time', default=None),
+            WKTArgument('location', geometry_types=(Polygon,)),
         ])
 
     def __repr__(self):
