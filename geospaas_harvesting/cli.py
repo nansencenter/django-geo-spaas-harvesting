@@ -15,7 +15,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 django.setup()
 
 from geospaas.catalog.models import Parameter
-from .config import Configuration
+from .config import ProvidersConfiguration, SearchConfiguration
 from .recovery import retry_ingest
 from .utils import read_yaml_file
 
@@ -55,24 +55,6 @@ def refresh_vocabularies(config):
         ))
 
 
-
-
-def parse_search_parameters(config, search_config):
-    """Goes through the search configuration, checks it and outputs
-    SearchResult objects.
-    No actual search occurs since these are lazy objects.
-    """
-    searches_results = []
-    for search_parameters in search_config:
-        provider_name = search_parameters.pop('provider_name')
-        if not provider_name:
-            raise ValueError(f"'provider_name' needs to be specified for each search")
-        elif provider_name not in config.providers:
-            raise ValueError(f"No provider named '{provider_name}' was found")
-        searches_results.append(config.providers[provider_name].search(**search_parameters))
-    return searches_results
-
-
 def save_results(searches_results):
     """Ingests the results of each search in a separate process"""
     processes_number = len(searches_results)
@@ -94,9 +76,10 @@ def harvest(cli_arguments):
     If errors occur during the ingestion process (like the provider
     website being temporarily unavailable), it is retried at the end.
     """
-    config = Configuration.from_file(cli_arguments.config_path)
-    search_config = read_yaml_file(cli_arguments.search_path)
-    searches_results = parse_search_parameters(config, search_config)
+    config = ProvidersConfiguration.from_file(cli_arguments.config_path)
+    search_config = SearchConfiguration.from_file(cli_arguments.search_path) \
+                                       .with_providers(config.providers)
+    searches_results = search_config.start_searches()
 
     refresh_vocabularies(config)
     save_results(searches_results)
