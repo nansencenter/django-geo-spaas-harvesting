@@ -58,9 +58,14 @@ def retry_ingest():
     base_path = Path(crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH)
     glob_pattern = f'*{crawlers.CrawlerIterator.RECOVERY_SUFFIX}'
     wait_time = 60  # seconds
+    recovery_attempted = False
 
     for _ in range(5):  # try maximum 5 times, i.e. wait in total 31 minutes
-        for file_path in base_path.glob(glob_pattern):
+        recovery_files = base_path.glob(glob_pattern)
+        if not recovery_files:
+            break
+        recovery_attempted = True
+        for file_path in recovery_files:
             try:
                 ingest_file(file_path)
             except Exception:  # pylint: disable=broad-except
@@ -77,8 +82,11 @@ def retry_ingest():
 
     if tuple(base_path.glob(glob_pattern)):
         logger.error("There are still errors. Stopping.")
-    else:
+    elif recovery_attempted:
         logger.info("All failed datasets have been successfully ingested.")
+    else:
+        logger.info("No recovery needed.")
+
 
 
 def main():
