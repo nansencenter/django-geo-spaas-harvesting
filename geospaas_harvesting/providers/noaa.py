@@ -11,7 +11,7 @@ class NOAAProvider(TimeFilterMixin, Provider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.url = "ftp://ftp.opc.ncep.noaa.gov"
+        self.url = "ftp://{server}.ncep.noaa.gov"
         self.search_parameters_parser.add_arguments([
             ChoiceArgument('server', valid_options=('ftp.opc', 'ftpprd'), default='ftp.opc'),
             PathArgument('directory', valid_options=(
@@ -22,8 +22,9 @@ class NOAAProvider(TimeFilterMixin, Provider):
         ])
 
     def _make_crawler(self, parameters):
+        url = self.url.format(server=parameters['server'])
         return FTPCrawler(
-            urljoin(self.url, parameters['directory']),
+            urljoin(url, parameters['directory']),
             time_range=(parameters['start_time'], parameters['end_time']),
             include=parameters['include'],
         )
