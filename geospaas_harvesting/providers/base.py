@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 class FilterMixin():
     """Base class for filter mixins. These are used to easily add
     filtering capabilities to providers.
+    This filtering is applied to the output of the crawler, after
+    the normalization step. So it is far less costly to narrow the
+    search down at the crawler level whenever possible rather than
+    using these filters (for example when the provider exposes an API
+    with search capabilities).
     """
 
     def _make_filters(self, parsed_parameters):  # pylint: disable=unused-argument
