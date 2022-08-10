@@ -174,7 +174,7 @@ class CrawlerIterator():
     RECOVERY_SUFFIX = 'failed_ingestions.pickle'
 
     def __init__(self, crawler, dataset_infos, max_threads=1):
-        """Initializes the iterator and creates a main thread which
+        """Initializes the iterator and creates a managing thread which
         will in turn spawn normalization threads
         """
         self.crawler = crawler
@@ -184,15 +184,16 @@ class CrawlerIterator():
         self._results = queue.Queue(self.QUEUE_SIZE)
         self._failed = queue.Queue(self.QUEUE_SIZE)
 
-        self.main_thread = threading.Thread(target=self._start_normalizing)
-        self.main_thread.start()
+        self.main_thread = threading.current_thread()
+        self.manager_thread = threading.Thread(target=self._start_normalizing)
+        self.manager_thread.start()
 
     def __del__(self):
-        """Make sure all the main thread is done before destroying the
+        """Make sure the managing thread is done before destroying the
         iterator
         """
         if self.main_thread == threading.current_thread():
-            self.main_thread.join()
+            self.manager_thread.join()
 
     def __next__(self):
         """Gets the next result from the _results queue"""
