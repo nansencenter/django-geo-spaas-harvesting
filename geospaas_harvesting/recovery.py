@@ -37,6 +37,8 @@ def ingest_file(file_path):
                         error.response.status_code >= 500 and
                         error.response.status_code <= 599)):
                     dataset_infos.append(dataset_info)
+                else:
+                    logger.warning("%s error, won't retry", error.__class__.__name__)
             except EOFError:
                 break
         if dataset_infos:
