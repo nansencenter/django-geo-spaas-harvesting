@@ -1,24 +1,7 @@
 # default configuration file
 ---
-update_vocabularies: False
-update_pythesint: False
-pythesint_versions:
-  gcmd_instrument: '9.1.5'
-  gcmd_science_keyword: '9.1.5'
-  gcmd_provider: '9.1.5'
-  gcmd_platform: '9.1.5'
-  gcmd_location: '9.1.5'
-  gcmd_horizontalresolutionrange: '9.1.5'
-  gcmd_verticalresolutionrange: '9.1.5'
-  gcmd_temporalresolutionrange: '9.1.5'
-  gcmd_project: '9.1.5'
-  gcmd_rucontenttype: '9.1.5'
-  mmd_access_constraints: 'v3.2'
-  mmd_activity_type: 'v3.2'
-  mmd_areas: 'v3.2'
-  mmd_operstatus: 'v3.2'
-  mmd_platform_type: 'v3.2'
-  mmd_use_constraint_type: 'v3.2'
+update_vocabularies: True
+update_pythesint: True
 providers:
   ceda:
     type: 'ceda'
