@@ -95,14 +95,14 @@ def make_arg_parser():
     """Creates a parser for the CLI arguments"""
     arg_parser = argparse.ArgumentParser(
         description='CLI for searching and harvesting data for the GeoSPaaS catalog')
-    subparsers = arg_parser.add_subparsers()
+    arg_parser.add_argument('-c', '--config',
+                            dest='config_path',
+                            default=default_configuration_path,
+                            help='Path to the configuration file')
 
+    subparsers = arg_parser.add_subparsers()
     harvest_parser = subparsers.add_parser('harvest',
                                            help='Harvest data directly into the database')
-    harvest_parser.add_argument('-c', '--config',
-                                dest='config_path',
-                                default=default_configuration_path,
-                                help='Path to the configuration file')
     harvest_parser.add_argument('-s', '--search',
                                 dest='search_path',
                                 default=default_search_path,
