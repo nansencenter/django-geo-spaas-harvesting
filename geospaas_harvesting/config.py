@@ -96,7 +96,7 @@ class SearchConfiguration(Configuration):
         self.config_arguments_parser = ArgumentParser([
             DictArgument(
                 'common', argument_parser=common_argument_parser),
-            ListArgument('provider_specific')
+            ListArgument('searches')
         ])
 
     def with_providers(self, providers):
@@ -115,7 +115,7 @@ class SearchConfiguration(Configuration):
         """Starts a search for each of the provider specific searches
         """
         searches = []
-        for provider_search in self.provider_specific:  # pylint: disable=no-member
+        for provider_search in self.searches:  # pylint: disable=no-member
             provider_name = provider_search.pop('provider_name')
             search_terms = self.common.copy()  # pylint: disable=no-member
             search_terms.update(provider_search)
