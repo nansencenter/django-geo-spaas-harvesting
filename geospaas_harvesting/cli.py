@@ -17,7 +17,6 @@ django.setup()
 from geospaas.catalog.models import Parameter
 from .config import ProvidersConfiguration, SearchConfiguration
 from .recovery import retry_ingest
-from .utils import read_yaml_file
 
 
 logger = logging.getLogger(__name__)
