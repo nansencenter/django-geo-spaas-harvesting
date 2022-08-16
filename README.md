@@ -3,40 +3,78 @@
 
 # Data gathering for GeoSPaaS
 
-This application crawls through data repositories to ingest metadata into a GeoSPaaS database. It
-relies on the Django for data access. Specifically, it uses the models defined in
-[django-geo-spaas](https://github.com/nansencenter/django-geo-spaas).
+This application can be used to search for satellite or model data from various providers and ingest
+metadata into a GeoSPaaS database. It relies on Django for data access. Specifically, it uses the
+models defined in [django-geo-spaas](https://github.com/nansencenter/django-geo-spaas).
 
-## Command line
+## Interfaces
 
-Harvesting can be launched by executing the `harvest.py` script. If no option is given, it will use
-the [default configuration file](./geospaas_harvesting/harvest.yml).
+The main interface is the CLI.
+A Web interface may be implemented in the future.
 
-Example:
+### Command line
 
-```shell
-python harvest.py
-```
-
-### Options
-
-#### -c, --config path
-
-A path to a custom configuration file can be specified.
+The CLI can be accessed through the `geospaas_harvesting.cli` module. If no option is given, it will
+use the [default configuration file](./geospaas_harvesting/config.yml).
 
 Example:
 
 ```shell
-python harvest.py -c ./harvest.yml
+python -m geospaas_harvesting.cli harvest
 ```
-### Warning for commencing the harvest process
-Before commencing the harvest process, the vocabulary must be updated by ```update_vocabularies``` command of django-geo-spaas. This will be done each time the *harvest.py* is executed (before the start of harvesting process). Otherwise, without an updated vocabulary, it will not add (assign) any parameter to the harvested dataset.
+
+#### Options
+
+##### -c, --config <path>
+
+Path to a custom configuration file can be specified.
+See [this section](#configyml) for more details.
+
+Example:
+
+```shell
+python -m geospaas_harvesting.cli -c ./config.yml harvest
+```
+
+##### -s, --search <path>
+
+A path to a search configuration file.
+See [this section](#search-configuration) for more details.
+
+```shell
+python -m geospaas_harvesting.cli -c ./config.yml harvest -s ./search.yml
+```
+
+#### Subcommands
+
+##### harvest
+
+The `harvest` subcommand runs searches based on the `search.yml` file (example
+[here](./geospaas_harvesting/search.yml)) and ingests the results in the database.
+
+##### help
+
+### Web interface
+
+Not implemented yet.
+
+
+### Warning before starting the harvesting process
+
+Before harvesting data, the database must be initialized with `Vocabulary` objects.
+The update can be done automatically and is controlled by the `update_vocabularies`, 
+`update_pythesint` and `pythesint_versions` in the configuration file.
+If you don't know what this means, it is best to keep the default values.
 
 ## Configuration
 
-### YAML file
+### Files
 
-The configuration of the harvesters is defined in a YAML file.
+All configuration files are in YAML. The `!ENV` tag allows to use environment variables as values.
+
+#### `config.yml`
+
+The configuration of the harvesters is defined in this file.
 An example can be seen in the [default configuration file](./geospaas_harvesting/harvest.yml).
 
 **Top-level keys**:
@@ -50,8 +88,56 @@ An example can be seen in the [default configuration file](./geospaas_harvesting
 - **pythesint_versions** (default: None): the pythesint vocabularies versions to use.
   This is a dictionary in which each key is a pythesint vocabulary name and each value is the
   corresponding version string.
-- **harvesters**: dictionary mapping the harvesters names to a dictionary containing their
-  properties.
+- **providers**: dictionary mapping the providers names to a dictionary containing their settings.
+
+##### Providers configuration
+
+The properties which are common to every harvester are:
+
+- **type** (mandatory): the type of provider. For a list of available harvesters see
+  [harvesters.py](./geospaas_harvesting/harvesters.py).
+
+The rest depends on the harvester and will be detailed in each provider's documentation.
+
+
+#### Search configuration
+
+This file is used to set the search parametersfor each provider you wish to use.
+By default, the CLI looks for a file called `search.yml` in the folder from which the search/harvest
+command is run.
+
+
+It contains two sections:
+- **common**: dictionary of parameters which will be applied to all the searches, unless overriden
+- **searches**: a list of dictionaries, each containing search parameters suited to a provider.
+  Each dictionary contained in that list must have the `provider_name` key defined.
+
+##### Common parameters
+
+These search parameters can be used for every provider:
+- **start_time** and **end_time**: used to define the temporal coverage. Most usual date formats are
+  supported, for example `'2020-05-09T00:00:00Z'`
+- **location**: a WKT string defining a shape defining the spatial coverage.
+
+##### Example
+
+```yaml
+---
+common: # these are common to all searches
+  start_time: '2022-07-13'
+  end_time: '2022-07-14'
+  location: 'POLYGON ((-43.2346 59.8972, -37.1701 62.2756, -31.8527 64.3661, -25.8762 65.8635, -20.7126 68.37690000000001, -19.9435 69.3939, -22.756 70.0712, -26.6232 68.8853, -32.2922 68.25920000000001, -36.6867 66.7291, -41.1252 65.0235, -42.6633 62.8226, -43.2346 59.8972))'
+searches:
+- provider_name: 'creodias'
+  collection: 'Sentinel1'
+  processingLevel: 'LEVEL1'
+  productType: 'GRD'
+
+- provider_name: 'earthdata_cmr'
+  short_name: 'VIIRSJ1_L2_OC_NRT'
+  start_time: '2018-12-01T00:00:00Z'
+  end_time: '2018-12-04T12:00:00Z'
+```
 
 ### Environment variables
 
@@ -66,32 +152,7 @@ Generic configuration can be defined using environment variables:
 - `GEOSPAAS_DB_USER`: database username
 - `GEOSPAAS_DB_PASSWORD`: database password
 
-Other environment variables can be defined in each harvester's configuration.
-
-### Harvesters configuration
-
-The properties which are common to every harvester are:
-
-- **class** (mandatory): the class of the harvester. For a list of available harvesters see
-  [harvesters.py](./geospaas_harvesting/harvesters.py).
-
-- **max_fetcher_threads** (optional): maximum number of threads in the pool which handles metadata
-  fetching and normalization. The optimal value varies from ingester to ingester.
-
-- **max_db_threads** (optional): maximum number of threads in the pool which handles database
-  writing. One is generally sufficient. Since each harvester runs in a separate process and each
-  thread maintains a database connection open, the total number of database threads across all
-  harvesters must be inferior to the maximum number of connections the database accepts (100 is the
-  default for Postgresql), with room to spare for other components which might access the database
-  (like a web interface or API).
-
-The rest depends on the harvester and will be detailed in each harvester's documentation.
-
-- **time_range** (optional): for harvesters which inherit from `WebDirectoryHarvester`. A
-  two-elements list containing two date strings which define a time range to which the crawler will
-  be limited.
-- **include** (obligatory for harvesters which inherit from `WebDirectoryHarvester`): A regular
-  expression matching the path of the files to include in the harvested repository.
+Other environment variables can be defined in the configuration files by using the `!ENV` tag.
 
 ## Design
 
@@ -99,85 +160,31 @@ The rest depends on the harvester and will be detailed in each harvester's docum
 
 This application is composed of three main components:
 
-- crawlers: explore data repositories and find URLs of useful datasets
-- ingesters: given the URL of a given dataset, fetches its metadata and writes it to the database
-- harvesters: orchestrates crawlers and harvesters to get metadata from various repositories
+- providers: offer an interface to search for data. Use crawlers and ingester.
+- crawlers: explore data repositories and find the metadata of useful datasets
+- ingester: write metadata to the database
 
 More details below.
 
 #### Crawlers
 
-The role of crawlers is to explore a data repository and find the URLs of the relevant datasets.
+The role of crawlers is to explore a data repository and find the metadata of 
+relevant datasets.
 
-They are iterables which, given a data repository URL, return the URLs found when exploring this
-repository.
+They are iterables which, given a data repository URL, return the metadata found
+when exploring this repository.
 
-The currently available crawlers are:
-
-- Local files
-- OpenDAP
-- THREDDS
-- FTP
-- Copernicus Scihub's OpenSearch API
-- Creodias REST API
-
-#### Ingesters
-
-The role of ingesters is to write to the database the relevant metadata about the datasets found by
-crawlers.
-
-Given the URL of a dataset, an ingester fetches the metadata from this URL, normalizes it into the
-format needed for GeoSPaaS, and writes it into the database.
-
-The tasks of an ingester are primarily I/O bound, so they are multi-threaded. Two thread pools are
-used:
-
-- one contains threads which fetch and normalize the metadata
-- the other contains threads which write it to the database
-
-The threads of the first thread pool put the normalized metadata in a queue. The threads which write
-to the database read from this queue.
-
-To extract the relevant metadata from the raw metadata, most ingesters use the
+To extract the relevant metadata from the raw metadata, most crawlers use the
 [metanorm](https://github.com/nansencenter/metanorm) library.
 
-The currently available ingesters are:
+#### Ingester
 
-- DDX ingester: uses the DDX metadata provided by OpenDAP repositories
-- THREDDS ingester: DDX ingester adapted to the particular case of THREDDS repositories
-- Copernicus OData API ingester: specific to the OData API from Copernicus API hub
-- Creodias EO finder API: specific to Creodias' search API
-- URL ingester: returns hard coded metadata for known URLs
-- Nansat ingester: uses [Nansat](https://github.com/nansencenter/nansat) to open a local or remote
-  file and get its metadata
+The role of the ingester is to write to the database the metadata found by
+crawlers.
 
-#### Harvesters
+The tasks of an ingester are primarily I/O bound, so they are multi-threaded.
 
-The role of harvesters is to aggregate crawlers and ingesters into an element which can be used to
-harvest data from a given provider.
+#### Providers
 
-Each harvester has at least two attributes:
-
-- a list of crawlers
-- an ingester
-
-The harvester iterates over each of the crawlers and feeds the URLs to the ingester.
-
-The currently available harvesters are:
-
-- PO.DAAC harvester: harvests VIIRS and MODIS data from NASA's PO.DAAC repository
-  (maybe more, but these are the only one which are tested)
-- OSISAF harvester: harvests THREDDS repositories
-- FTP harvester: harvests FTP repositories
-- Copernicus Sentinel harvester: harvests Sentinel 1, 2 and 3 data from the Copernicus API Hub
-- Creodias harvester: harvests Sentinel-3 data from Creodias
-- Local harvester: harvests local files using Nansat
-
-#### The `harvest.py` script
-
-The entry point of this application is the [harvest.py](./geospaas_harvesting/harvest.py) script.
-It takes care of several tasks:
-
-- based on the configuration file, instantiate and run each harvester in a separate process
-  so that each data repository can be harvested in parallel.
-- when receiving a SIGTERM or SIGINT signal, shut down the harvesters gracefully.
+The role of a Provider object is to offer an interface for searching through the
+data of a particular data provider (Creodias, CMEMS, NASA's PO.DAAC, etc.).
