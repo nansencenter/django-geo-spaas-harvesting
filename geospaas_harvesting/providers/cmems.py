@@ -20,6 +20,10 @@ class CMEMSFTPProvider(TimeFilterMixin, Provider):
                 '/Core/SEALEVEL_GLO_PHY_L4_NRT_OBSERVATIONS_008_046',
                 '/Core/IBI_ANALYSISFORECAST_PHY_005_001',
                 '/Core/MEDSEA_ANALYSISFORECAST_PHY_006_013',
+                '/Core/ARCTIC_ANALYSIS_FORECAST_PHYS_002_001_a',
+                '/Core/ARCTIC_MULTIYEAR_PHY_002_003',
+                '/Core/ARCTIC_ANALYSISFORECAST_BGC_002_004',
+                '/Core/ARCTIC_ANALYSISFORECAST_PHY_002_001',
             )),
             StringArgument('include', default=r'\.nc$'),
         ])
