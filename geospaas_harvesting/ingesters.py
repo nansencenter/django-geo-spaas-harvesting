@@ -142,6 +142,8 @@ class Ingester():
                                 self.LOGGER.warning("The Dataset URI '%s' was not created.", url)
                     except Exception:  # pylint: disable=broad-except
                         self.LOGGER.error("Error during ingestion", exc_info=True)
+                    finally:
+                        futures.remove(future)  # avoid keeping finished futures in memory
             except KeyboardInterrupt:
                 for future in reversed(futures):
                     future.cancel()
