@@ -12,10 +12,6 @@ logger = logging.getLogger(__name__)
 class Configuration():
     """Base class for configuration objects"""
 
-    def __init__(self):
-        """Define the argument parser for the configuration object"""
-        raise NotImplementedError()
-
     def _parse_config(self, config_dict):
         """Parse a config dictionary and set the keys as properties of
         the current Configuration object
@@ -24,11 +20,16 @@ class Configuration():
             setattr(self, name, value)
 
     @classmethod
+    def from_dict(cls, config_dict):
+        """Creates a configuration object from a dictionary"""
+        config = cls()
+        config._parse_config(config_dict)
+        return config
+
+    @classmethod
     def from_file(cls, config_path):
         """Creates a configuration object from a YAML file"""
-        config = cls()
-        config._parse_config(read_yaml_file(config_path))
-        return config
+        return cls.from_dict(read_yaml_file(config_path))
 
 
 class ProvidersArgument(DictArgument):
@@ -90,6 +91,7 @@ class ProvidersConfiguration(Configuration):
 
 class SearchConfiguration(Configuration):
     """Configuration manager used to parse search parameters"""
+
     def __init__(self):
         self.providers = None
         common_argument_parser = providers.base.Provider().search_parameters_parser
