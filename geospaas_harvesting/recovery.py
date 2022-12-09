@@ -64,10 +64,8 @@ def retry_ingest():
 
     for _ in range(5):  # try maximum 5 times, i.e. wait in total 31 minutes
         recovery_files = base_path.glob(glob_pattern)
-        if not recovery_files:
-            break
-        recovery_attempted = True
         for file_path in recovery_files:
+            recovery_attempted = True
             try:
                 ingest_file(file_path)
             except Exception:  # pylint: disable=broad-except
@@ -86,9 +84,6 @@ def retry_ingest():
         logger.error("There are still errors. Stopping.")
     elif recovery_attempted:
         logger.info("All failed datasets have been successfully ingested.")
-    else:
-        logger.info("No recovery needed.")
-
 
 
 def main():
