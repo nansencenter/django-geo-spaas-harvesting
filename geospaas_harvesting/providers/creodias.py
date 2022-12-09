@@ -27,6 +27,9 @@ class CreodiasProvider(Provider):
         self.search_parameters_parser.add_arguments([
             WKTArgument('location', geometry_types=(Polygon,)),
             CollectionArgument('collection', required=True, valid_options=self.collections),
+            StringArgument('status', default='all'),
+            StringArgument('dataset', default='ESA-DATASET'),
+            ProductIdentifierArgument('productIdentifier', required=False),
         ])
 
     def _make_crawler(self, parameters):
@@ -76,7 +79,15 @@ class CreodiasProvider(Provider):
                 }
                 for collection in response.json()['collections']
             }
+
         return self._collections
+
+
+class ProductIdentifierArgument(StringArgument):
+    """Product identifiers need to be put between '%' characters
+    """
+    def parse(self, value):
+        return f"%{super().parse(value)}%"
 
 
 class CollectionArgument(ChoiceArgument):
