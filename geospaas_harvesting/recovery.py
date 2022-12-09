@@ -6,10 +6,12 @@ import time
 from pathlib import Path
 
 import django
+import django.conf
 import requests
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
-django.setup()
+if not django.conf.settings.configured:
+    django.setup()
 
 import geospaas_harvesting.crawlers as crawlers  # pylint: disable=wrong-import-position
 import geospaas_harvesting.ingesters as ingesters  # pylint: disable=wrong-import-position

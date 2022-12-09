@@ -10,9 +10,11 @@ import signal
 from pathlib import Path
 
 import django
+import django.conf
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
-django.setup()
+if not django.conf.settings.configured:
+    django.setup()
 
 from geospaas.catalog.models import Parameter
 from .config import ProvidersConfiguration, SearchConfiguration
