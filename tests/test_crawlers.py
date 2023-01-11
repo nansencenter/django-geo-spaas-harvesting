@@ -35,6 +35,12 @@ class BaseCrawlerTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             _ = iter(base_crawler)
 
+    def test_iter(self):
+        """__iter__() should return self"""
+        crawler = crawlers.Crawler()
+        crawler.crawl = lambda: []
+        self.assertIsInstance(iter(crawler), crawlers.CrawlerIterator)
+
     def test_http_get_retry(self):
         """Test that _http_get retries the request when a connection
         error or a server error occurs
@@ -50,7 +56,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
                 requests.ReadTimeout,
                 http_500_error,
                 mock.Mock())
-            with self.assertLogs(crawlers.Crawler.LOGGER, level=logging.WARNING):
+            with self.assertLogs(crawlers.Crawler.logger, level=logging.WARNING):
                 crawlers.Crawler._http_get('url')
 
             self.assertEqual(len(mock_request.mock_calls), 5)
@@ -65,7 +71,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
                 mock.patch('time.sleep') as mock_sleep:
             mock_request.side_effect = requests.ConnectionError
 
-            with self.assertLogs(crawlers.Crawler.LOGGER, level=logging.ERROR):
+            with self.assertLogs(crawlers.Crawler.logger, level=logging.ERROR):
                 self.assertIsNone(crawlers.Crawler._http_get('url'))
 
             self.assertEqual(len(mock_request.mock_calls), 5)
@@ -77,95 +83,80 @@ class BaseCrawlerTestCase(unittest.TestCase):
         """
         with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
             mock_request.side_effect = requests.TooManyRedirects
-            with self.assertLogs(crawlers.Crawler.LOGGER, level=logging.ERROR):
+            with self.assertLogs(crawlers.Crawler.logger, level=logging.ERROR):
                 self.assertIsNone(crawlers.Crawler._http_get('url'))
 
 
-class WebDirectoryCrawlerTestCase(unittest.TestCase):
-    """Tests for the WebDirectoryCrawler"""
+class DirectoryCrawlerTestCase(unittest.TestCase):
+    """Tests for the DirectoryCrawler"""
+
+    def test_instantiation(self):
+        """Test the correct instantiation of a DirectoryCrawler
+        """
+        #TODO
+        # crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
+        # self.assertIsInstance(crawler, crawlers.Crawler)
+        # self.assertEqual(crawler.root_url, urlparse(self.TEST_DATA['root']['urls'][0]))
+        # self.assertEqual(crawler.time_range, (None, None))
+        # self.assertListEqual(crawler._urls, [])
+        # self.assertListEqual(crawler._to_process, [''])
 
     def test_abstract_list_folder_contents(self):
         """
         A NotImplementedError should be raised if the _list_folder_contents() method
-        is accessed directly on the WebDirectoryCrawler class
+        is accessed directly on the DirectoryCrawler class
         """
-        crawler = crawlers.WebDirectoryCrawler('')
+        crawler = crawlers.DirectoryCrawler('')
         with self.assertRaises(NotImplementedError):
             crawler._list_folder_contents('')
 
     def test_is_folder(self):
         """
         A NotImplementedError should be raised if the _is_folder() method
-        is accessed directly on the WebDirectoryCrawler class
+        is accessed directly on the DirectoryCrawler class
         """
-        crawler = crawlers.WebDirectoryCrawler('')
+        crawler = crawlers.DirectoryCrawler('')
         with self.assertRaises(NotImplementedError):
             crawler._is_folder('')
 
-
     def test_get_download_url(self):
         """
-        The get_download_url() method of the WebDirectoryCrawler
+        The get_download_url() method of the DirectoryCrawler
         should return the resource URL unchanged
         """
-        crawler = crawlers.WebDirectoryCrawler('')
-        self.assertEqual(crawler.get_download_url('foo'), 'foo')
+        crawler = crawlers.DirectoryCrawler('https://foo')
+        self.assertEqual(crawler.get_download_url('bar'), 'https://foo/bar')
 
     def test_base_url(self):
         """The base_url property should return the root_url without path"""
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
+        crawler = crawlers.DirectoryCrawler('http://foo/bar')
         self.assertEqual(crawler.base_url, 'http://foo')
 
     def test_set_initial_state(self):
         """set_initial_state() should set the right values for _urls and _to_process"""
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        crawler._urls = None
+        crawler = crawlers.DirectoryCrawler('http://foo/bar')
+        crawler._results = None
         crawler._to_process = None
         crawler.set_initial_state()
-        self.assertListEqual(crawler._urls, [])
+        self.assertListEqual(crawler._results, [])
         self.assertListEqual(crawler._to_process, ['/bar'])
-
-    def test_iter(self):
-        """__iter__() should return self"""
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        self.assertIs(iter(crawler), crawler)
-
-    def test_next_with_urls(self):
-        """__next__() should return the next URL from _urls"""
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        crawler._urls = ['http://foo/bar/baz.nc']
-        self.assertEqual(next(crawler), 'http://foo/bar/baz.nc')
-
-    def test_next_without_urls(self):
-        """If _urls is empty, _process_folder should be called"""
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        with mock.patch.object(crawler, '_process_folder') as mock_process_folder:
-            mock_process_folder.side_effect = lambda x: crawler._urls.append('http://foo/bar/baz.nc')
-            self.assertEqual(next(crawler), 'http://foo/bar/baz.nc')
-
-    def test_next_end_of_iteration(self):
-        """StopIteration should be raised when there are no more folders to process"""
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        crawler._to_process = []
-        with self.assertRaises(StopIteration):
-            next(crawler)
 
     def test_add_url_to_return(self):
         """
         _add_url_to_return() should add the full URL corresponding
         to the path if it fits in the time range constraint
         """
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        crawler.LOGGER = mock.Mock()
+        crawler = crawlers.DirectoryCrawler('http://foo/bar')
+        crawler.logger = mock.Mock()
         crawler._add_url_to_return('/bar/baz.nc')
-        self.assertListEqual(crawler._urls, ['http://foo/bar/baz.nc'])
+        self.assertListEqual(crawler._results, [crawlers.DatasetInfo('http://foo/bar/baz.nc')])
 
     def test_add_folder_to_process(self):
         """_add_folder_to_process() should add the path of the folder
         if it fits in the time range constraint
         """
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar')
-        crawler.LOGGER = mock.Mock()
+        crawler = crawlers.DirectoryCrawler('http://foo/bar')
+        crawler.logger = mock.Mock()
         crawler._to_process = []
         crawler._add_folder_to_process('/bar/baz')
         self.assertListEqual(crawler._to_process, ['/bar/baz'])
@@ -174,9 +165,9 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         """_process_folder() should feed the _urls stack
         with only file paths which are included
         """
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar', include='\.nc$')
+        crawler = crawlers.DirectoryCrawler('http://foo/bar', include='\.nc$')
         crawler.EXCLUDE = re.compile(r'\.h5$')
-        crawler.LOGGER = mock.Mock()
+        crawler.logger = mock.Mock()
         with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
                 mock.patch.object(crawler, '_is_folder', return_value=False), \
                 mock.patch.object(crawler, '_add_url_to_return') as mock_add_url:
@@ -188,9 +179,9 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         """_process_folder() should feed the _to_process stack
         with folder paths which are not excluded
         """
-        crawler = crawlers.WebDirectoryCrawler('http://foo/bar', include='baz')
+        crawler = crawlers.DirectoryCrawler('http://foo/bar', include='baz')
         crawler.EXCLUDE = re.compile(r'qux')
-        crawler.LOGGER = mock.Mock()
+        crawler.logger = mock.Mock()
         with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
                 mock.patch.object(crawler, '_is_folder', return_value=True), \
                 mock.patch.object(crawler, '_add_folder_to_process') as mock_add_folder:
@@ -201,43 +192,43 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
     def test_get_year_folder_coverage(self):
         """Get the correct time range from a year folder"""
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/contents.html'),
-            (datetime(2019, 1, 1), datetime(2020, 1, 1))
+            (datetime(2019, 1, 1, tzinfo=timezone.utc), datetime(2020, 1, 1, tzinfo=timezone.utc))
         )
 
     def test_get_month_folder_coverage(self):
         """Get the correct time range from a month folder"""
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/02/contents.html'),
-            (datetime(2019, 2, 1), datetime(2019, 3, 1))
+            (datetime(2019, 2, 1, tzinfo=timezone.utc), datetime(2019, 3, 1, tzinfo=timezone.utc))
         )
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/201902/contents.html'),
-            (datetime(2019, 2, 1), datetime(2019, 3, 1))
+            (datetime(2019, 2, 1, tzinfo=timezone.utc), datetime(2019, 3, 1, tzinfo=timezone.utc))
         )
 
     def test_get_day_of_month_folder_coverage(self):
         """Get the correct time range from a day of month folder"""
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/02/14/contents.html'),
-            (datetime(2019, 2, 14), datetime(2019, 2, 15))
+            (datetime(2019, 2, 14, tzinfo=timezone.utc), datetime(2019, 2, 15, tzinfo=timezone.utc))
         )
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/20190214/contents.html'),
-            (datetime(2019, 2, 14), datetime(2019, 2, 15))
+            (datetime(2019, 2, 14, tzinfo=timezone.utc), datetime(2019, 2, 15, tzinfo=timezone.utc))
         )
 
     def test_get_day_of_year_folder_coverage(self):
         """Get the correct time range from a day of year folder"""
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/046/contents.html'),
-            (datetime(2019, 2, 15), datetime(2019, 2, 16))
+            (datetime(2019, 2, 15, tzinfo=timezone.utc), datetime(2019, 2, 16, tzinfo=timezone.utc))
         )
 
     def test_none_when_no_folder_coverage(self):
@@ -246,15 +237,15 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         folder's path
         """
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/contents.html'), (None, None))
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/046/contents.html'),
             (None, None)
         )
         self.assertEqual(
-            crawlers.WebDirectoryCrawler._folder_coverage(
+            crawlers.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/02/contents.html'),
             (None, None)
         )
@@ -266,7 +257,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.WebDirectoryCrawler(
+        crawler = crawlers.DirectoryCrawler(
             '', time_range=(datetime(2019, 2, 14), datetime(2019, 2, 20)))
 
         # start_time < time_range[0] < stop_time < time_range[1]
@@ -314,7 +305,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.WebDirectoryCrawler('', time_range=(None, datetime(2019, 2, 20)))
+        crawler = crawlers.DirectoryCrawler('', time_range=(None, datetime(2019, 2, 20)))
 
         # no lower limit < time_range[1] < start_time < stop_time
         self.assertFalse(crawler._intersects_time_range(
@@ -340,7 +331,7 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.WebDirectoryCrawler('', time_range=(datetime(2019, 2, 20), None))
+        crawler = crawlers.DirectoryCrawler('', time_range=(datetime(2019, 2, 20), None))
 
         # start_time < stop_time < time_range[0] < no upper limit
         self.assertFalse(crawler._intersects_time_range(
@@ -357,6 +348,11 @@ class WebDirectoryCrawlerTestCase(unittest.TestCase):
         self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
         # no upper limit and no start_time, without intersection
         self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
+
+    def test_abstract_get_normalized_attributes(self):
+        """get_normalized_attributes is abstract in DirectoryCrawler"""
+        with self.assertRaises(NotImplementedError):
+            crawlers.DirectoryCrawler('').get_normalized_attributes(mock.Mock())
 
 
 class LocalDirectoryCrawlerTestCase(unittest.TestCase):
@@ -399,6 +395,11 @@ class LocalDirectoryCrawlerTestCase(unittest.TestCase):
         with mock.patch('os.path.isdir', return_value=False):
             self.assertFalse(self.crawler._is_folder(''), "_is_folder() should return False")
 
+    def test_abstract_get_normalized_attributes(self):
+        """get_normalized_attributes is abstract in LocalDirectoryCrawler"""
+        with self.assertRaises(NotImplementedError):
+            crawlers.LocalDirectoryCrawler('').get_normalized_attributes(mock.Mock())
+
 
 class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
     """Tests for the HTMLDirectoryCrawler crawler"""
@@ -434,6 +435,15 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
                 'https://test-opendap.com/folder/2019/02/14/20190214000000_dataset.nc'
             ],
             'file_path': None},
+        # 'dataset_contents': {
+        #     'urls': [
+        #         'https://test-opendap.com/dataset.nc.ddx',
+        #         'https://test2-opendap.com/dataset.nc.ddx',
+        #         'https://test-opendap.com/folder/dataset.nc.ddx',
+        #         'https://test-opendap.com/folder/2019/02/14/20190214120000_dataset.nc.ddx',
+        #         'https://test-opendap.com/folder/2019/02/14/20190214000000_dataset.nc.ddx'
+        #     ],
+        #     'file_path': 'data/opendap/full_ddx.xml',},
         'folder': {
             'urls': [
                 'https://test-opendap.com/folder/contents.html',
@@ -460,7 +470,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             'file_path': None}
     }
 
-    def request_side_effect(self, method, url):
+    def request_side_effect(self, method, url, **kwargs):
         """Side effect function used to mock calls to requests.get().text"""
         if method != 'GET':
             return None
@@ -488,7 +498,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def setUp(self):
         # Mock requests.request()
-        self.patcher_request = mock.patch.object(crawlers.requests, 'request')
+        self.patcher_request = mock.patch('geospaas_harvesting.crawlers.utils.http_request')
         self.mock_request = self.patcher_request.start()
         self.mock_request.side_effect = self.request_side_effect
 
@@ -500,15 +510,6 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         # Close any files opened during the test
         for opened_file in self.opened_files:
             opened_file.close()
-
-    def test_instantiation(self):
-        """Test the correct instantiation of an Opendap crawler"""
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
-        self.assertIsInstance(crawler, crawlers.Crawler)
-        self.assertEqual(crawler.root_url, urlparse(self.TEST_DATA['root']['urls'][0]))
-        self.assertEqual(crawler.time_range, (None, None))
-        self.assertListEqual(crawler._urls, [])
-        self.assertListEqual(crawler._to_process, [''])
 
     def test_get_correct_html_contents(self):
         """Test that the _http_get() method returns the correct HTML string"""
@@ -543,7 +544,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
     def test_link_extractor_error(self):
         """In case of error, LinkExtractor must use a logger"""
         parser = crawlers.LinkExtractor()
-        with self.assertLogs(parser.LOGGER, level=logging.ERROR):
+        with self.assertLogs(parser.logger, level=logging.ERROR):
             parser.error('some message')
 
     def test_process_folder(self):
@@ -551,19 +552,23 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         Explore root page and make sure the _url and _to_process attributes of the crawler have the
         right values
         """
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0],include='\.nc$')
-        with self.assertLogs(crawler.LOGGER):
+        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0], include=r'\.nc$')
+        with self.assertLogs(crawler.logger, level=logging.DEBUG):
             crawler._process_folder(crawler._to_process.pop())
-        self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][0]])
+        self.assertListEqual(
+            crawler._results,
+            [crawlers.DatasetInfo(self.TEST_DATA['dataset']['urls'][0])])
         self.assertListEqual(crawler._to_process, ['/folder/contents.html'])
 
     def test_process_folder_with_duplicates(self):
         """If the same URL is present twice in the page, it should only be processed once"""
         crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['urls'][0],
         include='\.nc$')
-        with self.assertLogs(crawler.LOGGER):
+        with self.assertLogs(crawler.logger, level=logging.DEBUG):
             crawler._process_folder(crawler._to_process.pop())
-        self.assertListEqual(crawler._urls, [self.TEST_DATA['dataset']['urls'][1]])
+        self.assertListEqual(
+            crawler._results,
+            [crawlers.DatasetInfo(self.TEST_DATA['dataset']['urls'][1])])
         self.assertListEqual(crawler._to_process, ['/folder/contents.html'])
 
     def test_process_folder_with_time_restriction(self):
@@ -572,45 +577,26 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         attributes of the crawler have the right values according to a
         time restriction.
         Since the precision of the time restriction is limited to the
-        folder level for WebDirectoryCrawlers, all datasets in a folder
+        folder level for DirectoryCrawlers, all datasets in a folder
         whose time coverage intersects the crawler's time range are
         selected, even if the timestamp of a dataset does not intersect
         the crawler's time range.
         """
         crawler = crawlers.OpenDAPCrawler(
-            self.TEST_DATA['folder_day_of_year']['urls'][0], include='\.nc$',
+            self.TEST_DATA['folder_day_of_year']['urls'][0], include=r'\.nc$',
             time_range=(datetime(2019, 2, 15, 11, 0, 0), datetime(2019, 2, 15, 13, 0, 0)))
-        with self.assertLogs(crawler.LOGGER):
+        with self.assertLogs(crawler.logger, level=logging.DEBUG):
             crawler._process_folder(crawler._to_process.pop())
         self.assertListEqual(
-            crawler._urls,
+            crawler._results,
             [
-                'https://test-opendap.com/folder/2019/046/20190215000000_dataset.nc',
-                'https://test-opendap.com/folder/2019/046/20190215120000_dataset.nc'
+                crawlers.DatasetInfo(
+                    'https://test-opendap.com/folder/2019/046/20190215000000_dataset.nc'),
+                crawlers.DatasetInfo(
+                    'https://test-opendap.com/folder/2019/046/20190215120000_dataset.nc'),
             ]
         )
         self.assertListEqual(crawler._to_process, [])
-
-    def test_iterating(self):
-        """Test the call to the __iter__ method"""
-        crawler = crawlers.OpenDAPCrawler(
-            self.TEST_DATA['root']['urls'][0], include='\.nc$',
-            time_range=(datetime(2019, 2, 14, 0, 0, 0), datetime(2019, 2, 14, 9, 0, 0)))
-        crawler_iterator = iter(crawler)
-
-        # Test the values returned by the iterator
-        with self.assertLogs(crawler.LOGGER):
-            self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][0])
-            self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][2])
-            self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][3])
-            self.assertEqual(next(crawler_iterator), self.TEST_DATA['dataset']['urls'][4])
-
-        # Test that a StopIteration is raised in the end. The nested
-        # context managers are necessary because the StopIteration
-        # exception is raised inside an 'except KeyError:' block
-        with self.assertRaises(StopIteration):
-            with self.assertRaises(KeyError):
-                next(crawler)
 
 
 class ThreddsCrawlerTestCase(unittest.TestCase):
@@ -681,15 +667,6 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
     def setUp(self):
         self.crawler = self.TestCrawler('foo', 'bar')
 
-    def test_instantiation(self):
-        """Test that attributes are correctly initialized"""
-        self.assertEqual(self.crawler.url, 'foo')
-        self.assertEqual(self.crawler.initial_offset, 0)
-        self.assertDictEqual(self.crawler.request_parameters, {
-            'params': {'size': 100, 'offset': 0}
-        })
-        self.assertListEqual(self.crawler._results, [])
-
     def test_get_page_size(self):
         """Test page_size getter"""
         self.assertEqual(self.TestCrawler('foo', page_size=10).page_size, 10)
@@ -714,20 +691,12 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
             self.crawler.request_parameters['params']['offset'], self.crawler.initial_offset)
         self.assertListEqual(self.crawler._results, [])
 
-    def test_iterating(self):
-        """Test that iterating over the crawler returns the discovered urls"""
-        expected_urls = ['url2', 'url1', 'url3']
-        self.crawler._results = ['url1', 'url2']
-
-        with mock.patch.object(self.crawler, '_get_next_page', return_value=''):
-            self.assertListEqual(list(self.crawler), expected_urls)
-
     def test_get_next_page(self):
         """_get_next_page() should get the page at the current offset,
         then increment the offset
         """
         with mock.patch.object(self.crawler, '_http_get', return_value='foo'):
-            with self.assertLogs(self.crawler.LOGGER, level=logging.INFO):
+            with self.assertLogs(self.crawler.logger, level=logging.DEBUG):
                 self.assertEqual(self.crawler._get_next_page(), 'foo')
                 self.assertEqual(self.crawler.request_parameters['params']['offset'], 1)
 
@@ -738,289 +707,6 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
         crawler = crawlers.HTTPPaginatedAPICrawler('foo')
         with self.assertRaises(NotImplementedError):
             crawler._get_datasets_info('')
-
-
-class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
-    """Tests for the Copernicus OpenSearch API crawler"""
-    BASE_URL = 'https://scihub.copernicus.eu/dhus/search'
-    SEARCH_TERMS = '(platformname:Sentinel-1 OR platformname:Sentinel-3) AND NOT L0'
-    PAGE_SIZE = 2
-
-    def setUp(self):
-        self.crawler = crawlers.CopernicusOpenSearchAPICrawler(
-            url=self.BASE_URL, search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, initial_offset=0)
-
-    def test_increment_offset(self):
-        """The offset should be incremented by the page size"""
-        self.assertEqual(self.crawler.page_offset, 0)
-        self.crawler.increment_offset()
-        self.assertEqual(self.crawler.page_offset, self.PAGE_SIZE)
-
-    def test_build_parameters_with_standard_time_range(self):
-        """Build the request parameters with a time range composed of two datetime objects"""
-        request_parameters = self.crawler._build_request_parameters(
-            search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, time_range=(
-                datetime(2020, 2, 10, tzinfo=timezone.utc),
-                datetime(2020, 2, 11, tzinfo=timezone.utc)))
-
-        self.assertDictEqual(request_parameters, {
-            'params': {
-                'q': f"({self.SEARCH_TERMS}) AND " +
-                     "(beginposition:[1000-01-01T00:00:00Z TO 2020-02-11T00:00:00Z] AND "
-                     "endposition:[2020-02-10T00:00:00Z TO NOW])",
-                'start': 0,
-                'rows': self.PAGE_SIZE,
-                'orderby': 'ingestiondate asc'
-            },
-            'auth': ('user', 'pass')
-        })
-
-    def test_build_parameters_with_time_range_without_lower_limit(self):
-        """Build the request parameters with a time range in which the first element is None"""
-        request_parameters = self.crawler._build_request_parameters(
-            search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, time_range=(None, datetime(2020, 2, 11, tzinfo=timezone.utc)))
-        self.assertEqual(request_parameters['params']['q'],
-                         f"({self.SEARCH_TERMS}) AND " +
-                         "(beginposition:[1000-01-01T00:00:00Z TO 2020-02-11T00:00:00Z])")
-
-    def test_build_parameters_with_time_range_without_upper_limit(self):
-        """Build the request parameters with a time range in which the second element is None"""
-        request_parameters = self.crawler._build_request_parameters(
-            search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, time_range=(datetime(2020, 2, 10, tzinfo=timezone.utc), None))
-        self.assertEqual(request_parameters['params']['q'],
-                         f"({self.SEARCH_TERMS}) AND " +
-                         "(endposition:[2020-02-10T00:00:00Z TO NOW])")
-
-    def test_build_parameters_without_time_range(self):
-        """
-        Build the request parameters with a time range in which the both elements are None
-        The result is equivalent to a search without a time condition.
-        """
-        request_parameters = self.crawler._build_request_parameters(
-            search_terms=self.SEARCH_TERMS, username='user', password='pass',
-            page_size=self.PAGE_SIZE, time_range=(None, None))
-
-        self.assertEqual(request_parameters['params']['q'], f"({self.SEARCH_TERMS})")
-
-    def test_get_datasets_info(self):
-        """_get_datasets_info() should extract download URLs from a response page"""
-        data_file_path = os.path.join(
-            os.path.dirname(__file__), 'data/copernicus_opensearch/page1.xml')
-
-        with open(data_file_path, 'r') as f_h:
-            page = f_h.read()
-
-        self.crawler._get_datasets_info(page)
-        self.assertListEqual(self.crawler._results, [
-            "https://scihub.copernicus.eu/dhus/odata/v1/"
-            "Products('87ddb795-dab4-4985-85f4-c390c9cdd65b')/$value",
-            "https://scihub.copernicus.eu/dhus/odata/v1/"
-            "Products('d023819a-60d3-4b5e-bb81-645294d73b5b')/$value"
-        ])
-
-
-class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
-    """Tests for CreodiasEOFinderCrawler"""
-    SEARCH_TERMS = {'param1': 'value1', 'param2': 'value2'}
-
-    def setUp(self):
-        self.crawler = crawlers.CreodiasEOFinderCrawler('foo', self.SEARCH_TERMS)
-
-    def test_build_request_parameters_no_argument(self):
-        """Test building the request parameters without specifying any argument"""
-        self.assertDictEqual(self.crawler._build_request_parameters(), {
-            'params': {
-                'maxRecords': 100,
-                'page': 1,
-                'sortOrder': 'ascending',
-                'sortParam': 'published'
-            }
-        })
-
-    def test_build_request_parameters_no_time_range(self):
-        """Test building the request parameters without time range"""
-        self.assertDictEqual(self.crawler._build_request_parameters(self.SEARCH_TERMS), {
-            'params': {
-                'param1': 'value1',
-                'param2': 'value2',
-                'maxRecords': 100,
-                'page': 1,
-                'sortOrder': 'ascending',
-                'sortParam': 'published'
-            }
-        })
-
-    def test_build_request_parameters_with_time_range(self):
-        """Test building the request parameters without time range"""
-        time_range = (
-            datetime(2020, 2, 1, tzinfo=timezone.utc),
-            datetime(2020, 2, 2, tzinfo=timezone.utc)
-        )
-
-        self.assertDictEqual(
-            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
-                'params': {
-                    'param1': 'value1',
-                    'param2': 'value2',
-                    'maxRecords': 100,
-                    'page': 1,
-                    'sortOrder': 'ascending',
-                    'sortParam': 'published',
-                    'startDate': '2020-02-01T00:00:00Z',
-                    'completionDate': '2020-02-02T00:00:00Z'
-                }
-            }
-        )
-
-    def test_build_request_parameters_with_time_range_start_only(self):
-        """Test building the request parameters without time range"""
-        time_range = (datetime(2020, 2, 1, tzinfo=timezone.utc), None)
-
-        self.assertDictEqual(
-            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
-                'params': {
-                    'param1': 'value1',
-                    'param2': 'value2',
-                    'maxRecords': 100,
-                    'page': 1,
-                    'sortOrder': 'ascending',
-                    'sortParam': 'published',
-                    'startDate': '2020-02-01T00:00:00Z'
-                }
-            })
-
-    def test_build_request_parameters_with_time_range_end_only(self):
-        """Test building the request parameters without time range"""
-        time_range = (None, datetime(2020, 2, 2, tzinfo=timezone.utc))
-
-        self.assertDictEqual(
-            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
-                'params': {
-                    'param1': 'value1',
-                    'param2': 'value2',
-                    'maxRecords': 100,
-                    'page': 1,
-                    'sortOrder': 'ascending',
-                    'sortParam': 'published',
-                    'completionDate': '2020-02-02T00:00:00Z'
-                }
-            })
-
-    def test_get_datasets_info(self):
-        """_get_datasets_info() should extract datasets information from a response page"""
-        data_file_path = os.path.join(
-            os.path.dirname(__file__), 'data/creodias_eofinder/result_page.json')
-
-        with open(data_file_path, 'r') as f_h:
-            page = f_h.read()
-
-        expected_entry = json.loads(page)['features'][0]
-        expected_result = expected_entry['properties']
-        expected_result['geometry'] = json.dumps(expected_entry['geometry'])
-
-        self.crawler._get_datasets_info(page)
-        self.assertDictEqual(self.crawler._results[0], expected_result)
-
-
-class EarthdataCMRCrawlerTestCase(unittest.TestCase):
-    """Tests for EarthdataCMRCrawler"""
-    SEARCH_TERMS = {'param1': 'value1', 'param2': 'value2'}
-
-    def setUp(self):
-        self.crawler = crawlers.EarthdataCMRCrawler('foo', self.SEARCH_TERMS)
-
-    def test_build_request_parameters_no_argument(self):
-        """Test building the request parameters without specifying any argument"""
-        self.assertDictEqual(self.crawler._build_request_parameters(), {
-            'params': {
-                'page_size': 100,
-                'page_num': 1,
-                'sort_key': '+start_date',
-            }
-        })
-
-    def test_build_request_parameters_no_time_range(self):
-        """Test building the request parameters without time range"""
-        self.assertDictEqual(self.crawler._build_request_parameters(self.SEARCH_TERMS), {
-            'params': {
-                'param1': 'value1',
-                'param2': 'value2',
-                'page_size': 100,
-                'page_num': 1,
-                'sort_key': '+start_date'
-            }
-        })
-
-    def test_build_request_parameters_with_time_range(self):
-        """Test building the request parameters without time range"""
-        time_range = (
-            datetime(2020, 2, 1, tzinfo=timezone.utc),
-            datetime(2020, 2, 2, tzinfo=timezone.utc)
-        )
-
-        self.assertDictEqual(
-            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
-                'params': {
-                    'param1': 'value1',
-                    'param2': 'value2',
-                    'page_size': 100,
-                    'page_num': 1,
-                    'sort_key': '+start_date',
-                    'temporal': '2020-02-01T00:00:00+00:00,2020-02-02T00:00:00+00:00'
-                }
-            }
-        )
-
-    def test_build_request_parameters_with_time_range_start_only(self):
-        """Test building the request parameters without time range"""
-        time_range = (datetime(2020, 2, 1, tzinfo=timezone.utc), None)
-
-        self.assertDictEqual(
-            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
-                'params': {
-                    'param1': 'value1',
-                    'param2': 'value2',
-                    'page_size': 100,
-                    'page_num': 1,
-                    'sort_key': '+start_date',
-                    'temporal': '2020-02-01T00:00:00+00:00,'
-                }
-            })
-
-    def test_build_request_parameters_with_time_range_end_only(self):
-        """Test building the request parameters without time range"""
-        time_range = (None, datetime(2020, 2, 2, tzinfo=timezone.utc))
-
-        self.assertDictEqual(
-            self.crawler._build_request_parameters(self.SEARCH_TERMS, time_range), {
-                'params': {
-                    'param1': 'value1',
-                    'param2': 'value2',
-                    'page_size': 100,
-                    'page_num': 1,
-                    'sort_key': '+start_date',
-                    'temporal': ',2020-02-02T00:00:00+00:00'
-                }
-            })
-
-    def test_get_datasets_info(self):
-        """_get_datasets_info() should extract datasets information
-        from a response page
-        """
-        data_file_path = os.path.join(
-            os.path.dirname(__file__), 'data/earthdata_cmr/result_page.json')
-
-        with open(data_file_path, 'r') as f_h:
-            page = f_h.read()
-
-        expected_entry = json.loads(page)['items'][0]
-
-        self.crawler._get_datasets_info(page)
-        self.assertDictEqual(self.crawler._results[0], expected_entry)
 
 
 class FTPCrawlerTestCase(unittest.TestCase):
@@ -1040,11 +726,16 @@ class FTPCrawlerTestCase(unittest.TestCase):
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
         test_crawler.ftp.cwd = self.emulate_cwd_of_ftp
         test_crawler.ftp.host = ''
-        with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler'):
+        with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler', level=logging.DEBUG):
             test_crawler._process_folder('')
         # '.gz' files must be in the "_urls" list
         # Other type of files should not be in the "_urls" list
-        self.assertCountEqual(['ftp://foo/file1.gz', 'ftp://foo/file2.gz'], test_crawler._urls)
+        self.assertEqual(
+            test_crawler._results,
+            [
+                crawlers.DatasetInfo('ftp://foo/file1.gz'),
+                crawlers.DatasetInfo('ftp://foo/file2.gz')
+            ])
         # folder with 'folder_name' must be in the "_to_process" list
         self.assertCountEqual(['/', 'folder_name'], test_crawler._to_process)
 
@@ -1084,7 +775,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
             crawler.ftp.nlst.side_effect = ftplib.error_temp('421')
 
             with self.assertRaises(ftplib.error_temp), \
-                 self.assertLogs(crawler.LOGGER, level=logging.INFO) as log_cm:
+                 self.assertLogs(crawler.logger, level=logging.INFO) as log_cm:
                 crawler._list_folder_contents('/')
 
             self.assertEqual(log_cm.records[0].getMessage(), "Re-initializing the FTP connection")
@@ -1102,7 +793,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
 
                 with mock.patch.object(crawler, 'connect') as mock_connect:
                     with self.assertRaises(error), \
-                        self.assertLogs(crawler.LOGGER, level=logging.INFO):
+                        self.assertLogs(crawler.logger, level=logging.INFO):
                         crawler._list_folder_contents('/')
                 self.assertEqual(mock_connect.call_count, 5)
 
