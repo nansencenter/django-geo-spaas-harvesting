@@ -17,6 +17,22 @@ import requests
 import geospaas_harvesting.crawlers as crawlers
 
 
+class InvalidMetadataErrorTestCase(unittest.TestCase):
+    """Tests for InvalidMetadataError"""
+    def test_instanciation(self):
+        """Test the correct creation of an InvalidMetadataError object"""
+        error = crawlers.InvalidMetadataError('message', missing_fields=('foo', 'bar'))
+        self.assertTupleEqual(error.args, ('message',))
+        self.assertSetEqual(error.missing_fields, {'foo', 'bar'})
+
+    def test_str(self):
+        """Test the string representation of a InvalidMetadataError object"""
+        string = str(crawlers.InvalidMetadataError(missing_fields=('foo', 'bar')))
+        # we use a set to store missing fields so it can come out in
+        # one order or the other
+        self.assertIn(string, ('Missing fields: foo,bar', 'Missing fields: bar,foo'))
+
+
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
 
