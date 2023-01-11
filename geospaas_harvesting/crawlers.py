@@ -37,8 +37,8 @@ class InvalidMetadataError(Exception):
     NormalizedDatasetInfo object with invalid fields
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.missing_fields = kwargs.get('missing_fields', set())
+        super().__init__(*args)
+        self.missing_fields = set(kwargs.get('missing_fields', tuple()))
 
     def __str__(self):
         return f"Missing fields: {','.join(self.missing_fields)}"
@@ -79,8 +79,9 @@ class NormalizedDatasetInfo(DatasetInfo):
         """Check that the metadata attribute contains at least all
         required fields
         """
-        if not self.required_fields.issubset(set(self.metadata)):
-            raise InvalidMetadataError(missing_fields=self.required_fields-self.metadata)
+        metadata_set = set(self.metadata)
+        if not self.required_fields.issubset(metadata_set):
+            raise InvalidMetadataError(missing_fields=self.required_fields-metadata_set)
 
     def __init__(self, url, metadata=None):
         super().__init__(url, metadata)
@@ -340,7 +341,6 @@ class LinkExtractor(HTMLParser):
 
 class DirectoryCrawler(Crawler):
     """Parent class for crawlers used on repositories which expose a directory-like structure"""
-    logger = None
     EXCLUDE = None
 
     YEAR_PATTERN = r'y?(?P<year>\d{4})'
@@ -471,11 +471,11 @@ class DirectoryCrawler(Crawler):
 
     def _list_folder_contents(self, folder_path):
         """Lists the contents of a folder. Should return absolute paths"""
-        raise NotImplementedError("_list_folder_contents is abstract in WebDirectoryCrawler")
+        raise NotImplementedError()
 
     def _is_folder(self, path):
         """Returns True if path points to a folder"""
-        raise NotImplementedError("_is_folder is abstract in WebDirectoryCrawler")
+        raise NotImplementedError()
 
     def get_download_url(self, path):
         """Get the download URL from a path in the repository
@@ -545,6 +545,8 @@ class LocalDirectoryCrawler(DirectoryCrawler):
 
 class HTMLDirectoryCrawler(DirectoryCrawler):
     """Implementation of WebDirectoryCrawler for repositories exposed as HTML pages."""
+
+    logger = logging.getLogger(__name__ + '.HTMLDirectoryCrawler')
 
     FOLDERS_SUFFIXES = None
 
