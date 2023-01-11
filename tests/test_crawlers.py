@@ -33,6 +33,56 @@ class InvalidMetadataErrorTestCase(unittest.TestCase):
         self.assertIn(string, ('Missing fields: foo,bar', 'Missing fields: bar,foo'))
 
 
+class DatasetInfoTestCase(unittest.TestCase):
+    """Tests for DatasetInfo"""
+
+    def test_instanciation(self):
+        """Test the correct creation of a DatasetInfo object"""
+        dataset_info = crawlers.DatasetInfo('url', metadata={'foo': 'bar'})
+        self.assertEqual(dataset_info.url, 'url')
+        self.assertDictEqual(dataset_info.metadata, {'foo': 'bar'})
+
+
+class NormalizedDatasetInfo(unittest.TestCase):
+    """Tests for NormalizedDatasetInfo"""
+
+    def test_instanciation(self):
+        """Test the correct creation of a DatasetInfo object"""
+        with mock.patch(
+                'geospaas_harvesting.crawlers.NormalizedDatasetInfo.check_metadata'
+        ) as mock_check_metadata:
+            crawlers.NormalizedDatasetInfo('url', metadata={'foo': 'bar'})
+        mock_check_metadata.assert_called()
+
+    def test_check_metadata(self):
+        """Check that no exception is raised using correct metadata
+        """
+        metadata = {
+            'entry_title': 'title',
+            'entry_id': 'id',
+            'summary': 'sum-up',
+            'time_coverage_start': 'start time',
+            'time_coverage_end': 'end time',
+            'platform': 'satellite',
+            'instrument': 'sar',
+            'location_geometry': 'somewhere',
+            'provider': 'someone',
+            'iso_topic_category': 'ocean',
+            'gcmd_location': 'surface',
+            'dataset_parameters': ['params'],
+        }
+        try:
+            crawlers.NormalizedDatasetInfo('url', metadata)
+        except crawlers.InvalidMetadataError:
+            self.fail("InvalidMetadataError should not be raised")
+
+    def test_check_metadata_error(self):
+        """Test that an exception is raised in case of invalid metadata
+        """
+        with self.assertRaises(crawlers.InvalidMetadataError):
+            crawlers.NormalizedDatasetInfo('url', {'foo': 'bar'})
+
+
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
 
