@@ -2,7 +2,6 @@
 # pylint: disable=protected-access
 
 import ftplib
-import json
 import logging
 import os
 import re
@@ -10,7 +9,6 @@ import requests
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
-from urllib.parse import urlparse
 
 import requests
 
