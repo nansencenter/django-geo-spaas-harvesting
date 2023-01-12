@@ -9,6 +9,7 @@ import requests
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
+from urllib.parse import ParseResult
 
 import requests
 
@@ -179,13 +180,23 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
     def test_instantiation(self):
         """Test the correct instantiation of a DirectoryCrawler
         """
-        #TODO
-        # crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0])
-        # self.assertIsInstance(crawler, crawlers.Crawler)
-        # self.assertEqual(crawler.root_url, urlparse(self.TEST_DATA['root']['urls'][0]))
-        # self.assertEqual(crawler.time_range, (None, None))
-        # self.assertListEqual(crawler._urls, [])
-        # self.assertListEqual(crawler._to_process, [''])
+        crawler = crawlers.DirectoryCrawler(
+            'https://foo/bar.nc',
+            time_range=(
+                datetime(2020, 1, 1, tzinfo=timezone.utc),
+                datetime(2020, 1, 2, tzinfo=timezone.utc)),
+            include='.*')
+        self.assertIsInstance(crawler, crawlers.Crawler)
+        self.assertEqual(
+            crawler.root_url,
+            ParseResult(scheme='https', netloc='foo', path='/bar.nc',
+                        params='', query='', fragment=''))
+        self.assertEqual(
+            crawler.time_range,
+            (datetime(2020, 1, 1, tzinfo=timezone.utc),
+             datetime(2020, 1, 2, tzinfo=timezone.utc)))
+        self.assertListEqual(crawler._results, [])
+        self.assertListEqual(crawler._to_process, ['/bar.nc'])
 
     def test_abstract_list_folder_contents(self):
         """
@@ -439,6 +450,20 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         """get_normalized_attributes is abstract in DirectoryCrawler"""
         with self.assertRaises(NotImplementedError):
             crawlers.DirectoryCrawler('').get_normalized_attributes(mock.Mock())
+
+    def test_crawl(self):
+        """Test crawling"""
+        crawler = crawlers.DirectoryCrawler('https://foo/bar.nc')
+        crawler._results = ['foo', 'bar']
+
+        with mock.patch.object(crawler, '_process_folder') as mock_process_folder:
+            generator = crawler.crawl()
+            self.assertEqual(next(generator), 'bar')
+            self.assertEqual(next(generator), 'foo')
+            self.assertListEqual(crawler._results, [])
+            with self.assertRaises(StopIteration):
+                next(generator)
+            mock_process_folder.assert_called()
 
 
 class LocalDirectoryCrawlerTestCase(unittest.TestCase):
