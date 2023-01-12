@@ -526,6 +526,13 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
             ['/foo/bar', '/foo/baz']
         )
 
+    def test_abstract_get_normalized_attributes(self):
+        """The get_normalized_attribute is abstract in
+        HTMLDirectoryCrawler
+        """
+        with self.assertRaises(NotImplementedError):
+            crawlers.HTMLDirectoryCrawler('').get_normalized_attributes(None)
+
 
 class OpenDAPCrawlerTestCase(unittest.TestCase):
     """Tests for the OpenDAP crawler"""
