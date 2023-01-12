@@ -152,6 +152,28 @@ class BaseCrawlerTestCase(unittest.TestCase):
             with self.assertLogs(crawlers.Crawler.logger, level=logging.ERROR):
                 self.assertIsNone(crawlers.Crawler._http_get('url'))
 
+    def test_abstract_get_normalized_attributes(self):
+        """get_normalized_attributes() should raise a NotImplementedError"""
+        with self.assertRaises(NotImplementedError):
+            crawlers.Crawler().get_normalized_attributes({})
+
+    def test_add_url(self):
+        """Test adding a dataset's url to its raw attributes dictionary
+        """
+        raw_attributes = {'bar': 'baz'}
+        crawlers.Crawler.add_url('foo', raw_attributes)
+        self.assertDictEqual(
+            raw_attributes,
+            {'url': 'foo', 'bar': 'baz'})
+
+    def test_add_url_already_present(self):
+        """Don't add the url if it is already there
+        """
+        raw_attributes = {'url': 'baz'}
+        crawlers.Crawler.add_url('foo', raw_attributes)
+        self.assertDictEqual(
+            raw_attributes,
+            {'url': 'baz'})
 
 class DirectoryCrawlerTestCase(unittest.TestCase):
     """Tests for the DirectoryCrawler"""
