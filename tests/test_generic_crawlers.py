@@ -8,6 +8,7 @@ import re
 import requests
 import unittest
 import unittest.mock as mock
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from urllib.parse import ParseResult
 
@@ -553,15 +554,15 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
                 'https://test-opendap.com/folder/2019/02/14/20190214000000_dataset.nc'
             ],
             'file_path': None},
-        # 'dataset_contents': {
-        #     'urls': [
-        #         'https://test-opendap.com/dataset.nc.ddx',
-        #         'https://test2-opendap.com/dataset.nc.ddx',
-        #         'https://test-opendap.com/folder/dataset.nc.ddx',
-        #         'https://test-opendap.com/folder/2019/02/14/20190214120000_dataset.nc.ddx',
-        #         'https://test-opendap.com/folder/2019/02/14/20190214000000_dataset.nc.ddx'
-        #     ],
-        #     'file_path': 'data/opendap/full_ddx.xml',},
+        'full_ddx': {
+            'urls': ["https://opendap.jpl.nasa.gov/opendap/full_dataset.nc.ddx"],
+            'file_path': "data/opendap/full_ddx.xml"},
+        'short_ddx': {
+            'urls': ["https://test-opendap.com/short_dataset.nc.ddx"],
+            'file_path': "data/opendap/short_ddx.xml"},
+        'no_ns_ddx': {
+            'urls': ["https://test-opendap.com/no_ns_dataset.nc.ddx"],
+            'file_path': "data/opendap/ddx_no_ns.xml"},
         'folder': {
             'urls': [
                 'https://test-opendap.com/folder/contents.html',
@@ -715,6 +716,153 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             ]
         )
         self.assertListEqual(crawler._to_process, [])
+
+    def test_get_xml_namespace(self):
+        """Get xml namespace from the test data DDX file"""
+        test_file_path = os.path.join(
+            os.path.dirname(__file__),
+            self.TEST_DATA['short_ddx']['file_path'])
+
+        with open(test_file_path, 'rb') as test_file:
+            root = ET.parse(test_file).getroot()
+
+        self.assertEqual(
+            crawlers.OpenDAPCrawler('')._get_xml_namespace(root),
+            'http://xml.opendap.org/ns/DAP/3.2#')
+
+    def test_logging_if_no_xml_namespace(self):
+        """A warning must be logged if no namespace has been found, and an empty string returned"""
+        test_file_path = os.path.join(
+            os.path.dirname(__file__),
+            self.TEST_DATA['no_ns_ddx']['file_path'])
+
+        with open(test_file_path, 'rb') as test_file:
+            root = ET.parse(test_file).getroot()
+
+        crawler = crawlers.OpenDAPCrawler('')
+        with self.assertLogs(crawler.logger, level=logging.WARNING):
+            namespace = crawlers.OpenDAPCrawler('')._get_xml_namespace(root)
+        self.assertEqual(namespace, '')
+
+    def test_extract_global_attributes(self):
+        """Get nc_global attributes from the test data DDX file"""
+        test_file_path = os.path.join(
+            os.path.dirname(__file__),
+            self.TEST_DATA['short_ddx']['file_path'])
+
+        with open(test_file_path, 'rb') as test_file:
+            root = ET.parse(test_file).getroot()
+
+        self.assertDictEqual(
+            crawlers.OpenDAPCrawler('')._extract_attributes(root),
+            {
+                'Conventions': 'CF-1.7, ACDD-1.3',
+                'raw_dataset_parameters': [],
+                'title': 'VIIRS L2P Sea Surface Skin Temperature'
+            }
+        )
+
+    def test_get_normalized_attributes(self):
+        """Test that the correct attributes are extracted from a DDX file"""
+        with mock.patch(
+                'geospaas_harvesting.crawlers.MetadataHandler.get_parameters') as mock_get_params:
+            _ = crawlers.OpenDAPCrawler('').get_normalized_attributes(
+                crawlers.DatasetInfo("https://opendap.jpl.nasa.gov/opendap/full_dataset.nc"))
+        mock_get_params.assert_called_with({
+                'Conventions': 'CF-1.7, ACDD-1.3',
+                'title': 'VIIRS L2P Sea Surface Skin Temperature',
+                'summary': (
+                    "Sea surface temperature (SST) retrievals produced at the NASA OBPG for the "
+                    "Visible Infrared Imaging\n                Radiometer Suite (VIIRS) sensor on "
+                    "the Suomi National Polar-Orbiting Partnership (Suomi NPP) platform.\n         "
+                    "       These have been reformatted to GHRSST GDS version 2 Level 2P "
+                    "specifications by the JPL PO.DAAC. VIIRS\n                SST algorithms "
+                    "developed by the University of Miami, RSMAS"),
+                'references': 'GHRSST Data Processing Specification v2r5',
+                'institution': (
+                    "NASA Jet Propulsion Laboratory"
+                    " (JPL) Physical Oceanography Distributed Active Archive Center\n              "
+                    "  (PO.DAAC)/NASA Goddard Space Flight Center (GSFC), Ocean Biology Processing "
+                    "Group (OBPG)/University of\n                Miami Rosential School of Marine "
+                    "and Atmospheric Science (RSMAS)"),
+                'history': ("VIIRS L2P created at JPL PO.DAAC"
+                    " by combining OBPG SNPP_SST and SNPP_SST3, and outputing to the\n             "
+                    "   GHRSST GDS2 netCDF file format"),
+                'comment': ("L2P Core without DT analysis "
+                    "or other ancillary fields; Day, Start Node:Ascending, End\n                "
+                    "Node:Ascending; WARNING Some applications are unable to properly handle signed"
+                    " byte values. If values\n                are encountered > 127, please "
+                    "subtract 256 from this reported value; Quicklook"),
+                'license': 'GHRSST and PO.DAAC protocol allow data use as free and open.',
+                'id': 'VIIRS_NPP-JPL-L2P-v2016.2',
+                'naming_authority': 'org.ghrsst',
+                'product_version': '2016.2',
+                'uuid': 'b6ac7651-7b02-44b0-942b-c5dc3c903eba',
+                'gds_version_id': '2.0',
+                'netcdf_version_id': '4.1',
+                'date_created': '20200101T211816Z',
+                'file_quality_level': '3',
+                'spatial_resolution': '750 m',
+                'start_time': '20200101T000001Z',
+                'time_coverage_start': '20200101T000001Z',
+                'stop_time': '20200101T000559Z',
+                'time_coverage_end': '20200101T000559Z',
+                'northernmost_latitude': '9.47472000',
+                'southernmost_latitude': '-15.3505001',
+                'easternmost_longitude': '-142.755005',
+                'westernmost_longitude': '-175.084000',
+                'geospatial_lat_max': '9.47472000',
+                'geospatial_lat_min': '-15.3505001',
+                'geospatial_lon_max': '-142.755005',
+                'geospatial_lon_min': '-175.084000',
+                'source': ("VIIRS sea surface temperature observations from the Ocean Biology "
+                           "Processing Group (OBPG)"),
+                'platform': 'Suomi-NPP',
+                'sensor': 'VIIRS',
+                'metadata_link': (
+                    'http://podaac.jpl.nasa.gov/ws/metadata/dataset/?format=iso&shortName='
+                    'VIIRS_NPP-JPL-L2P-v2016.2\n            '),
+                'keywords': (
+                    'Oceans > Ocean Temperature > Sea Surface Temperature > '
+                    'Skin Sea Surface Temperature'),
+                'keywords_vocabulary': ('NASA Global Change Master Directory (GCMD) Science '
+                                        'Keywords'),
+                'standard_name_vocabulary': 'NetCDF Climate and Forecast (CF) Metadata Conventions',
+                'geospatial_lat_units': 'degrees_north',
+                'geospatial_lat_resolution': '0.00749999983',
+                'geospatial_lon_units': 'degrees_east',
+                'geospatial_lon_resolution': '0.00749999983',
+                'acknowledgment': (
+                    'The VIIRS L2P sea surface temperature data are sponsored by NASA'),
+                'creator_name': 'JPL PO.DAAC',
+                'creator_email': 'ghrsst@jpl.nasa.gov',
+                'creator_url': 'http://podaac.jpl.nasa.gov',
+                'project': 'Group for High Resolution Sea Surface Temperature',
+                'publisher_name': 'The GHRSST Project Office',
+                'publisher_url': 'http://www.ghrsst.org',
+                'publisher_email': 'ghrsst-po@nceo.ac.uk',
+                'processing_level': 'L2P',
+                'cdm_data_type': 'swath',
+                'startDirection': 'Ascending',
+                'endDirection': 'Ascending',
+                'day_night_flag': 'Day',
+                'raw_dataset_parameters': ['sea_ice_area_fraction'],
+                'url': 'https://opendap.jpl.nasa.gov/opendap/full_dataset.nc',
+            })
+
+    def test_get_ddx_url(self):
+        """Test utility function which transforms download links into
+        metadata links for OpenDAP
+        """
+        self.assertEqual(
+            crawlers.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc.ddx'),
+            'https://foo/bar.nc.ddx')
+        self.assertEqual(
+            crawlers.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc'),
+            'https://foo/bar.nc.ddx')
+        self.assertEqual(
+            crawlers.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc.dods'),
+            'https://foo/bar.nc.ddx')
 
 
 class ThreddsCrawlerTestCase(unittest.TestCase):
