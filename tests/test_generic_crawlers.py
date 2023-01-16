@@ -904,6 +904,24 @@ class ThreddsCrawlerTestCase(unittest.TestCase):
         mock_get_link.return_value = ['/thredds/dodsC/osisaf/met.no/ice_conc201911301200.nc.dods']
         self.assertIsNone(crawlers.ThreddsCrawler('').get_download_url("dummy"))
 
+    def test_get_ddx_url(self):
+        """Test utility function which transforms download links into
+        metadata links for Thredds
+        """
+        self.assertEqual(
+            crawlers.ThreddsCrawler.get_ddx_url(
+                'https://thredds.met.no/thredds/fileServer/osisaf/met.no/ice/conc/2023/01/'
+                'ice_conc_sh_polstere-100_multi_202301141200.nc'),
+            'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/conc/2023/01/'
+            'ice_conc_sh_polstere-100_multi_202301141200.nc.ddx')
+
+    def test_get_ddx_url_error(self):
+        """get_ddx_url() should raise an exception when the provided
+        URL is not a Thredds fileserver URL
+        """
+        with self.assertRaises(ValueError):
+            crawlers.ThreddsCrawler.get_ddx_url('https://foo/bar.nc')
+
 
 class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
     """Tests for the HTTPPaginatedAPICrawler base class"""
