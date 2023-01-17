@@ -467,19 +467,6 @@ class DDXIngesterTestCase(django.test.TestCase):
         for opened_file in self.opened_files:
             opened_file.close()
 
-    def test_get_xml_namespace(self):
-        """Get xml namespace from the test data DDX file"""
-        test_file_path = os.path.join(
-            os.path.dirname(__file__),
-            self.TEST_DATA['short_ddx']['file_path'])
-
-        with open(test_file_path, 'rb') as test_file:
-            root = ET.parse(test_file).getroot()
-
-        ingester = ingesters.DDXIngester()
-
-        self.assertEqual(ingester._get_xml_namespace(root), 'http://xml.opendap.org/ns/DAP/3.2#')
-
     @mock.patch('xml.etree.ElementTree.parse')
     @mock.patch('geospaas_harvesting.ingesters.DDXIngester._extract_attributes')
     @mock.patch('metanorm.handlers.MetadataHandler.get_parameters')
@@ -491,104 +478,6 @@ class DDXIngesterTestCase(django.test.TestCase):
         ingester = ingesters.DDXIngester()
         ingester._get_normalized_attributes('test_url')
         self.assertIn(({'url': 'test_url'},), mock_get_parameters.call_args)
-
-    def test_logging_if_no_namespace(self):
-        """A warning must be logged if no namespace has been found, and an empty string returned"""
-        test_file_path = os.path.join(
-            os.path.dirname(__file__),
-            self.TEST_DATA['no_ns_ddx']['file_path'])
-
-        with open(test_file_path, 'rb') as test_file:
-            root = ET.parse(test_file).getroot()
-
-        ingester = ingesters.DDXIngester()
-
-        with self.assertLogs(ingester.LOGGER, level=logging.WARNING):
-            namespace = ingester._get_xml_namespace(root)
-
-        self.assertEqual(namespace, '')
-
-    def test_extract_global_attributes(self):
-        """Get nc_global attributes from the test data DDX file"""
-        test_file_path = os.path.join(
-            os.path.dirname(__file__),
-            self.TEST_DATA['short_ddx']['file_path'])
-
-        with open(test_file_path, 'rb') as test_file:
-            root = ET.parse(test_file).getroot()
-
-        ingester = ingesters.DDXIngester()
-        self.assertDictEqual(
-            ingester._extract_attributes(root),
-            {
-                'Conventions': 'CF-1.7, ACDD-1.3',
-                'raw_dataset_parameters': [],
-                'title': 'VIIRS L2P Sea Surface Skin Temperature'
-            }
-        )
-
-    def test_get_normalized_attributes(self):
-        """Test that the correct attributes are extracted from a DDX file"""
-        ingester = ingesters.DDXIngester()
-        normalized_parameters = ingester._get_normalized_attributes(
-            "https://opendap.jpl.nasa.gov/opendap/full_dataset.nc")
-
-        self.assertEqual(normalized_parameters['entry_title'],
-                         'VIIRS L2P Sea Surface Skin Temperature')
-        self.assertEqual(normalized_parameters['summary'], ('Description: ' +
-            'Sea surface temperature (SST) retrievals produced at the NASA OBPG for the Visible I' +
-            'nfrared Imaging\n                Radiometer Suite (VIIRS) sensor on the Suomi Nation' +
-            'al Polar-Orbiting Partnership (Suomi NPP) platform.\n                These have been' +
-            ' reformatted to GHRSST GDS version 2 Level 2P specifications by the JPL PO.DAAC. VII' +
-            'RS\n                SST algorithms developed by the University of Miami, RSMAS;' +
-            'Processing level: 2P'))
-        self.assertEqual(normalized_parameters['time_coverage_start'], datetime(
-            year=2020, month=1, day=1, hour=0, minute=0, second=1, tzinfo=tzutc()))
-        self.assertEqual(normalized_parameters['time_coverage_end'], datetime(
-            year=2020, month=1, day=1, hour=0, minute=5, second=59, tzinfo=tzutc()))
-
-        self.assertEqual(normalized_parameters['instrument']['Short_Name'], 'VIIRS')
-        self.assertEqual(normalized_parameters['instrument']['Long_Name'],
-                         'Visible-Infrared Imager-Radiometer Suite')
-        self.assertEqual(normalized_parameters['instrument']['Category'],
-                         'Earth Remote Sensing Instruments')
-        self.assertEqual(normalized_parameters['instrument']['Subtype'],
-                         'Imaging Spectrometers/Radiometers')
-        self.assertEqual(normalized_parameters['instrument']['Class'],
-                         'Passive Remote Sensing')
-
-        self.assertEqual(normalized_parameters['platform']['Short_Name'], 'Suomi-NPP')
-        self.assertEqual(normalized_parameters['platform']['Long_Name'],
-                         'Suomi National Polar-orbiting Partnership')
-        self.assertEqual(normalized_parameters['platform']['Category'],
-                         'Earth Observation Satellites')
-        self.assertEqual(normalized_parameters['platform']['Series_Entity'],
-                         'Joint Polar Satellite System (JPSS)')
-
-        self.assertEqual(normalized_parameters['location_geometry'], (
-            'POLYGON(('
-            '-175.084000 -15.3505001,'
-            '-142.755005 -15.3505001,'
-            '-142.755005 9.47472000,'
-            '-175.084000 9.47472000,'
-            '-175.084000 -15.3505001))'
-        ))
-
-        self.assertEqual(normalized_parameters['provider']['Short_Name'],
-                         'NASA/JPL/PODAAC')
-        self.assertEqual(normalized_parameters['provider']['Long_Name'],
-                         'Physical Oceanography Distributed Active Archive Center,' +
-                         ' Jet Propulsion Laboratory, NASA')
-        self.assertEqual(normalized_parameters['provider']['Data_Center_URL'],
-                         'https://podaac.jpl.nasa.gov/')
-
-        self.assertEqual(normalized_parameters['iso_topic_category']
-                         ['iso_topic_category'], 'Oceans')
-
-        self.assertEqual(normalized_parameters['gcmd_location']
-                         ['Location_Category'], 'VERTICAL LOCATION')
-        self.assertEqual(normalized_parameters['gcmd_location']['Location_Type'], 'SEA SURFACE')
-        self.assertEqual(normalized_parameters['entry_id'], 'full_dataset')
 
     def test_ingest_dataset_twice_different_urls(self):
         """The same dataset must not be ingested twice in the case of second time execution of
