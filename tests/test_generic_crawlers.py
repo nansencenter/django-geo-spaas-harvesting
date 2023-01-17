@@ -1091,3 +1091,51 @@ class FTPCrawlerTestCase(unittest.TestCase):
                 with self.assertRaises(ftplib.error_temp):
                     crawler._list_folder_contents('/')
                 mock_connect.assert_not_called()
+
+    def test_getstate(self):
+        """Test pickling an FTPCrawler"""
+        with mock.patch('ftplib.FTP', return_value=mock.Mock(spec_set=ftplib.FTP)):
+            crawler = crawlers.FTPCrawler('ftp://foo/bar')
+        expected_result = crawler.__dict__.copy()
+        expected_result['ftp'] = None
+        self.assertDictEqual(crawler.__getstate__(), expected_result)
+
+    def test_setstate(self):
+        """Test unpickling an FTPCrawler"""
+        state = {
+            '_metadata_handler': crawlers.MetadataHandler(crawlers.GeoSPaaSMetadataNormalizer),
+            '_results': [],
+            '_to_process': ['/bar'],
+            'ftp': None,
+            'include': None,
+            'max_threads': 1,
+            'password': 'anonymous',
+            'root_url': ParseResult(
+                scheme='ftp', netloc='foo', path='/bar', params='', query='', fragment=''),
+            'time_range': (None, None),
+            'username': 'anonymous'
+        }
+        ftp_mock = mock.Mock(spec_set=ftplib.FTP)
+        with mock.patch('ftplib.FTP', return_value=ftp_mock):
+            crawler = crawlers.FTPCrawler.__new__(crawlers.FTPCrawler)
+            crawler.__setstate__(state)
+        expected_result = state.copy()
+        expected_result['ftp'] = ftp_mock
+        self.assertDictEqual(crawler.__dict__, expected_result)
+
+    def test_get_normalized_attributes(self):
+        """Test that the attributes are gotten using metanorm, and the
+        geospaas_service attributes are set to 'ftp'
+        """
+        with mock.patch('ftplib.FTP', return_value=mock.Mock(spec_set=ftplib.FTP)):
+            crawler = crawlers.FTPCrawler('ftp://foo')
+        with mock.patch.object(crawler, '_metadata_handler') as mock_handler:
+            mock_handler.get_parameters.return_value = {'foo': 'bar'}
+            self.assertDictEqual(
+                    crawler.get_normalized_attributes(crawlers.DatasetInfo('ftp://uri')),
+                    {
+                        'foo': 'bar',
+                        'geospaas_service_name': 'ftp',
+                        'geospaas_service': 'ftp'
+                    })
+            mock_handler.get_parameters.assert_called_once_with({'url': 'ftp://uri'})

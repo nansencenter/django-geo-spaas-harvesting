@@ -810,32 +810,6 @@ class EarthdataCMRIngesterTestCase(django.test.TestCase):
         self.assertEqual(self.ingester.get_download_url(dataset_info), 'http://something')
 
 
-class FTPIngesterTestCase(django.test.TestCase):
-    """Test the FTPIngester"""
-
-    def setUp(self):
-        self.patcher_param_count = mock.patch.object(Parameter.objects, 'count')
-        self.mock_param_count = self.patcher_param_count.start()
-        self.mock_param_count.return_value = 2
-
-    def tearDown(self):
-        self.patcher_param_count.stop()
-
-    def test_get_normalized_attributes(self):
-        """Test that the attributes are gotten using metanorm, and the
-        geospaas_service attributes are set to 'ftp'
-        """
-        ingester = ingesters.FTPIngester()
-        with mock.patch.object(ingester, '_metadata_handler') as mock_handler:
-            mock_handler.get_parameters.return_value = {'foo': 'bar'}
-            self.assertDictEqual(ingester._get_normalized_attributes('ftp://uri'), {
-                'foo': 'bar',
-                'geospaas_service_name': 'ftp',
-                'geospaas_service': 'ftp'
-            })
-            mock_handler.get_parameters.assert_called_once_with({'url': 'ftp://uri'})
-
-
 class NansatIngesterTestCase(django.test.TestCase):
     """Test the NansatIngester"""
 
