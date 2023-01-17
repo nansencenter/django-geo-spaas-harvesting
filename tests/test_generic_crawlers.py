@@ -926,63 +926,45 @@ class ThreddsCrawlerTestCase(unittest.TestCase):
 class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
     """Tests for the HTTPPaginatedAPICrawler base class"""
 
-    class TestCrawler(crawlers.HTTPPaginatedAPICrawler):
-        """Test class used to test HTTPPaginatedAPICrawler functionalities"""
-        PAGE_OFFSET_NAME = 'offset'
-        PAGE_SIZE_NAME = 'size'
-        MIN_OFFSET = 0
-
-        def __init__(self, url, search_terms=None, time_range=(None, None),
-                     username=None, password=None,
-                     page_size=100, initial_offset=None):
-            super().__init__(url, search_terms=search_terms, time_range=time_range,
-                             username=username, password=password,
-                             page_size=page_size, initial_offset=initial_offset)
-            self._ran_once = False
-
-        def _get_datasets_info(self, page):
-            if self._ran_once:
-                return False
-            else:
-                self._ran_once = True
-                self._results.append('url3')
-                return True
-
-    def setUp(self):
-        self.crawler = self.TestCrawler('foo', 'bar')
-
     def test_get_page_size(self):
         """Test page_size getter"""
-        self.assertEqual(self.TestCrawler('foo', page_size=10).page_size, 10)
+        with mock.patch(
+                'geospaas_harvesting.crawlers.HTTPPaginatedAPICrawler.PAGE_SIZE_NAME', 'size'):
+            self.assertEqual(
+                crawlers.HTTPPaginatedAPICrawler('https://foo', page_size=10).page_size,
+                10)
 
     def test_get_page_offset(self):
         """Test page_offset getter"""
-        self.assertEqual(self.TestCrawler('foo', initial_offset=10).page_offset, 10)
+        self.assertEqual(crawlers.HTTPPaginatedAPICrawler('foo', initial_offset=10).page_offset, 10)
 
     def test_set_page_offset(self):
         """Test page_offset setter"""
-        self.crawler.page_offset = 12
-        self.assertEqual(self.crawler.page_offset, 12)
+        crawler = crawlers.HTTPPaginatedAPICrawler('https://foo')
+        crawler.page_offset = 12
+        self.assertEqual(crawler.page_offset, 12)
 
     def test_set_initial_state(self):
         """Test that set_initial_state correctly resets the crawler"""
+        crawler = crawlers.HTTPPaginatedAPICrawler('https://foo')
         # Set non-default offset and _urls values
-        self.crawler.request_parameters['params']['offset'] = 200
-        self.crawler._results = ['url1', 'url2']
+        crawler.request_parameters['params'][crawler.PAGE_OFFSET_NAME] = 200
+        crawler._results = ['url1', 'url2']
 
-        self.crawler.set_initial_state()
+        crawler.set_initial_state()
         self.assertEqual(
-            self.crawler.request_parameters['params']['offset'], self.crawler.initial_offset)
-        self.assertListEqual(self.crawler._results, [])
+            crawler.request_parameters['params'][crawler.PAGE_OFFSET_NAME], crawler.initial_offset)
+        self.assertListEqual(crawler._results, [])
 
     def test_get_next_page(self):
         """_get_next_page() should get the page at the current offset,
         then increment the offset
         """
-        with mock.patch.object(self.crawler, '_http_get', return_value='foo'):
-            with self.assertLogs(self.crawler.logger, level=logging.DEBUG):
-                self.assertEqual(self.crawler._get_next_page(), 'foo')
-                self.assertEqual(self.crawler.request_parameters['params']['offset'], 1)
+        crawler = crawlers.HTTPPaginatedAPICrawler('https://foo')
+        with mock.patch.object(crawler, '_http_get', return_value='foo'), \
+                self.assertLogs(crawler.logger, level=logging.DEBUG):
+            self.assertEqual(crawler._get_next_page(), 'foo')
+            self.assertEqual(crawler.request_parameters['params'][crawler.PAGE_OFFSET_NAME], 1)
 
     def test_abstract_get_datasets_info(self):
         """_get_datasets_info() should raise a NotImplementedError
@@ -991,6 +973,19 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
         crawler = crawlers.HTTPPaginatedAPICrawler('foo')
         with self.assertRaises(NotImplementedError):
             crawler._get_datasets_info('')
+
+    def test_abstract_get_normalized_attributes(self):
+        """get_normalized_attributes() should raise a NotImplementedError"""
+        with self.assertRaises(NotImplementedError):
+            crawlers.HTTPPaginatedAPICrawler('https://foo').get_normalized_attributes({})
+
+    def test_crawl(self):
+        """Test the crawling mechanism for HTTP paginated APIs"""
+        crawler = crawlers.HTTPPaginatedAPICrawler('https://foo')
+        crawler._results = [crawlers.DatasetInfo('bar')]
+        with mock.patch.object(crawler, '_get_datasets_info', return_value=False), \
+                mock.patch.object(crawler, '_get_next_page'):
+            self.assertListEqual(list(crawler.crawl()), [crawlers.DatasetInfo('bar')])
 
 
 class FTPCrawlerTestCase(unittest.TestCase):
