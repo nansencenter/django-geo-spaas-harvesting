@@ -44,6 +44,12 @@ class InvalidMetadataError(Exception):
         return f"Missing fields: {','.join(self.missing_fields)}"
 
 
+class Stop():
+    """Class used in normalizing queues to signal that processing
+    should stop
+    """
+
+
 class DatasetInfo():
     """Class used to store dataset information coming from crawled repositories
     url is a string, metadata is a dict
@@ -186,7 +192,7 @@ class CrawlerIterator():
         self._failed = queue.Queue(self.QUEUE_SIZE)
 
         self.main_thread = threading.current_thread()
-        self.manager_thread = threading.Thread(target=self._start_normalizing)
+        self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
         self.manager_thread.start()
 
     def __del__(self):
@@ -196,10 +202,13 @@ class CrawlerIterator():
         if self.main_thread == threading.current_thread():
             self.manager_thread.join()
 
+    def __iter__(self):
+        return self
+
     def __next__(self):
         """Gets the next result from the _results queue"""
         next_result = self._results.get()
-        if next_result is None:
+        if next_result is Stop:
             raise StopIteration()
         else:
             return next_result
@@ -217,12 +226,12 @@ class CrawlerIterator():
         normalize the attributes. Normalizing happens in separate threads to
         parallelize the I/Os.
         """
-        try:
-            # Launch thread which checks the size of the failed ingestions
-            # queue and dumps it to disk when necessary
-            failed_queue_thread = threading.Thread(target=self._thread_manage_failed_normalizing)
-            failed_queue_thread.start()
+        # Launch thread which checks the size of the failed ingestions
+        # queue and dumps it to disk when necessary
+        failed_queue_thread = threading.Thread(target=self._thread_manage_failed_normalizing)
+        failed_queue_thread.start()
 
+        try:
             # Launch normalizing threads
             with concurrent.futures.ThreadPoolExecutor(
                     max_workers=self.max_threads,
@@ -235,16 +244,16 @@ class CrawlerIterator():
                         **kwargs
                     ))
         except KeyboardInterrupt:
+            self.logger.info('Normalizing thread received stopping signal')
             for future in reversed(futures):
                 future.cancel()
-            self.logger.debug(
-                'Cancelled future fetching threads')
-            raise
+            self.logger.info(
+                'Cancelled future normalizing threads')
         finally:
             self.logger.debug("Normalizing threads are done")
-            self._results.put(None)
+            self._results.put(Stop)
             self.logger.debug('Stopping failed queue watcher thread')
-            self._failed.put(None)
+            self._failed.put(Stop)
             failed_queue_thread.join()
 
             # raise exceptions from threads
@@ -292,7 +301,7 @@ class CrawlerIterator():
         while True:
             element = self._failed.get()
 
-            if element is None:
+            if element is Stop:
                 self.logger.debug("Stopping failure management thread")
                 if failed_ingestions:
                     self._pickle_list_elements(failed_ingestions, pickle_path)
