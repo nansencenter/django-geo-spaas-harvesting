@@ -4,8 +4,11 @@
 import ftplib
 import logging
 import os
+import pickle
 import re
-import requests
+import shutil
+import tempfile
+import threading
 import unittest
 import unittest.mock as mock
 import xml.etree.ElementTree as ET
@@ -174,6 +177,160 @@ class BaseCrawlerTestCase(unittest.TestCase):
         self.assertDictEqual(
             raw_attributes,
             {'url': 'baz'})
+
+
+class CrawlerIteratorTestCase(unittest.TestCase):
+    """Tests for CrawlerIterator.
+    """
+
+    def setUp(self):
+        self.tmp_dir = tempfile.mkdtemp()
+        self.old_ingestion_path = crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH
+        self.old_max_failed = crawlers.CrawlerIterator.MAX_FAILED
+        crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH = self.tmp_dir
+        crawlers.CrawlerIterator.MAX_FAILED = 2
+
+    def tearDown(self):
+        crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH = self.old_ingestion_path
+        crawlers.CrawlerIterator.MAX_FAILED = self.old_max_failed
+        shutil.rmtree(self.tmp_dir)
+
+    class TestCrawler(crawlers.Crawler):
+        """Crawler used for testing the CrawlerIterator"""
+
+        def crawl(self):
+            for url in ['https://foo', 'https://bar', 'https://baz']:
+                yield crawlers.DatasetInfo(url)
+
+        def set_initial_state(self):
+            pass
+
+        def get_normalized_attributes(self, dataset_info, **kwargs):
+            #used for testing error management
+            if dataset_info.url == 'https://bar':
+                raise RuntimeError()
+            elif dataset_info.url == 'https://baz':
+                return {}
+
+            normalized_metadata = {
+                field: ''
+                for field in crawlers.NormalizedDatasetInfo.required_fields
+            }
+            normalized_metadata['summary'] = dataset_info.url
+            return normalized_metadata
+
+    def test_iterating(self):
+        """Test iterating over normalization results"""
+        crawler = self.TestCrawler()
+        with self.assertLogs(crawlers.CrawlerIterator.logger, level=logging.ERROR) as scm:
+            crawler_iterator = iter(crawler)
+            crawler_iterator.manager_thread.join()
+
+        self.assertIs(scm.records[0].exc_info[0], RuntimeError)
+        self.assertIs(scm.records[1].exc_info[0], crawlers.InvalidMetadataError)
+
+        results = list(crawler_iterator)
+
+        self.assertListEqual(
+            results,
+            [
+                crawlers.NormalizedDatasetInfo(
+                    url, crawler.get_normalized_attributes(crawlers.DatasetInfo(url)))
+                for url in ['https://foo']#, 'https://bar', 'https://baz']
+            ])
+
+        failed_ingestion_files = os.listdir(self.tmp_dir)
+        self.assertEqual(len(failed_ingestion_files), 1)
+        self.assertTrue(failed_ingestion_files[0].endswith(crawler_iterator.RECOVERY_SUFFIX))
+
+    def test_pickle_list_elements(self):
+        """Test pickling a list of objects"""
+        # create a crawler iterator without starting the processing threads
+        with mock.patch('threading.Thread'):
+            crawler_iterator = iter(self.TestCrawler())
+        objects_to_pickle = [1, 'one', 2.2]
+        reference = list(objects_to_pickle)  # needed because the list will be cleared
+        with tempfile.TemporaryDirectory() as tmp_dir, self.assertLogs(crawler_iterator.logger):
+            file_path = os.path.join(tmp_dir, 'random_objects.pickle')
+            # pickle various objects to a temporary file
+            crawler_iterator._pickle_list_elements(objects_to_pickle, file_path)
+
+            # retrieve the pickled objects and check they are the same
+            # as the ones which were pickled
+            unpickled_objects = []
+            with open(file_path, 'rb') as pickle_file:
+                while True:
+                    try:
+                        unpickled_objects.append(pickle.load(pickle_file))
+                    except EOFError:
+                        break
+
+            self.assertListEqual(unpickled_objects, reference)
+            self.assertFalse(objects_to_pickle)  # check that the list has been cleared
+
+    def test_thread_manage_failed_ingestions(self):
+        """Test the processing of failed ingestions"""
+        # create a crawler iterator without starting the processing threads
+        with mock.patch('threading.Thread'):
+            crawler_iterator = iter(self.TestCrawler())
+
+        # start the thread
+        thread = threading.Thread(target=crawler_iterator._thread_manage_failed_normalizing)
+        with self.assertLogs(crawler_iterator.logger, level=logging.INFO) as log_manager:
+            thread.start()
+            # put two items in the failed queue (one more than the
+            # max number of items per file)
+            items_to_pickle = [
+                (crawlers.DatasetInfo('foo', {}), RuntimeError()),
+                (crawlers.DatasetInfo('baz', {}), ValueError()),
+                (crawlers.DatasetInfo('quux', {}), KeyError())
+            ]
+            for item in items_to_pickle:
+                crawler_iterator._failed.put(item)
+            # stop the thread
+            crawler_iterator._failed.put(crawlers.Stop)
+            # wait for the thread to stop
+            thread.join()
+
+        # check that one file is created
+        failed_dir_contents = os.listdir(self.tmp_dir)
+        self.assertEqual(len(failed_dir_contents), 1)
+
+        with open(os.path.join(self.tmp_dir, failed_dir_contents[0]), 'rb') as pickle_file:
+            pickled_objects = [
+                pickle.load(pickle_file) for _ in range(len(items_to_pickle))
+            ]
+
+            with self.assertRaises(EOFError):
+                pickle.load(pickle_file)
+
+        # check the contents of the file
+        self.assertTrue(all(
+            (to_pickle[0] == result[0],
+             type(to_pickle[1]) == type(result[1]) and to_pickle[1].args == result[1].args)
+            for to_pickle, result in zip(items_to_pickle, pickled_objects)
+        ))
+
+        # check that the dump method has been called twice
+        # (because the number of items exceeds the max number
+        # of items per file)
+        dump_messages = 0
+        for record in log_manager.records:
+            if record.getMessage().startswith('Dumping items to'):
+                dump_messages += 1
+        self.assertEqual(dump_messages, 2)
+
+    def test_keyboard_interruption(self):
+        """Test that keyboard interrupts are managed properly"""
+        mock_futures = (mock.Mock(), KeyboardInterrupt)
+        with mock.patch('concurrent.futures.ThreadPoolExecutor.submit',
+                        side_effect=mock_futures) as mock_submit, \
+             mock.patch('concurrent.futures.as_completed') as mock_as_completed:
+            with self.assertLogs(crawlers.CrawlerIterator.logger, level=logging.DEBUG):
+                crawler_iterator = iter(self.TestCrawler())
+                crawler_iterator.manager_thread.join()
+            mock_futures[0].cancel.assert_called()
+
 
 class DirectoryCrawlerTestCase(unittest.TestCase):
     """Tests for the DirectoryCrawler"""
