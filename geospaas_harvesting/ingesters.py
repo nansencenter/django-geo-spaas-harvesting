@@ -19,7 +19,7 @@ class Ingester():
     """Takes care of ingesting the output of a crawler to the database
     """
 
-    LOGGER = logging.getLogger(__name__ + '.Ingester')
+    logger = logging.getLogger(__name__ + '.Ingester')
 
     def __init__(self, max_db_threads=1):
         if not isinstance(max_db_threads, int):
@@ -41,7 +41,7 @@ class Ingester():
         created_dataset = created_dataset_uri = False
 
         if self._uri_exists(url):
-            self.LOGGER.info(
+            self.logger.info(
                 "'%s' is already present in the database", url)
             return (url, created_dataset, created_dataset_uri)
 
@@ -133,21 +133,21 @@ class Ingester():
                     try:
                         url, created_dataset, created_dataset_uri = future.result()
                         if created_dataset:
-                            self.LOGGER.info("Successfully created dataset from url: '%s'", url)
+                            self.logger.info("Successfully created dataset from url: '%s'", url)
                             if not created_dataset_uri:
                                 # This should only happen if a database problem
                                 # occurred in _ingest_dataset(), because the
                                 # presence of the URI in the database is checked
                                 # before attempting to ingest.
-                                self.LOGGER.warning("The Dataset URI '%s' was not created.", url)
+                                self.logger.warning("The Dataset URI '%s' was not created.", url)
                     except Exception:  # pylint: disable=broad-except
-                        self.LOGGER.error("Error during ingestion", exc_info=True)
+                        self.logger.error("Error during ingestion", exc_info=True)
                     finally:
                         futures.remove(future)  # avoid keeping finished futures in memory
             except KeyboardInterrupt:
                 for future in reversed(futures):
                     future.cancel()
-                self.LOGGER.debug(
+                self.logger.debug(
                     'Cancelled future ingestion threads, '
                     'waiting for the running threads to finish')
                 raise
