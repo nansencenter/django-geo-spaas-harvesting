@@ -55,12 +55,8 @@ class Ingester():
             normalized_attributes.pop('provider'))
 
         location_geometry = normalized_attributes.pop('location_geometry')
-        if isinstance(location_geometry, GEOSGeometry):
-            # backward compatibility. can be removed later
-            geometry = location_geometry
-        else:
-            geometry = GEOSGeometry(location_geometry)
-        geographic_location, _ = GeographicLocation.objects.get_or_create(geometry=geometry)
+        geographic_location, _ = GeographicLocation.objects.get_or_create(
+            geometry=GEOSGeometry(location_geometry))
 
         location, _ = Location.objects.get_or_create(normalized_attributes.pop('gcmd_location'))
 
