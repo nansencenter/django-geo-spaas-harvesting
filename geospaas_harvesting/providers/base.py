@@ -102,6 +102,9 @@ class SearchResults():
     def __repr__(self):
         return f"SearchResults for crawler: {self.crawler}"
 
+    def __eq__(self, other):
+        return self.crawler == other.crawler and self.filters == other.filters
+
     def __iter__(self):
         self.crawler.set_initial_state()
         self.crawler_iterator = iter(self.crawler)
