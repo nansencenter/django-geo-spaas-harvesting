@@ -80,8 +80,8 @@ class Provider(FilterMixin):
         search results returned by the crawler
         """
         parsed_parameters = self.search_parameters_parser.parse(parameters)
-        time_filters = self._make_filters(parsed_parameters)
-        return SearchResults(self._make_crawler(parsed_parameters), filters=time_filters)
+        filters = self._make_filters(parsed_parameters)
+        return SearchResults(self._make_crawler(parsed_parameters), filters=filters)
 
     def _make_crawler(self, parameters):
         """Create a crawler from the search parameters"""
