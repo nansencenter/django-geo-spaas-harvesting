@@ -46,7 +46,6 @@ class TimeFilterMixin(FilterMixin):
         filters = []
         self._mixin_start_time = parsed_parameters.get('start_time')
         if self._mixin_start_time is not None:
-            # di is a DatasetInfo object
             filters.append(self._time_coverage_end_gt)
         self._mixin_end_time = parsed_parameters.get('end_time')
         if self._mixin_end_time is not None:
