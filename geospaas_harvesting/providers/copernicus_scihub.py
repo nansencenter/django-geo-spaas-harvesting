@@ -25,8 +25,6 @@ class CopernicusScihubProvider(Provider):
             WKTArgument('location', geometry_types=(LineString, Point, Polygon)),
             ChoiceArgument('level', valid_options=('L0', 'L1', 'L2')),
             StringArgument('platformname'),
-            StringArgument('beginposition'),
-            StringArgument('endposition'),
             StringArgument('ingestiondate'),
             StringArgument('collection'),
             StringArgument('filename'),
@@ -95,6 +93,14 @@ class CopernicusScihubCrawler(HTTPPaginatedAPICrawler):
         self._url_regex = re.compile(r'^(\S+)/\$value$')
         super().__init__(*args, **kwargs)
 
+    def __eq__(self, other):
+        return (
+            self.url == other.url and
+            self._credentials == other._credentials and
+            self.initial_offset == other.initial_offset and
+            self.request_parameters == other.request_parameters
+        )
+
     def increment_offset(self):
         self.page_offset += self.page_size
 
@@ -128,8 +134,9 @@ class CopernicusScihubCrawler(HTTPPaginatedAPICrawler):
         """
         raw_query = search_terms.pop('raw_query', None)
         query = ' AND '.join((f"{k}:{v}" for k, v in search_terms.items()))
+        query_to_append = f" AND ({query})" if query else ''
         if raw_query is not None:
-            query = f"{raw_query} AND ({query})"
+            query = f"({raw_query}){query_to_append}"
         return query
 
     def _make_time_condition(self, time_range):
