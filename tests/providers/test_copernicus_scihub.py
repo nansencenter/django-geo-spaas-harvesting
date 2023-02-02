@@ -143,33 +143,6 @@ class CopernicusOpenSearchAPICrawlerTestCase(unittest.TestCase):
         for opened_file in self.opened_files:
             opened_file.close()
 
-    def test_equality(self):
-        """Test the equality operator between crawlers"""
-        self.assertEqual(CopernicusScihubCrawler('http://foo'),
-                         CopernicusScihubCrawler('http://foo'))
-        self.assertEqual(
-            CopernicusScihubCrawler('http://foo',
-                                    username='user', password='pass', search_terms={'bar': 'baz'}),
-            CopernicusScihubCrawler('http://foo',
-                                    username='user', password='pass', search_terms={'bar': 'baz'}))
-        self.assertNotEqual(CopernicusScihubCrawler('http://foo'),
-                            CopernicusScihubCrawler('http://bar'))
-        self.assertNotEqual(
-            CopernicusScihubCrawler('http://foo',
-                                    username='user2', password='pass', search_terms={'bar': 'baz'}),
-            CopernicusScihubCrawler('http://foo',
-                                    username='user', password='pass', search_terms={'bar': 'baz'}))
-        self.assertNotEqual(
-            CopernicusScihubCrawler('http://foo',
-                                    username='user', password='pass2', search_terms={'bar': 'baz'}),
-            CopernicusScihubCrawler('http://foo',
-                                    username='user', password='pass', search_terms={'bar': 'baz'}))
-        self.assertNotEqual(
-            CopernicusScihubCrawler('http://foo',
-                                    username='user', password='pass', search_terms={'bar': 'baz'}),
-            CopernicusScihubCrawler('http://foo',
-                                    username='user', password='pass', search_terms={'bar': 'qux'}))
-
     def test_increment_offset(self):
         """The offset should be incremented by the page size"""
         self.assertEqual(self.crawler.page_offset, 0)

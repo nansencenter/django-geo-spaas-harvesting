@@ -87,14 +87,8 @@ class CopernicusScihubCrawler(HTTPPaginatedAPICrawler):
     MIN_OFFSET = 0
 
     def __init__(self, *args, **kwargs):
-        username = kwargs.get('username')
-        password = kwargs.get('password')
-        self._credentials = (username, password) if username and password else None
         self._url_regex = re.compile(r'^(\S+)/\$value$')
         super().__init__(*args, **kwargs)
-
-    def __eq__(self, other):
-        return self._credentials == other._credentials and super().__eq__(other)
 
     def increment_offset(self):
         self.page_offset += self.page_size
@@ -175,7 +169,7 @@ class CopernicusScihubCrawler(HTTPPaginatedAPICrawler):
         """Get the raw JSON metadata from a Copernicus OData URL"""
         metadata_url = self._build_metadata_url(url)
         stream = utils.http_request(
-            'GET', metadata_url, auth=self._credentials, stream=True).content
+            'GET', metadata_url, auth=self.request_parameters.get('auth'), stream=True).content
         return json.load(io.BytesIO(stream))
 
     def get_normalized_attributes(self, dataset_info, **kwargs):
