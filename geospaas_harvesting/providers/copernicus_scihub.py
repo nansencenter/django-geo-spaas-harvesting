@@ -94,12 +94,7 @@ class CopernicusScihubCrawler(HTTPPaginatedAPICrawler):
         super().__init__(*args, **kwargs)
 
     def __eq__(self, other):
-        return (
-            self.url == other.url and
-            self._credentials == other._credentials and
-            self.initial_offset == other.initial_offset and
-            self.request_parameters == other.request_parameters
-        )
+        return self._credentials == other._credentials and super().__eq__(other)
 
     def increment_offset(self):
         self.page_offset += self.page_size

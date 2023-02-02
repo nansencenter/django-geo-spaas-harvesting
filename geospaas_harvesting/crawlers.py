@@ -849,6 +849,13 @@ class HTTPPaginatedAPICrawler(Crawler):
             search_terms, time_range, username, password, page_size)
         self.set_initial_state()
 
+    def __eq__(self, other):
+        return (
+            self.url == other.url and
+            self.initial_offset == other.initial_offset and
+            self.request_parameters == other.request_parameters
+        )
+
     # ------------- crawl ------------
     def set_initial_state(self):
         self.page_offset = self.initial_offset
