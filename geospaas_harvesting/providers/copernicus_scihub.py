@@ -10,9 +10,9 @@ from shapely.geometry.polygon import LineString, Point, Polygon
 
 import geospaas.catalog.managers as catalog_managers
 import geospaas_harvesting.utils as utils
+from geospaas_harvesting.crawlers import DatasetInfo, HTTPPaginatedAPICrawler
 from .base import Provider
 from ..arguments import ChoiceArgument, StringArgument, WKTArgument
-from geospaas_harvesting.crawlers import DatasetInfo, HTTPPaginatedAPICrawler
 
 
 class CopernicusScihubProvider(Provider):
