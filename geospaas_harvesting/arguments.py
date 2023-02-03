@@ -81,6 +81,14 @@ class Argument():
         self.parent = None
         self.children = []
 
+    def __eq__(self, other):
+        return (
+            self.name == other.name and
+            self.required == other.required and
+            self.default == other.default and
+            self.description == other.description
+        )
+
     def set_parent(self, parent):
         """Define the parent of the current argument"""
         self.parent = parent
@@ -123,6 +131,9 @@ class ChoiceArgument(Argument):
         if self.default is not NoDefault:
             self.validate(self.default)
 
+    def __eq__(self, other):
+        return super().__eq__(other) and self.valid_options == other.valid_options
+
     def validate(self, value):
         """Check if the value is valid. Returns a boolean"""
         if self.valid_options and value not in self.valid_options:
@@ -154,6 +165,9 @@ class DictArgument(Argument):
         self.valid_keys = set(kwargs.pop('valid_keys', []))
         super().__init__(name, **kwargs)
 
+    def __eq__(self, other):
+        return super().__eq__(other) and self.valid_keys == other.valid_keys
+
     def parse(self, value):
         if not isinstance(value, dict):
             raise ValueError(f"{self.name} should be a dictionary")
@@ -172,6 +186,13 @@ class IntegerArgument(Argument):
         self.min_value = kwargs.pop('min_value', None)
         self.max_value = kwargs.pop('max_value', None)
         super().__init__(name, **kwargs)
+
+    def __eq__(self, other):
+        return (
+            super().__eq__(other) and
+            self.min_value == other.min_value and
+            self.max_value == other.max_value
+        )
 
     def parse(self, value):
         if not isinstance(value, int):
@@ -227,6 +248,9 @@ class StringArgument(Argument):
         self.regex = kwargs.pop('regex', None)
         super().__init__(name, **kwargs)
 
+    def __eq__(self, other):
+        return super().__eq__(other) and self.regex == other.regex
+
     def parse(self, value):
         if not isinstance(value, str):
             raise ValueError(f"{self.name} should be a string")
@@ -241,6 +265,9 @@ class WKTArgument(Argument):
     def __init__(self, name, **kwargs):
         self.geometry_types = kwargs.pop('geometry_types', None)
         super().__init__(name, **kwargs)
+
+    def __eq__(self, other):
+        return super().__eq__(other) and self.geometry_types == other.geometry_types
 
     def parse(self, value):
         geometry = shapely.wkt.loads(value)
