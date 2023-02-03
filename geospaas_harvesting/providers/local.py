@@ -13,12 +13,12 @@ from django.contrib.gis.geos.point import Point
 
 import geospaas.catalog.managers as catalog_managers
 import pythesint as pti
-from .base import Provider, TimeFilterMixin
-from ..arguments import PathArgument, StringArgument
-from ..crawlers import LocalDirectoryCrawler
 from geospaas.utils.utils import nansat_filename
 from metanorm.utils import get_cf_or_wkv_standard_name
 from nansat import Nansat
+from .base import Provider, TimeFilterMixin
+from ..arguments import PathArgument, StringArgument
+from ..crawlers import LocalDirectoryCrawler
 
 
 class NansatProvider(TimeFilterMixin, Provider):
