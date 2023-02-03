@@ -1,0 +1,37 @@
+{
+    "collections": [
+        {
+            "id": "Sentinel1",
+            "displayName": "Sentinel-1",
+            "dataset": "ESA-DATASET",
+            "billing": "free",
+            "formFields": [
+                {
+                    "id": "platform",
+                    "displayName": "platform",
+                    "placeholder": "Platform",
+                    "required": false,
+                    "fieldType": "select",
+                    "options": [
+                        {
+                            "name": "S1A",
+                            "value": "S1A"
+                        },
+                        {
+                            "name": "S1B",
+                            "value": "S1B"
+                        }
+                    ]
+                },
+                {
+                    "id": "swath",
+                    "displayName": "swath",
+                    "placeholder": "Swath",
+                    "required": false,
+                    "fieldType": "input",
+                    "inputType": "text"
+                }
+            ]
+        }
+    ]
+}
