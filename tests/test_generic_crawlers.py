@@ -1083,6 +1083,18 @@ class ThreddsCrawlerTestCase(unittest.TestCase):
 class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
     """Tests for the HTTPPaginatedAPICrawler base class"""
 
+    def test_equality(self):
+        """Test the equality operator between crawlers"""
+        self.assertEqual(crawlers.HTTPPaginatedAPICrawler('http://foo'),
+                         crawlers.HTTPPaginatedAPICrawler('http://foo'))
+        self.assertEqual(
+            crawlers.HTTPPaginatedAPICrawler('http://foo',
+                                    username='user', password='pass', search_terms={'bar': 'baz'}),
+            crawlers.HTTPPaginatedAPICrawler('http://foo',
+                                    username='user', password='pass', search_terms={'bar': 'baz'}))
+        self.assertNotEqual(crawlers.HTTPPaginatedAPICrawler('http://foo'),
+                            crawlers.HTTPPaginatedAPICrawler('http://bar'))
+
     def test_get_page_size(self):
         """Test page_size getter"""
         with mock.patch(
