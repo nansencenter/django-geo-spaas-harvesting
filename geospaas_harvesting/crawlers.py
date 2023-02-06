@@ -377,6 +377,12 @@ class DirectoryCrawler(Crawler):
         self.include = re.compile(include) if include else None
         self.set_initial_state()
 
+    def __eq__(self, other):
+        return (
+            self.root_url == other.root_url and
+            self.time_range == other.time_range and
+            self.include == other.include)
+
     @property
     def base_url(self):
         """Get the root URL without the path"""
