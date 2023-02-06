@@ -161,9 +161,6 @@ class NetCDFCrawler(LocalDirectoryCrawler):
                 lonlat_dependent_data = True
                 break
 
-        #read the fill_value just one time for usage in below loop
-        lat_fil_value = latitudes[:].fill_value if np.ma.isMaskedArray(latitudes[:]) else None
-        lon_fil_value = longitudes[:].fill_value if np.ma.isMaskedArray(longitudes[:]) else None
         # If at least a variable is dependent on latitude and
         # longitude, the longitude and latitude arrays are combined to
         # find all the data points
@@ -171,8 +168,6 @@ class NetCDFCrawler(LocalDirectoryCrawler):
             points = []
             for lon in longitudes:
                 for lat in latitudes:
-                    if lon_fil_value == lon or lat_fil_value == lat:
-                        continue  # Don't add the points that have the default value inside them
                     points.append(Point(float(lon), float(lat), srid=4326))
             geometry = MultiPoint(points, srid=4326).convex_hull
         # If the longitude and latitude variables have the same shape,
@@ -180,11 +175,18 @@ class NetCDFCrawler(LocalDirectoryCrawler):
         # point
         elif longitudes.shape == latitudes.shape:
             points = []
-            # in this case numpy.nditer() works like zip() for
-            # multi-dimensional arrays
+            lat_fil_value = latitudes[:].fill_value if np.ma.isMaskedArray(latitudes[:]) else None
+            lon_fil_value = longitudes[:].fill_value if np.ma.isMaskedArray(longitudes[:]) else None
+            # In this case numpy.nditer() works like zip() for
+            # multi-dimensional arrays.
+            # It does not keep the masking information
             for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
+                # Skip points containing masked values
+                # It needs to be excluded from coverage because of a
+                # Python optimization which the "continue" line to
+                # never be executed
                 if lon_fil_value == lon or lat_fil_value == lat:
-                    continue  # Don't add the points that have the default value inside them
+                    continue  # pragma: no cover
                 new_point = Point(float(lon), float(lat), srid=4326)
                 # Don't add duplicate points in trajectories
                 if not points or new_point != points[-1]:
