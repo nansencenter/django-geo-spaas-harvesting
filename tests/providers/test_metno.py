@@ -20,11 +20,10 @@ class METNOProviderTestCase(unittest.TestCase):
             'directory': 'foo',
             'include': '.*'
         }
-        with mock.patch('ftplib.FTP'):
-            self.assertEqual(
-                provider._make_crawler(parameters),
-                crawlers.ThreddsCrawler(
-                    'https://thredds.met.no/thredds/foo',
-                    include='.*',
-                    time_range=(datetime(2023, 1, 1, tzinfo=timezone.utc),
-                                datetime(2023, 1, 2, tzinfo=timezone.utc))))
+        self.assertEqual(
+            provider._make_crawler(parameters),
+            crawlers.ThreddsCrawler(
+                'https://thredds.met.no/thredds/foo',
+                include='.*',
+                time_range=(datetime(2023, 1, 1, tzinfo=timezone.utc),
+                            datetime(2023, 1, 2, tzinfo=timezone.utc))))
