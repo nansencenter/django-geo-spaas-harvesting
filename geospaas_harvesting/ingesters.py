@@ -107,7 +107,6 @@ class Ingester():
 
         return (url, created_dataset, created_dataset_uri)
 
-
     def ingest(self, datasets_to_ingest, *args, **kwargs):
         """Iterates over a crawler and writes the datasets to the
         database. Database access can be parallelized, although it is
