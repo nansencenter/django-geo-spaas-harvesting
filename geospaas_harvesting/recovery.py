@@ -11,7 +11,7 @@ import requests
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 if not django.conf.settings.configured:
-    django.setup()
+    django.setup()  # pragma: no cover
 
 import geospaas_harvesting.crawlers as crawlers  # pylint: disable=wrong-import-position
 import geospaas_harvesting.ingesters as ingesters  # pylint: disable=wrong-import-position
