@@ -13,12 +13,6 @@ import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.recovery as recovery
 
 
-class PickableMock(mock.MagicMock):
-    """MagicMock class that can be pickled"""
-    def __reduce__(self):
-        return (mock.MagicMock, ())
-
-
 class IngestionRecoveryTestCase(django.test.TestCase):
     """Tests for the ingestion recovery functions"""
 
