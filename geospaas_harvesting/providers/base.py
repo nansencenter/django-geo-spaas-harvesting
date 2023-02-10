@@ -72,7 +72,7 @@ class Provider(FilterMixin):
         ])
 
     def __repr__(self):
-        return f"[{self.__class__.__name__}, name: {self.name}]"
+        return f"{self.__class__.__name__}(name={self.name}, username={self.username}, password=*)"
 
     def search(self, **parameters):
         """Returns a Search object which can be used to explore the
