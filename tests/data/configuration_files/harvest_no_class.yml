@@ -1,7 +1,0 @@
----
-harvesters:
-  test:
-    urls:
-      - 'https://random1.url'
-      - 'https://random2.url'
-...
