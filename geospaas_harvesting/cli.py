@@ -118,10 +118,7 @@ def main():
     """
     arg_parser = make_arg_parser()
     cli_arguments = arg_parser.parse_args()
-    try:
-        cli_arguments.func(cli_arguments)
-    except AttributeError:
-        arg_parser.print_help()
+    cli_arguments.func(cli_arguments)
 
 
 if __name__ == '__main__':  # pragma: no cover
