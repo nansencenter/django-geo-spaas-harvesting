@@ -105,12 +105,10 @@ class SearchConfiguration(Configuration):
         """Adds a dict of providers to the current object.
         Needs to be called before the start_searches() method
         """
-        try:
+        if isinstance(providers, dict):
             self.providers = providers
-        except IndexError as error:
-            raise ValueError(
-                "Expecting a dict of providers as returned "
-                "by a ProvidersConfiguration object") from error
+        else:
+            raise ValueError("Need a dictionary")
         return self
 
     def start_searches(self):
