@@ -1,8 +1,6 @@
+"""This module provides means to gather metadata about various datasets
+into the GeoSPaaS catalog
 """
-This module provides means to gather metadata about various Datasets into the GeoSPaaS catalog
-"""
-#TODO: review docstrings in the whole package
-
 import logging.config
 import os
 import os.path
