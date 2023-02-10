@@ -39,7 +39,7 @@ class ProviderTestCase(unittest.TestCase):
 
     def test_repr(self):
         """Test provider representation"""
-        self.assertEqual(repr(self.provider), '[Provider, name: test]')
+        self.assertEqual(repr(self.provider), 'Provider(name=test, username=user, password=*)')
 
     def test_abstract_make_crawler(self):
         """_make_crawler should raise a NotImplementedError"""
