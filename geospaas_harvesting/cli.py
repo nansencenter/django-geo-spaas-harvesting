@@ -14,7 +14,7 @@ import django.conf
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 if not django.conf.settings.configured:
-    django.setup()
+    django.setup()  # pragma: no cover
 
 from geospaas.catalog.models import Parameter
 from .config import ProvidersConfiguration, SearchConfiguration
