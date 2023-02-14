@@ -13,7 +13,7 @@ LOGGING_CONF_FILE = os.getenv('GEOSPAAS_HARVESTING_LOG_CONF_PATH', DEFAULT_LOGGI
 try:
     with open(LOGGING_CONF_FILE, 'rb') as stream:
         logging_configuration = yaml.safe_load(stream)  # pylint: disable=invalid-name
-except FileNotFoundError:
+except FileNotFoundError:  # pragma: no cover
     print(f"'{LOGGING_CONF_FILE}' does not exist, logging can't be configured.", file=sys.stderr)
     logging_configuration = None  # pylint: disable=invalid-name
 
