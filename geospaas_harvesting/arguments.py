@@ -89,13 +89,13 @@ class Argument():
             self.description == other.description
         )
 
-    def set_parent(self, parent):
+    def _set_parent(self, parent):
         """Define the parent of the current argument"""
         self.parent = parent
 
     def add_child(self, child):
         """Add a child argument"""
-        child.set_parent(self)
+        child._set_parent(self)
         self.children.append(child)
 
     def parse(self, value):
@@ -215,6 +215,7 @@ class ListArgument(Argument):
 
 class PathArgument(ChoiceArgument):
     """Path argument with format validation and optional valid options.
+    Only absolute paths are accepted.
     Subdirectories of the valid options are still valid.
     """
     SEP = '/'
