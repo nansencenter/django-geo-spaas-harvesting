@@ -79,16 +79,37 @@ class IngesterTestCase(django.test.TransactionTestCase):
             'summary': 'sum-up',
             'time_coverage_start': '2022-01-01',
             'time_coverage_end': '2022-01-02',
-            'platform': {'Series_Entity': 'Space-based Platforms'},
-            'instrument': {'Short_Name': 'sar'},
+            'platform': {
+                'Series_Entity': 'Space-based Platforms',
+                'Category': '',
+                'Short_Name': '',
+                'Long_Name': '',
+            },
+            'instrument': {
+                'Short_Name': 'sar',
+                'Category': '',
+                'Class': '',
+                'Type': '',
+                'Subtype': '',
+                'Long_Name': '',
+            },
             'location_geometry': 'POINT(10 11)',
             'provider': {
-                'Short_Name': 'someone'
+                'Short_Name': 'someone',
+                'Bucket_Level0': '',
+                'Bucket_Level1': '',
+                'Bucket_Level2': '',
+                'Bucket_Level3': '',
+                'Long_Name': '',
+                'Data_Center_URL': '',
             },
             'iso_topic_category': {'iso_topic_category': 'oceans'},
             'gcmd_location': {
                 'Location_Category': 'vertical location',
                 'Location_Type': 'sea surface',
+                'Location_Subregion1': '',
+                'Location_Subregion2': '',
+                'Location_Subregion3': '',
             },
             'dataset_parameters': [
                 {
