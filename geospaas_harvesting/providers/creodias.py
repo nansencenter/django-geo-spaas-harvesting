@@ -98,7 +98,7 @@ class CollectionArgument(ChoiceArgument):
 
     def __str__(self):
         return (Argument.__str__(self) +
-                f", valid options={self.valid_options.keys()}")
+                f", valid options={list(self.valid_options.keys())}")
 
     def _get_collection_parameters(self, collection):
         """Makes argument objects from the data returned by the API
