@@ -77,7 +77,7 @@ class Argument():
     In case there are arguments depending on another one, they can be
     listed as children. In that case, their 'parent' attribute is set
     """
-    type = 'unknown type'
+    type = 'unknown'
 
     def __init__(self, name, **kwargs):
         self.name = name
@@ -304,10 +304,10 @@ class StringArgument(Argument):
 
 class WKTArgument(Argument):
     """Creates a shapely geometry object from a WKT string"""
-    type = 'WKT'
+    type = 'WKT string'
 
     def __init__(self, name, **kwargs):
-        self.geometry_types = kwargs.pop('geometry_types', None)
+        self.geometry_types = kwargs.pop('geometry_types', [])
         super().__init__(name, **kwargs)
 
     def __eq__(self, other):
