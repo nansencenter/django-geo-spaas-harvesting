@@ -79,7 +79,7 @@ def print_providers(cli_arguments):
     """Print each provider's description, notably the possible search
     arguments
     """
-    print('Available providers: ')
+    print('Available providers:')
     for provider in ProvidersConfiguration.from_file(cli_arguments.config_path).providers.values():
         print(provider)
 
