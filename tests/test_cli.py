@@ -1,5 +1,6 @@
 """Tests for the CLI"""
 import argparse
+import io
 import logging
 import unittest
 import unittest.mock as mock
@@ -112,6 +113,15 @@ class CLITestCase(unittest.TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 cli.save_results([mock.Mock()])
         mock_executor.shutdown.assert_called()
+
+    def test_print_providers(self):
+        """Test printing providers help texts"""
+        buffer = io.StringIO()
+        with mock.patch('sys.stdout', buffer), \
+             mock.patch('geospaas_harvesting.cli.ProvidersConfiguration') as mock_config:
+            mock_config.from_file.return_value.providers = {'foo': 'bar'}
+            cli.print_providers(argparse.Namespace(config_path=''))
+        self.assertEqual(buffer.getvalue(), 'Available providers:\nbar\n')
 
     def test_harvest(self):
         """Check that the necessary functions are called"""
