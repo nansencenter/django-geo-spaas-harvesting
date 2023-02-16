@@ -9,7 +9,7 @@ import geospaas.catalog.managers as catalog_managers
 import geospaas_harvesting.utils as utils
 from geospaas_harvesting.crawlers import DatasetInfo, HTTPPaginatedAPICrawler
 from .base import Provider
-from ..arguments import ChoiceArgument, IntegerArgument, StringArgument, WKTArgument
+from ..arguments import Argument, ChoiceArgument, IntegerArgument, StringArgument, WKTArgument
 
 
 class CreodiasProvider(Provider):
@@ -95,6 +95,10 @@ class CollectionArgument(ChoiceArgument):
     It populates child parameters at parsing time according to the
     collection being searched.
     """
+
+    def __str__(self):
+        return (Argument.__str__(self) +
+                f", valid options={self.valid_options.keys()}")
 
     def _get_collection_parameters(self, collection):
         """Makes argument objects from the data returned by the API

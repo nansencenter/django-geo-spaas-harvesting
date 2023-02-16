@@ -154,6 +154,9 @@ class ChoiceArgument(Argument):
     def __eq__(self, other):
         return super().__eq__(other) and self.valid_options == other.valid_options
 
+    def __str__(self):
+        return super().__str__() + f", valid options={self.valid_options}"
+
     def validate(self, value):
         """Check if the value is valid. Returns a boolean"""
         if self.valid_options and value not in self.valid_options:
@@ -190,6 +193,10 @@ class DictArgument(Argument):
     def __eq__(self, other):
         return super().__eq__(other) and self.valid_keys == other.valid_keys
 
+    def __str__(self):
+        return (super().__str__() +
+                (f", valid keys={self.valid_keys}" if self.valid_keys else ''))
+
     def parse(self, value):
         if not isinstance(value, dict):
             raise ValueError(f"{self.name} should be a dictionary")
@@ -216,6 +223,11 @@ class IntegerArgument(Argument):
             self.min_value == other.min_value and
             self.max_value == other.max_value
         )
+
+    def __str__(self):
+        return (super().__str__() +
+                (f", minimum value={self.min_value}" if self.min_value else '') +
+                (f", maximum value={self.max_value}" if self.max_value else ''))
 
     def parse(self, value):
         if not isinstance(value, int):
@@ -278,6 +290,10 @@ class StringArgument(Argument):
     def __eq__(self, other):
         return super().__eq__(other) and self.regex == other.regex
 
+    def __str__(self):
+        return (super().__str__() +
+                (f", validation regex={self.regex}" if self.regex else ''))
+
     def parse(self, value):
         if not isinstance(value, str):
             raise ValueError(f"{self.name} should be a string")
@@ -296,6 +312,11 @@ class WKTArgument(Argument):
 
     def __eq__(self, other):
         return super().__eq__(other) and self.geometry_types == other.geometry_types
+
+    def __str__(self):
+        accepted_geometries = [g.__name__ for g in self.geometry_types]
+        return (super().__str__() +
+                (f", accepted geometries={accepted_geometries}" if accepted_geometries else ''))
 
     def parse(self, value):
         geometry = shapely.wkt.loads(value)
