@@ -37,7 +37,7 @@ class ArgumentParser():
         validated.
         """
         parsed_parameters = {}
-        recursion_stack = [arg for arg in self.arguments.values()]
+        recursion_stack = list(self.arguments.values())
         max_stack_size = 10000
 
         # Loop through the argument definitions and check that the
