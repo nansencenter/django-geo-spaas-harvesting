@@ -75,6 +75,15 @@ def save_results(searches_results):
             raise
 
 
+def print_providers(cli_arguments):
+    """Print each provider's description, notably the possible search
+    arguments
+    """
+    print('Available providers: ')
+    for provider in ProvidersConfiguration.from_file(cli_arguments.config_path).providers.values():
+        print(provider)
+
+
 def harvest(cli_arguments):
     """Reads the configuration files and harvests the searched data.
     If errors occur during the ingestion process (like the provider
@@ -102,6 +111,10 @@ def make_arg_parser():
                             help='Path to the configuration file')
 
     subparsers = arg_parser.add_subparsers()
+
+    list_subparser = subparsers.add_parser('list', help='List available providers')
+    list_subparser.set_defaults(func=print_providers)
+
     harvest_parser = subparsers.add_parser('harvest',
                                            help='Harvest data directly into the database')
     harvest_parser.add_argument('-s', '--search',
