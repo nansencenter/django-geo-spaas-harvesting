@@ -24,6 +24,11 @@ class ArgumentParser():
         self.add_arguments(arguments)
         self.strict = strict
 
+    def __str__(self):
+        result = ['available arguments:']
+        result.extend([str(arg) for arg in self.arguments.values()])
+        return '\n\t'.join(result)
+
     def add_arguments(self, arguments):
         """Adds or updates Arguments in the valid arguments"""
         for arg in arguments:
@@ -72,6 +77,7 @@ class Argument():
     In case there are arguments depending on another one, they can be
     listed as children. In that case, their 'parent' attribute is set
     """
+    type = 'unknown type'
 
     def __init__(self, name, **kwargs):
         self.name = name
@@ -88,6 +94,15 @@ class Argument():
             self.default == other.default and
             self.description == other.description
         )
+
+    def __str__(self):
+        return ', '.join(filter(None, (
+            f"{self.name}",
+            f"type={self.type}",
+            'required' if self.required else 'not required',
+            f"default={self.default}" if self.default is not NoDefault else '',
+            f"description={self.description}" if self.description else '',
+        )))
 
     def _set_parent(self, parent):
         """Define the parent of the current argument"""
@@ -107,12 +122,15 @@ class Argument():
 
 class AnyArgument(Argument):
     """Passthrough argument with no validation"""
+    type = 'any type'
+
     def parse(self, value):
         return value
 
 
 class BooleanArgument(Argument):
     """Boolean argument. Should be an explicit boolean"""
+    type = 'boolean'
 
     def parse(self, value):
         if isinstance(value, bool):
@@ -125,6 +143,8 @@ class ChoiceArgument(Argument):
     """Validates that the value of the argument is included in a list
     of valid options
     """
+    type = 'multiple choices'
+
     def __init__(self, name, **kwargs):
         self.valid_options = kwargs.pop('valid_options', [])
         super().__init__(name, **kwargs)
@@ -148,6 +168,7 @@ class DatetimeArgument(Argument):
     """Creates a Datetime from a string. If no timezone is specified,
     it is set as UTC.
     """
+    type = 'datetime'
 
     def parse(self, value):
         if value is None:
@@ -160,6 +181,7 @@ class DatetimeArgument(Argument):
 
 class DictArgument(Argument):
     """Dictionary argument"""
+    type = 'dictionary'
 
     def __init__(self, name, **kwargs):
         self.valid_keys = set(kwargs.pop('valid_keys', []))
@@ -181,6 +203,7 @@ class IntegerArgument(Argument):
     """Validates that the argument value is an integer, optionally
     comprised between a minimum and a maximum value
     """
+    type = 'integer'
 
     def __init__(self, name, **kwargs):
         self.min_value = kwargs.pop('min_value', None)
@@ -206,6 +229,7 @@ class IntegerArgument(Argument):
 
 class ListArgument(Argument):
     """Check that the value is a list"""
+    type = 'list'
 
     def parse(self, value):
         if not isinstance(value, list):
@@ -218,6 +242,7 @@ class PathArgument(ChoiceArgument):
     Only absolute paths are accepted.
     Subdirectories of the valid options are still valid.
     """
+    type = 'path'
     SEP = '/'
     path_re = re.compile(rf'^\.{{,2}}({SEP}[^{SEP}]*)*{SEP}?$')
 
@@ -244,6 +269,7 @@ class PathArgument(ChoiceArgument):
 
 class StringArgument(Argument):
     """String argument with optional regex validation"""
+    type = 'string'
 
     def __init__(self, name, **kwargs):
         self.regex = kwargs.pop('regex', None)
@@ -262,6 +288,7 @@ class StringArgument(Argument):
 
 class WKTArgument(Argument):
     """Creates a shapely geometry object from a WKT string"""
+    type = 'WKT'
 
     def __init__(self, name, **kwargs):
         self.geometry_types = kwargs.pop('geometry_types', None)
