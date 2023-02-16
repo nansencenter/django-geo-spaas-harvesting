@@ -74,6 +74,9 @@ class Provider(FilterMixin):
     def __repr__(self):
         return f"{self.__class__.__name__}(name={self.name}, username={self.username}, password=*)"
 
+    def __str__(self):
+        return f"{self.name} provider, {str(self.search_parameters_parser)}"
+
     def __eq__(self, other):
         return (
             type(self) is type(other) and
