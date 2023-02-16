@@ -7,9 +7,10 @@ from datetime import datetime, timezone as tz
 from pathlib import Path
 
 import geospaas_harvesting.config as config
-import geospaas_harvesting.crawlers as crawlers
-import geospaas_harvesting.providers as providers
-
+import geospaas_harvesting.providers.base as providers_base
+import geospaas_harvesting.providers.podaac as providers_podaac
+import geospaas_harvesting.providers.cmems as providers_cmems
+import geospaas_harvesting.providers.creodias as providers_creodias
 
 
 TEST_FILES_PATH = Path(__file__).parent / 'data' / 'configuration_files'
@@ -53,8 +54,8 @@ class ProvidersArgumentTestCase(unittest.TestCase):
         self.assertDictEqual(
             parsed_providers,
             {
-                'podaac': providers.podaac.PODAACProvider(name='podaac'),
-                'cmems': providers.cmems.CMEMSFTPProvider(
+                'podaac': providers_podaac.PODAACProvider(name='podaac'),
+                'cmems': providers_cmems.CMEMSFTPProvider(
                     name='cmems', username='user', password='pass'),
             })
 
@@ -76,7 +77,7 @@ class ProvidersConfigurationTestCase(unittest.TestCase):
         self.assertDictEqual(providers_config.pythesint_versions, {'gcmd_instrument': '9.1.5'})
         self.assertDictEqual(
             providers_config.providers,
-            {'creodias': providers.creodias.CreodiasProvider(name='creodias')}
+            {'creodias': providers_creodias.CreodiasProvider(name='creodias')}
         )
 
 
@@ -116,8 +117,8 @@ class SearchConfigurationTestCase(unittest.TestCase):
         self.assertListEqual(
             self.search_config.start_searches(),
             [
-                providers.base.SearchResults(
-                    crawler=providers.creodias.CreodiasEOFinderCrawler(
+                providers_base.SearchResults(
+                    crawler=providers_creodias.CreodiasEOFinderCrawler(
                         'https://finder.creodias.eu/resto/api/collections/Sentinel3/search.json',
                         search_terms={
                             'processingLevel': 'LEVEL2',

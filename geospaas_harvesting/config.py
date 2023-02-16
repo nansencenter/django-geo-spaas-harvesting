@@ -1,7 +1,18 @@
 """Configuration management"""
 import logging
 
-import geospaas_harvesting.providers as providers  # pylint: disable=wrong-import-position
+import geospaas_harvesting.providers.base as providers_base
+import geospaas_harvesting.providers.ceda as providers_ceda
+import geospaas_harvesting.providers.cmems as providers_cmems
+import geospaas_harvesting.providers.copernicus_scihub as providers_copernicus_scihub
+import geospaas_harvesting.providers.creodias as providers_creodias
+import geospaas_harvesting.providers.earthdata_cmr as providers_earthdata_cmr
+import geospaas_harvesting.providers.ftp as providers_ftp
+import geospaas_harvesting.providers.jaxa as providers_jaxa
+import geospaas_harvesting.providers.local as providers_local
+import geospaas_harvesting.providers.metno as providers_metno
+import geospaas_harvesting.providers.noaa as providers_noaa
+import geospaas_harvesting.providers.podaac as providers_podaac
 from .arguments import ArgumentParser, BooleanArgument, DictArgument, ListArgument
 from .utils import read_yaml_file
 
@@ -44,18 +55,18 @@ class ProvidersArgument(DictArgument):
     }
     """
     provider_types = {
-        'ceda': providers.ceda.CEDAProvider,
-        'cmems_ftp': providers.cmems.CMEMSFTPProvider,
-        'copernicus_scihub': providers.copernicus_scihub.CopernicusScihubProvider,
-        'creodias': providers.creodias.CreodiasProvider,
-        'earthdata_cmr': providers.earthdata_cmr.EarthDataCMRProvider,
-        'ftp': providers.ftp.FTPProvider,
-        'gportal_ftp': providers.jaxa.GPortalProvider,
-        'netcdf': providers.local.NetCDFProvider,
-        'nansat': providers.local.NansatProvider,
-        'metno': providers.metno.METNOProvider,
-        'noaa': providers.noaa.NOAAProvider,
-        'podaac': providers.podaac.PODAACProvider,
+        'ceda': providers_ceda.CEDAProvider,
+        'cmems_ftp': providers_cmems.CMEMSFTPProvider,
+        'copernicus_scihub': providers_copernicus_scihub.CopernicusScihubProvider,
+        'creodias': providers_creodias.CreodiasProvider,
+        'earthdata_cmr': providers_earthdata_cmr.EarthDataCMRProvider,
+        'ftp': providers_ftp.FTPProvider,
+        'gportal_ftp': providers_jaxa.GPortalProvider,
+        'netcdf': providers_local.NetCDFProvider,
+        'nansat': providers_local.NansatProvider,
+        'metno': providers_metno.METNOProvider,
+        'noaa': providers_noaa.NOAAProvider,
+        'podaac': providers_podaac.PODAACProvider,
     }
     valid_settings = {'type', 'username', 'password'}
 
@@ -94,7 +105,7 @@ class SearchConfiguration(Configuration):
 
     def __init__(self):
         self.providers = None
-        common_argument_parser = providers.base.Provider().search_parameters_parser
+        common_argument_parser = providers_base.Provider().search_parameters_parser
         self.config_arguments_parser = ArgumentParser([
             DictArgument(
                 'common', argument_parser=common_argument_parser),
