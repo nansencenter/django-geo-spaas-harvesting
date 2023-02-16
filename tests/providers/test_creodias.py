@@ -160,6 +160,14 @@ class CollectionArgumentTestCase(unittest.TestCase):
                 'Sentinel1': {'foo': {'fieldType': 'input', 'inputType': 'bar'}}
             })._get_collection_parameters('Sentinel1')
 
+    def test_str(self):
+        """Test string representation"""
+        self.assertEqual(
+            str(provider_creodias.CollectionArgument('collection',
+                                                     required=False,
+                                                     valid_options={'Sentinel1': {}})),
+            "collection, type=multiple choices, not required, valid options=['Sentinel1']")
+
 
 class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
     """Tests for CreodiasEOFinderCrawler"""
