@@ -47,6 +47,13 @@ class ArgumentParserTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             arg_parser.parse({'foo': 'bar', 'baz': 'qux'})
 
+    def test_str(self):
+        """Test the string representation"""
+        argument = arguments.AnyArgument('foo')
+        arg_parser = arguments.ArgumentParser([argument])
+        self.assertEqual(str(arg_parser), f"available arguments:\n\t{str(argument)}")
+
+
 class ArgumentTestCase(unittest.TestCase):
     """Tests for the Argument base class"""
 
@@ -63,6 +70,15 @@ class ArgumentTestCase(unittest.TestCase):
         self.assertNotEqual(arguments.Argument('foo'), arguments.Argument('bar'))
         self.assertNotEqual(arguments.Argument('foo', required=True),
                             arguments.Argument('foo', required=False))
+
+    def test_str(self):
+        """Test the string representation"""
+        self.assertEqual(
+            str(arguments.Argument('foo', required=True)),
+            'foo, type=unknown, required')
+        self.assertEqual(
+            str(arguments.Argument('foo', required=False, default='bar', description='baz')),
+            'foo, type=unknown, not required, default=bar, description=baz')
 
     def test_add_child(self):
         """Test adding a child to an argument"""
@@ -121,6 +137,12 @@ class ChoiceArgumentTestCase(unittest.TestCase):
         self.assertNotEqual(arguments.ChoiceArgument('foo', valid_options=['bar']),
                             arguments.ChoiceArgument('foo', valid_options=['baz']))
 
+    def test_str(self):
+        """Test the string representation"""
+        self.assertEqual(
+            str(arguments.ChoiceArgument('foo', required=True, valid_options=['bar'])),
+            "foo, type=multiple choices, required, valid options=['bar']")
+
 
 class DatetimeArgumentTestCase(unittest.TestCase):
     """Tests for the DatetimeArgument class"""
@@ -157,6 +179,15 @@ class DictArgumentTestCase(unittest.TestCase):
             arguments.DictArgument(name='foo', valid_keys=['bar']),
             arguments.DictArgument(name='foo', valid_keys=['baz']))
 
+    def test_str(self):
+        """Test the string representation"""
+        self.assertEqual(
+            str(arguments.DictArgument('foo', required=True)),
+            "foo, type=dictionary, required")
+        self.assertEqual(
+            str(arguments.DictArgument('foo', required=True, valid_keys=['bar'])),
+            "foo, type=dictionary, required, valid keys={'bar'}")
+
 
 class IntegerArgumentTestCase(unittest.TestCase):
     """Tests for the IntegerArgument class"""
@@ -180,6 +211,15 @@ class IntegerArgumentTestCase(unittest.TestCase):
                          arguments.IntegerArgument(name='foo', min_value=1, max_value=5))
         self.assertNotEqual(arguments.IntegerArgument(name='foo', min_value=1, max_value=5),
                             arguments.IntegerArgument(name='foo', min_value=1, max_value=6))
+
+    def test_str(self):
+        """Test the string representation"""
+        self.assertEqual(
+            str(arguments.IntegerArgument('foo', required=True)),
+            "foo, type=integer, required")
+        self.assertEqual(
+            str(arguments.IntegerArgument('foo', required=True, min_value=1, max_value=5)),
+            "foo, type=integer, required, minimum value=1, maximum value=5")
 
 
 class ListArgumentTestCase(unittest.TestCase):
@@ -238,6 +278,15 @@ class StringArgumentTestCase(unittest.TestCase):
         self.assertNotEqual(arguments.StringArgument(name='foo', regex='^bar.*$'),
                             arguments.StringArgument(name='foo', regex='^baz.*$'))
 
+    def test_str(self):
+        """Test the string representation"""
+        self.assertEqual(
+            str(arguments.StringArgument('foo', required=True)),
+            "foo, type=string, required")
+        self.assertEqual(
+            str(arguments.StringArgument('foo', required=True, regex='.*')),
+            "foo, type=string, required, validation regex=.*")
+
 
 class WKTArgumentTestCase(unittest.TestCase):
     """Tests for the WKTArgument class"""
@@ -259,3 +308,14 @@ class WKTArgumentTestCase(unittest.TestCase):
                          arguments.WKTArgument('foo', geometry_types=[shapely.geometry.Point]))
         self.assertNotEqual(arguments.WKTArgument('foo', geometry_types=[shapely.geometry.Point]),
                             arguments.WKTArgument('foo', geometry_types=[shapely.geometry.Polygon]))
+
+    def test_str(self):
+        """Test the string representation"""
+        self.assertEqual(
+            str(arguments.WKTArgument('foo', required=True)),
+            "foo, type=WKT string, required")
+        self.assertEqual(
+            str(arguments.WKTArgument('foo',
+                                      required=True,
+                                      geometry_types=[shapely.geometry.Point])),
+            "foo, type=WKT string, required, accepted geometries=['Point']")
