@@ -7,6 +7,9 @@ This application can be used to search for satellite or model data from various 
 metadata into a GeoSPaaS database. It relies on Django for data access. Specifically, it uses the
 models defined in [django-geo-spaas](https://github.com/nansencenter/django-geo-spaas).
 
+This readme explains the basic usage of this package.
+Documentation aimed at developers can be found [here](./dev.md).
+
 ## Interfaces
 
 The main interface is the CLI.
@@ -23,12 +26,13 @@ Example:
 python -m geospaas_harvesting.cli harvest
 ```
 
-#### Options
+#### Base options
 
 ##### -c, --config <path>
 
 Path to a custom configuration file can be specified.
 See [this section](#configyml) for more details.
+If not provided, the [default configuration](./geospaas_harvesting/config.yml) file is used.
 
 Example:
 
@@ -36,14 +40,9 @@ Example:
 python -m geospaas_harvesting.cli -c ./config.yml harvest
 ```
 
-##### -s, --search <path>
+##### -h, --help
 
-A path to a search configuration file.
-See [this section](#search-configuration) for more details.
-
-```shell
-python -m geospaas_harvesting.cli -c ./config.yml harvest -s ./search.yml
-```
+Prints the help message
 
 #### Subcommands
 
@@ -52,14 +51,29 @@ python -m geospaas_harvesting.cli -c ./config.yml harvest -s ./search.yml
 The `harvest` subcommand runs searches based on the `search.yml` file (example
 [here](./geospaas_harvesting/search.yml)) and ingests the results in the database.
 
-##### help
+###### -s, --search <path>
+
+A path to a search configuration file.
+See [this section](#search-configuration) for more details.
+
+```shell
+python -m geospaas_harvesting.cli -c ./config.yml harvest -s ./search.yml
+```
+
+##### list
+
+Display a list of the available providers and their search parameters.
+
+```shell
+python -m geospaas_harvesting.cli -c ./config.yml list
+```
 
 ### Web interface
 
 Not implemented yet.
 
 
-### Warning before starting the harvesting process
+## Warning before starting the harvesting process
 
 Before harvesting data, the database must be initialized with `Vocabulary` objects.
 The update can be done automatically and is controlled by the `update_vocabularies`, 
@@ -106,17 +120,29 @@ This file is used to set the search parametersfor each provider you wish to use.
 By default, the CLI looks for a file called `search.yml` in the folder from which the search/harvest
 command is run.
 
-
 It contains two sections:
 - **common**: dictionary of parameters which will be applied to all the searches, unless overriden
 - **searches**: a list of dictionaries, each containing search parameters suited to a provider.
   Each dictionary contained in that list must have the `provider_name` key defined.
 
+The `list` subcommand can be used to find out which search parameters each provider supports.
+The search parameters can have the following types:
+- **any type**: can be anything
+- **boolean**
+- **multiple choices**: choose one in a set of valid options
+- **datetime**: a string representing a date and time. Must be readable by [dateutil](https://dateutil.readthedocs.io/en/stable/index.html). Example: '2020-04-20T00:00:00Z'
+- **dictionary**: key-value mapping
+- **list**
+- **path**: string representing an absolute path
+- **string**
+- **WKT string**: string representing a geometry in the [WKT](https://libgeos.org/specifications/wkt/) format.
+
+Some providers define specific parameters types as needed.
+
 ##### Common parameters
 
 These search parameters can be used for every provider:
-- **start_time** and **end_time**: used to define the temporal coverage. Most usual date formats are
-  supported, for example `'2020-05-09T00:00:00Z'`
+- **start_time** and **end_time**: used to define the temporal coverage.
 - **location**: a WKT string defining a shape defining the spatial coverage.
 
 ##### Example
@@ -153,38 +179,3 @@ Generic configuration can be defined using environment variables:
 - `GEOSPAAS_DB_PASSWORD`: database password
 
 Other environment variables can be defined in the configuration files by using the `!ENV` tag.
-
-## Design
-
-### Components
-
-This application is composed of three main components:
-
-- providers: offer an interface to search for data. Use crawlers and ingester.
-- crawlers: explore data repositories and find the metadata of useful datasets
-- ingester: write metadata to the database
-
-More details below.
-
-#### Crawlers
-
-The role of crawlers is to explore a data repository and find the metadata of 
-relevant datasets.
-
-They are iterables which, given a data repository URL, return the metadata found
-when exploring this repository.
-
-To extract the relevant metadata from the raw metadata, most crawlers use the
-[metanorm](https://github.com/nansencenter/metanorm) library.
-
-#### Ingester
-
-The role of the ingester is to write to the database the metadata found by
-crawlers.
-
-The tasks of an ingester are primarily I/O bound, so they are multi-threaded.
-
-#### Providers
-
-The role of a Provider object is to offer an interface for searching through the
-data of a particular data provider (Creodias, CMEMS, NASA's PO.DAAC, etc.).
