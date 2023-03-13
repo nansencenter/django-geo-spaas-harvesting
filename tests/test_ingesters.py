@@ -64,7 +64,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.assertTrue(self.ingester._uri_exists(uri))
 
     def test_ingest_dataset(self):
-        """Test ingesting a dataset from a NormalizedDatasetInfo object"""
+        """Test ingesting a dataset from a DatasetInfo object"""
         parameters = [
             Parameter(standard_name='parameter', short_name='param', units='bananas'),
             Parameter(standard_name='parameter', short_name='param', units='apples'),
@@ -73,7 +73,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         for p in parameters:
             p.save()
 
-        dataset_info = crawlers.NormalizedDatasetInfo('some_url', {
+        dataset_info = crawlers.DatasetInfo('some_url', {
             'entry_title': 'title',
             'entry_id': 'id',
             'summary': 'sum-up',
@@ -146,12 +146,9 @@ class IngesterTestCase(django.test.TransactionTestCase):
 
     def test_ingest_same_uri_twice(self):
         """Ingestion of the same URI must not happen twice and the attempt must be logged"""
-
         uri = 'http://test.uri/dataset'
         dataset, _ = self._create_dummy_dataset('test')
         self._create_dummy_dataset_uri(uri, dataset)
-        # we get away with not using a NormalizedDatasetInfo because
-        # the ingestion is interrupted before it becomes a problem
         dataset_info = crawlers.DatasetInfo(uri, {})
 
         with self.assertLogs(self.ingester.logger, level=logging.INFO) as logger_cm:

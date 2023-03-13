@@ -32,18 +32,6 @@ from metanorm.normalizers.geospaas import GeoSPaaSMetadataNormalizer
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
-class InvalidMetadataError(Exception):
-    """Exception used when trying to instantiate a
-    NormalizedDatasetInfo object with invalid fields
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args)
-        self.missing_fields = set(kwargs.get('missing_fields', tuple()))
-
-    def __str__(self):
-        return f"Missing fields: {','.join(self.missing_fields)}"
-
-
 class Stop():
     """Class used in normalizing queues to signal that processing
     should stop
@@ -60,38 +48,6 @@ class DatasetInfo():
 
     def __eq__(self, other):
         return self.url == other.url and self.metadata == other.metadata
-
-
-class NormalizedDatasetInfo(DatasetInfo):
-    """DatasetInfo with validation that all fields are present at
-    instantiation
-    """
-    required_fields = {
-        'entry_title',
-        'entry_id',
-        'summary',
-        'time_coverage_start',
-        'time_coverage_end',
-        'platform',
-        'instrument',
-        'location_geometry',
-        'provider',
-        'iso_topic_category',
-        'gcmd_location',
-        'dataset_parameters',
-    }
-
-    def check_metadata(self):
-        """Check that the metadata attribute contains at least all
-        required fields
-        """
-        metadata_set = set(self.metadata)
-        if not self.required_fields.issubset(metadata_set):
-            raise InvalidMetadataError(missing_fields=self.required_fields-metadata_set)
-
-    def __init__(self, url, metadata=None):
-        super().__init__(url, metadata)
-        self.check_metadata()
 
 
 class Crawler():
@@ -169,8 +125,7 @@ class Crawler():
 
 
 class CrawlerIterator():
-    """Iterator for crawlers which returns NormalizedDatasetInfo
-    objects
+    """Iterator for crawlers which returns DatasetInfo objects
     """
     logger = logging.getLogger(__name__ + '.CrawlerIterator')
     QUEUE_SIZE = 500
@@ -281,7 +236,7 @@ class CrawlerIterator():
             self.logger.error("Could not get metadata for '%s'", dataset_info.url, exc_info=True)
             self._failed.put((dataset_info, error), block=True)
         else:
-            self._results.put(NormalizedDatasetInfo(dataset_info.url, normalized_attributes))
+            self._results.put(DatasetInfo(dataset_info.url, normalized_attributes))
 
     def _thread_manage_failed_normalizing(self):
         """Watches the `_failed` queue and put the incoming failed

@@ -20,22 +20,6 @@ import requests
 import geospaas_harvesting.crawlers as crawlers
 
 
-class InvalidMetadataErrorTestCase(unittest.TestCase):
-    """Tests for InvalidMetadataError"""
-    def test_instanciation(self):
-        """Test the correct creation of an InvalidMetadataError object"""
-        error = crawlers.InvalidMetadataError('message', missing_fields=('foo', 'bar'))
-        self.assertTupleEqual(error.args, ('message',))
-        self.assertSetEqual(error.missing_fields, {'foo', 'bar'})
-
-    def test_str(self):
-        """Test the string representation of a InvalidMetadataError object"""
-        string = str(crawlers.InvalidMetadataError(missing_fields=('foo', 'bar')))
-        # we use a set to store missing fields so it can come out in
-        # one order or the other
-        self.assertIn(string, ('Missing fields: foo,bar', 'Missing fields: bar,foo'))
-
-
 class DatasetInfoTestCase(unittest.TestCase):
     """Tests for DatasetInfo"""
 
@@ -44,46 +28,6 @@ class DatasetInfoTestCase(unittest.TestCase):
         dataset_info = crawlers.DatasetInfo('url', metadata={'foo': 'bar'})
         self.assertEqual(dataset_info.url, 'url')
         self.assertDictEqual(dataset_info.metadata, {'foo': 'bar'})
-
-
-class NormalizedDatasetInfo(unittest.TestCase):
-    """Tests for NormalizedDatasetInfo"""
-
-    def test_instanciation(self):
-        """Test the correct creation of a DatasetInfo object"""
-        with mock.patch(
-                'geospaas_harvesting.crawlers.NormalizedDatasetInfo.check_metadata'
-        ) as mock_check_metadata:
-            crawlers.NormalizedDatasetInfo('url', metadata={'foo': 'bar'})
-        mock_check_metadata.assert_called()
-
-    def test_check_metadata(self):
-        """Check that no exception is raised using correct metadata
-        """
-        metadata = {
-            'entry_title': 'title',
-            'entry_id': 'id',
-            'summary': 'sum-up',
-            'time_coverage_start': 'start time',
-            'time_coverage_end': 'end time',
-            'platform': 'satellite',
-            'instrument': 'sar',
-            'location_geometry': 'somewhere',
-            'provider': 'someone',
-            'iso_topic_category': 'ocean',
-            'gcmd_location': 'surface',
-            'dataset_parameters': ['params'],
-        }
-        try:
-            crawlers.NormalizedDatasetInfo('url', metadata)
-        except crawlers.InvalidMetadataError:
-            self.fail("InvalidMetadataError should not be raised")
-
-    def test_check_metadata_error(self):
-        """Test that an exception is raised in case of invalid metadata
-        """
-        with self.assertRaises(crawlers.InvalidMetadataError):
-            crawlers.NormalizedDatasetInfo('url', {'foo': 'bar'})
 
 
 class BaseCrawlerTestCase(unittest.TestCase):
@@ -210,14 +154,12 @@ class CrawlerIteratorTestCase(unittest.TestCase):
             if dataset_info.url == 'https://bar':
                 raise RuntimeError()
             elif dataset_info.url == 'https://baz':
-                return {}
+                # bypass the broad exception catch in
+                # _thread_get_normalized_attributes() to check handling
+                # of exceptions happening in that method
+                raise BaseException() # pylint: disable=broad-exception-raised
 
-            normalized_metadata = {
-                field: ''
-                for field in crawlers.NormalizedDatasetInfo.required_fields
-            }
-            normalized_metadata['summary'] = dataset_info.url
-            return normalized_metadata
+            return {'foo': 'bar'}
 
     def test_iterating(self):
         """Test iterating over normalization results"""
@@ -227,17 +169,11 @@ class CrawlerIteratorTestCase(unittest.TestCase):
             crawler_iterator.manager_thread.join()
 
         self.assertIs(scm.records[0].exc_info[0], RuntimeError)
-        self.assertIs(scm.records[1].exc_info[0], crawlers.InvalidMetadataError)
+        self.assertIs(scm.records[1].exc_info[0], BaseException)
 
         results = list(crawler_iterator)
 
-        self.assertListEqual(
-            results,
-            [
-                crawlers.NormalizedDatasetInfo(
-                    url, crawler.get_normalized_attributes(crawlers.DatasetInfo(url)))
-                for url in ['https://foo']#, 'https://bar', 'https://baz']
-            ])
+        self.assertListEqual(results, [crawlers.DatasetInfo('https://foo', {'foo': 'bar'})])
 
         failed_ingestion_files = os.listdir(self.tmp_dir)
         self.assertEqual(len(failed_ingestion_files), 1)

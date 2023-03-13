@@ -33,7 +33,7 @@ class Ingester():
 
     def _ingest_dataset(self, dataset_info):
         """Writes a dataset to the database based on its attributes and
-        URL. The input should be a NormalizedDatasetInfo object.
+        URL. The input should be a DatasetInfo object.
         """
         url = dataset_info.url
         normalized_attributes = dataset_info.metadata
