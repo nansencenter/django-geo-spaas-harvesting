@@ -111,11 +111,11 @@ class SearchConfigurationTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             config.SearchConfiguration().with_providers('foo')
 
-    def test_start_searches(self):
+    def test_create_provider_searches(self):
         """Test starting searches from a SearchConfiguration object
         """
         self.assertListEqual(
-            self.search_config.start_searches(),
+            self.search_config.create_provider_searches(),
             [
                 providers_base.SearchResults(
                     crawler=providers_creodias.CreodiasEOFinderCrawler(

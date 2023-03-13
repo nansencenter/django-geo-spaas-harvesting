@@ -92,7 +92,7 @@ def harvest(cli_arguments):
     config = ProvidersConfiguration.from_file(cli_arguments.config_path)
     search_config = SearchConfiguration.from_file(cli_arguments.search_path) \
                                        .with_providers(config.providers)
-    searches_results = search_config.start_searches()
+    searches_results = search_config.create_provider_searches()
 
     refresh_vocabularies(config)
     save_results(searches_results)

@@ -114,7 +114,7 @@ class SearchConfiguration(Configuration):
 
     def with_providers(self, providers):
         """Adds a dict of providers to the current object.
-        Needs to be called before the start_searches() method
+        Needs to be called before the create_provider_searches() method
         """
         if isinstance(providers, dict):
             self.providers = providers
@@ -122,8 +122,9 @@ class SearchConfiguration(Configuration):
             raise ValueError("Need a dictionary")
         return self
 
-    def start_searches(self):
-        """Starts a search for each of the provider specific searches
+    def create_provider_searches(self):
+        """Creates a SearchResults object for each of the provider
+        specific searches
         """
         searches = []
         for provider_search in self.searches:  # pylint: disable=no-member
