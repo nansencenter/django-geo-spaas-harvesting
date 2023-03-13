@@ -2,19 +2,15 @@
 import logging
 import tempfile
 import unittest.mock as mock
+from datetime import datetime
 from pathlib import Path
 
 import django.test
 import requests
 
+import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.recovery as recovery
-
-
-class PickableMock(mock.MagicMock):
-    """MagicMock class that can be pickled"""
-    def __reduce__(self):
-        return (mock.MagicMock, ())
 
 
 class IngestionRecoveryTestCase(django.test.TestCase):
@@ -23,7 +19,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
     def setUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
         mock.patch(
-            'geospaas_harvesting.ingesters.Ingester.FAILED_INGESTIONS_PATH',
+            'geospaas_harvesting.crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH',
             self.tmp_dir.name
         ).start()
 
@@ -33,20 +29,16 @@ class IngestionRecoveryTestCase(django.test.TestCase):
 
     def generate_recovery_file(self, exception_type, errors_count=1):
         """Generate recovery file"""
-        with mock.patch('geospaas.catalog.models.Parameter.objects.count', return_value=2):
-            ingester = ingesters.Ingester()
-
-        with mock.patch.object(ingester, '_get_normalized_attributes',
-                               new_callable=PickableMock,
-                               side_effect=exception_type()):
-            datasets = [(f'http://foo{i}', f'bar{i}') for i in range(errors_count)]
-            # put errors in the queue
-            with self.assertLogs(ingester.LOGGER):
-                for url, info in datasets:
-                    ingester._thread_get_normalized_attributes(url, info)
-                ingester._failed.put(None)  # need to satisfy the stop condition
-                # read errors from the queue
-                ingester._thread_manage_failed_ingestions()
+        crawler_iterator = crawlers.CrawlerIterator(mock.Mock(), [])
+        to_pickle = [
+            (crawlers.DatasetInfo(f'http://foo{i}'), exception_type(f'bar{i}'))
+            for i in range(errors_count)
+        ]
+        date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
+        # the assertion is just to remove the logs from the output
+        with self.assertLogs(crawler_iterator.logger):
+            crawler_iterator._pickle_list_elements(
+                to_pickle, Path(self.tmp_dir.name, f"{date}_{crawler_iterator.RECOVERY_SUFFIX}"))
 
     def test_ingest_file(self):
         """Test ingesting a recovery file"""
@@ -61,7 +53,8 @@ class IngestionRecoveryTestCase(django.test.TestCase):
             with self.assertLogs(recovery.logger, level=logging.INFO):
                 recovery.ingest_file(recovery_file)
 
-        mock_ingest.assert_called_once_with([f'bar{i}' for i in range(2)])
+        mock_ingest.assert_called_once_with([crawlers.DatasetInfo(f'http://foo{i}')
+                                             for i in range(2)])
         self.assertFalse(recovery_file.exists())
 
     def test_ingest_file_nothing_to_ingest(self):
@@ -142,7 +135,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
         # generated when processing the first one
         self.assertEqual(len(mock_ingest_file.call_args_list), 2)
         self.assertTrue(all([
-            call[1][0].name.endswith(ingesters.Ingester.RECOVERY_SUFFIX)
+            call[1][0].name.endswith(crawlers.CrawlerIterator.RECOVERY_SUFFIX)
             for call in mock_ingest_file.mock_calls]))
         mock_sleep.assert_called_once_with(60)
 

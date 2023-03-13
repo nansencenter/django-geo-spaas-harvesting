@@ -1,6 +1,8 @@
 """Utilities module for geospaas_harvesting"""
+import os
 
 import requests
+import yaml
 from urllib.parse import urlparse
 
 
@@ -36,3 +38,23 @@ def http_request(http_method, *args, **kwargs):
             return session.request(http_method, *args, **kwargs)
     else:
         return requests.request(http_method, *args, **kwargs)
+
+
+class EnvTag(yaml.YAMLObject):
+    """class for reading the tags of yml file for finding the value of
+    environment variables
+    """
+    yaml_tag = u'!ENV'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return os.getenv(node.value)
+
+
+def read_yaml_file(config_path):
+    """Loads the harvesting configuration from a file"""
+    yaml.SafeLoader.add_constructor('!ENV', EnvTag.from_yaml)
+    data = None
+    with open(config_path, 'rb') as config_stream:
+        data = yaml.safe_load(config_stream)
+    return data

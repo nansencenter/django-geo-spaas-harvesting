@@ -1,0 +1,52 @@
+# default configuration file
+---
+update_vocabularies: True
+update_pythesint: True
+providers:
+  ceda:
+    type: 'ceda'
+    username: 'anonymous'
+    password: ''
+  cmems:
+    type: 'cmems_ftp'
+    username: !ENV CMEMS_USERNAME
+    password: !ENV CMEMS_PASSWORD
+  cmems_in_situ:
+    type: 'netcdf'
+    longitude_attribute: 'LONGITUDE'
+    latitude_attribute: 'LATITUDE'
+  scihub:
+    type: 'copernicus_scihub'
+    username: !ENV COPERNICUS_OPEN_HUB_USERNAME
+    password: !ENV COPERNICUS_OPEN_HUB_PASSWORD
+  creodias:
+    type: 'creodias'
+  earthdata_cmr:
+    type: 'earthdata_cmr'
+  gportal:
+    type: 'gportal_ftp'
+    username: !ENV JAXA_USERNAME
+    password: !ENV JAXA_PASSWORD
+  sla_aviso:
+    type: 'netcdf'
+    longitude_attribute: 'longitude'
+    latitude_attribute: 'latitude'
+  metno:
+    type: 'metno'
+  noaa:
+    type: 'noaa'
+    username: !ENV JAXA_USERNAME
+    password: !ENV JAXA_PASSWORD
+  podaac:
+    type: 'podaac'
+  cpom:
+    type: 'netcdf'
+    longitude_attribute: 'lon'
+    latitude_attribute: 'lat'
+  nansat:
+    type: 'nansat'
+  nextsim:
+    type: 'netcdf'
+    longitude_attribute: 'longitude'
+    latitude_attribute: 'latitude'
+...
