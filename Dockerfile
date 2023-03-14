@@ -7,7 +7,8 @@ RUN pip install --upgrade --no-cache-dir \
     https://github.com/nansencenter/metanorm/releases/download/${METANORM_VERSION}/metanorm-${METANORM_VERSION}-py3-none-any.whl \
     'feedparser==6.0.*' \
     'graypy==2.1.*' \
-    'requests_oauthlib==1.3.*'
+    'requests_oauthlib==1.3.*' \
+    'tblib'
 
 RUN python -c 'import pythesint; pythesint.update_all_vocabularies( \
 { \
@@ -31,7 +32,7 @@ RUN python -c 'import pythesint; pythesint.update_all_vocabularies( \
 
 FROM base
 
-ARG GEOSPAAS_HARVESTING_RELEASE '0.0.0dev'
+ARG GEOSPAAS_HARVESTING_RELEASE='0.0.0dev'
 WORKDIR /tmp/setup
 COPY setup.py README.md ./
 COPY geospaas_harvesting ./geospaas_harvesting

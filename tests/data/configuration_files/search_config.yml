@@ -1,0 +1,8 @@
+---
+common: {}
+searches:
+  - provider_name: 'creodias'
+    collection: 'Sentinel3'
+    processingLevel: 'LEVEL2'
+    start_time: '2023-01-01'
+    end_time: '2023-01-02'

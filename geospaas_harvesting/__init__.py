@@ -1,8 +1,6 @@
+"""This module provides means to gather metadata about various datasets
+into the GeoSPaaS catalog
 """
-This module provides means to gather metadata about various Datasets into the GeoSPaaS catalog
-"""
-#TODO: review docstrings in the whole package
-
 import logging.config
 import os
 import os.path
@@ -15,13 +13,10 @@ LOGGING_CONF_FILE = os.getenv('GEOSPAAS_HARVESTING_LOG_CONF_PATH', DEFAULT_LOGGI
 try:
     with open(LOGGING_CONF_FILE, 'rb') as stream:
         logging_configuration = yaml.safe_load(stream)  # pylint: disable=invalid-name
-except FileNotFoundError:
+except FileNotFoundError:  # pragma: no cover
     print(f"'{LOGGING_CONF_FILE}' does not exist, logging can't be configured.", file=sys.stderr)
     logging_configuration = None  # pylint: disable=invalid-name
 
 if logging_configuration:
-    log_level_value = os.getenv('LOG_LEVEL', default=None)
-    if log_level_value:
-        logging_configuration['loggers']['geospaas_harvesting']['level'] = int(log_level_value)
     logging.config.dictConfig(logging_configuration)
     logging.captureWarnings(True)

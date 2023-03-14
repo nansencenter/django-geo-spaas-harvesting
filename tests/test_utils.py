@@ -1,5 +1,5 @@
 """Tests for the geospaas_harvesting.utils module"""
-
+import io
 import unittest
 import unittest.mock as mock
 
@@ -49,3 +49,16 @@ class UtilsTestCase(unittest.TestCase):
                 'response'
             )
             mock_request.assert_called_once_with('GET', 'url', stream=True)
+
+    def test_yaml_parsing(self):
+        """Test YAML parsing with environment variable retrieval"""
+        yaml_content="""---
+        foo: bar
+        baz: !ENV ENV_VAR
+        """
+        buffer = io.StringIO(yaml_content)
+        with mock.patch('builtins.open', return_value=buffer), \
+             mock.patch('os.environ', {'ENV_VAR': 'qux'}):
+            self.assertDictEqual(
+                utils.read_yaml_file(''),
+                {'foo': 'bar', 'baz': 'qux'})

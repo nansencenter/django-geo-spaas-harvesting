@@ -3,52 +3,270 @@ A set of crawlers used to explore data provider interfaces and get resources URL
 should inherit from the Crawler class and implement the abstract methods defined in Crawler.
 """
 import calendar
+import concurrent.futures
 import ftplib
 import functools
-import json
+import io
 import logging
 import os
 import os.path
+import pickle
+import queue
 import re
-from datetime import datetime, timedelta
+import threading
+import time
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
-import feedparser
 import requests
 
 import geospaas_harvesting.utils as utils
+import geospaas.catalog.managers as catalog_managers
+
+from metanorm.handlers import MetadataHandler
+from metanorm.normalizers.geospaas import GeoSPaaSMetadataNormalizer
+
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+
+class Stop():
+    """Class used in normalizing queues to signal that processing
+    should stop
+    """
+
+
+class DatasetInfo():
+    """Class used to store dataset information coming from crawled repositories
+    url is a string, metadata is a dict
+    """
+    def __init__(self, url, metadata=None):
+        self.url = url
+        self.metadata = metadata
+
+    def __eq__(self, other):
+        return self.url == other.url and self.metadata == other.metadata
 
 
 class Crawler():
     """Base Crawler class"""
 
-    LOGGER = logging.getLogger(__name__ + '.Crawler')
+    logger = logging.getLogger(__name__ + '.Crawler')
 
+    def __init__(self, max_threads=1):
+        self._metadata_handler = MetadataHandler(GeoSPaaSMetadataNormalizer)
+        self.max_threads = max_threads
+
+    # ------------- crawl ------------
     def __iter__(self):
-        raise NotImplementedError('The __iter__() method was not implemented')
+        return CrawlerIterator(self, self.crawl(), max_threads=self.max_threads)
+
+    def crawl(self):
+        """Generator which crawls through a dataset repository and yields
+        DatasetInfo objects
+        """
+        raise NotImplementedError()
 
     def set_initial_state(self):
         """
         This method should set the crawler's attributes which are used for iterating in their
         initial state. Child classes must implement this method so that the crawler can be reused
         """
-        raise NotImplementedError('The set_initial_state() method was not implemented')
+        raise NotImplementedError()
 
     @classmethod
     def _http_get(cls, url, request_parameters=None):
         """Returns the contents of a Web page as a string"""
-        html_page = ''
-        cls.LOGGER.debug("Getting page: '%s'", url)
+        cls.logger.debug("Getting page: '%s'", url)
+
+        max_tries = 5
+        wait_time = 30
+        for try_index in range(max_tries):
+            try:
+                response = utils.http_request('GET', url, **request_parameters or {})
+                response.raise_for_status()
+                return response.text
+            except (requests.ConnectionError, requests.HTTPError, requests.Timeout) as error:
+                # retry only for connection errors and HTTP errors 5**
+                if (isinstance(error, requests.HTTPError) and
+                        (error.response.status_code < 500 or error.response.status_code > 599)):
+                    cls.logger.error('Could not get page', exc_info=True)
+                    return None
+                cls.logger.warning('Error while sending request to %s, %d retries left',
+                                   url, max_tries - try_index - 1, exc_info=True)
+            except requests.exceptions.RequestException:
+                # don't retry
+                cls.logger.error('Could not get page', exc_info=True)
+                return None
+
+            time.sleep(wait_time)
+            wait_time *= 2
+
+        cls.logger.error('Max retries reached for %s', url)
+        return None
+
+    # --------- get metadata ---------
+    def get_normalized_attributes(self, dataset_info, **kwargs):
+        """
+        Returns a dictionary of normalized attribute which characterize a Dataset. It should
+        contain the following extra entries: `geospaas_service` and `geospaas_service_name`, which
+        should respectively contain the `service` and `service_name` values necessary to create a
+        DatasetURI object.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def add_url(url, raw_attributes):
+        """Utility method to add the dataset's URL to the raw attributes in case it is not there"""
+        if 'url' not in raw_attributes:
+            raw_attributes['url'] = url
+
+
+class CrawlerIterator():
+    """Iterator for crawlers which returns DatasetInfo objects
+    """
+    logger = logging.getLogger(__name__ + '.CrawlerIterator')
+    QUEUE_SIZE = 500
+    FAILED_INGESTIONS_PATH = os.getenv(
+        'GEOSPAAS_FAILED_INGESTIONS_DIR',
+        os.path.join('/', 'var', 'run', 'geospaas'))
+    MAX_FAILED = 500000  # max number of failed objects per recovery file
+    RECOVERY_SUFFIX = 'failed_ingestions.pickle'
+
+    def __init__(self, crawler, dataset_infos, max_threads=1):
+        """Initializes the iterator and creates a managing thread which
+        will in turn spawn normalization threads
+        """
+        self.crawler = crawler
+        self.dataset_infos = dataset_infos
+        self.max_threads = max_threads
+
+        self._results = queue.Queue(self.QUEUE_SIZE)
+        self._failed = queue.Queue(self.QUEUE_SIZE)
+
+        self.main_thread = threading.current_thread()
+        self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
+        self.manager_thread.start()
+
+    def __del__(self):
+        """Make sure the managing thread is done before destroying the
+        iterator
+        """
+        if self.main_thread == threading.current_thread():
+            self.manager_thread.join()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        """Gets the next result from the _results queue"""
+        next_result = self._results.get()
+        if next_result is Stop:
+            raise StopIteration()
+        else:
+            return next_result
+
+    def _pickle_list_elements(self, list_to_pickle, pickle_path):
+        """Pickle all the elements in the list, then empty it"""
+        self.logger.info("Dumping items to %s", pickle_path)
+        with open(pickle_path, 'ab') as pickle_file:
+            for element_to_pickle in list_to_pickle:
+                pickle.dump(element_to_pickle, pickle_file)
+        list_to_pickle.clear()
+
+    def _start_normalizing(self, **kwargs):
+        """Iterate over the DatasetInfo objects obtained from the crawler and
+        normalize the attributes. Normalizing happens in separate threads to
+        parallelize the I/Os.
+        """
+        # Launch thread which checks the size of the failed ingestions
+        # queue and dumps it to disk when necessary
+        failed_queue_thread = threading.Thread(target=self._thread_manage_failed_normalizing)
+        failed_queue_thread.start()
+
         try:
-            response = utils.http_request('GET', url, **request_parameters or {})
-            response.raise_for_status()
-            html_page = response.text
-        except requests.exceptions.RequestException:
-            cls.LOGGER.error('Could not get page', exc_info=True)
-        return html_page
+            # Launch normalizing threads
+            with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=self.max_threads,
+                    thread_name_prefix=self.__class__.__name__) as executor:
+                futures = []
+                for dataset_info in self.dataset_infos:
+                    futures.append(executor.submit(
+                        self._thread_get_normalized_attributes,
+                        dataset_info,
+                        **kwargs
+                    ))
+        except KeyboardInterrupt:
+            self.logger.info('Normalizing thread received stopping signal')
+            for future in reversed(futures):
+                future.cancel()
+            self.logger.info(
+                'Cancelled future normalizing threads')
+        finally:
+            self.logger.debug("Normalizing threads are done")
+            self._results.put(Stop)
+            self.logger.debug('Stopping failed queue watcher thread')
+            self._failed.put(Stop)
+            failed_queue_thread.join()
+
+            # raise exceptions from threads
+            for future in concurrent.futures.as_completed(futures):
+                exception = future.exception()
+                if exception:
+                    self.logger.error(
+                        "Exception happened during thread",
+                        exc_info=exception)
+
+    def _thread_get_normalized_attributes(self, dataset_info, **kwargs):
+        """
+        Gets the attributes needed to insert a dataset into the
+        database from its URL, and puts a dictionary containing these
+        attributes in the results queue.
+        If an error occurs while retrieving the attributes, the dataset
+        info and the exception are put in the _failed queue for
+        processing by the dedicated thread.
+        This method is meant to be run in a thread.
+        """
+        self.logger.debug("Getting metadata for '%s'", dataset_info.url)
+        try:
+            normalized_attributes = self.crawler.get_normalized_attributes(dataset_info, **kwargs)
+        except Exception as error:  # pylint: disable=broad-except
+            self.logger.error("Could not get metadata for '%s'", dataset_info.url, exc_info=True)
+            self._failed.put((dataset_info, error), block=True)
+        else:
+            self._results.put(DatasetInfo(dataset_info.url, normalized_attributes))
+
+    def _thread_manage_failed_normalizing(self):
+        """Watches the `_failed` queue and put the incoming failed
+        elements in a list. When the list reaches its maximum size or
+        when None is received, dump the contents of the list to a file.
+        This method is meant to be run in a thread.
+        """
+        self.logger.debug("Starting failure management thread")
+        class_name = self.__class__.__name__.lower()
+        date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
+        pickle_path = os.path.join(self.FAILED_INGESTIONS_PATH,
+                                   f'{class_name}_{date}_{self.RECOVERY_SUFFIX}')
+
+        os.makedirs(self.FAILED_INGESTIONS_PATH, exist_ok=True)
+
+        failed_ingestions = []
+        while True:
+            element = self._failed.get()
+
+            if element is Stop:
+                self.logger.debug("Stopping failure management thread")
+                if failed_ingestions:
+                    self._pickle_list_elements(failed_ingestions, pickle_path)
+                self._failed.task_done()
+                break
+
+            failed_ingestions.append(element)
+            if len(failed_ingestions) >= self.MAX_FAILED:
+                self._pickle_list_elements(failed_ingestions, pickle_path)
+            self._failed.task_done()
 
 
 class LinkExtractor(HTMLParser):
@@ -56,7 +274,7 @@ class LinkExtractor(HTMLParser):
     HTML parser which extracts links from an HTML page
     """
 
-    LOGGER = logging.getLogger(__name__ + '.LinkExtractor')
+    logger = logging.getLogger(__name__ + '.LinkExtractor')
 
     def __init__(self):
         """Constructor with extra attribute definition"""
@@ -65,7 +283,7 @@ class LinkExtractor(HTMLParser):
 
     def error(self, message):
         """Error behavior"""
-        self.LOGGER.error(message)
+        self.logger.error(message)
 
     def feed(self, data):
         """Reset links lists when new data is fed to the parser"""
@@ -85,9 +303,8 @@ class LinkExtractor(HTMLParser):
                     self._links.append(attr[1])
 
 
-class WebDirectoryCrawler(Crawler):
+class DirectoryCrawler(Crawler):
     """Parent class for crawlers used on repositories which expose a directory-like structure"""
-    LOGGER = None
     EXCLUDE = None
 
     YEAR_PATTERN = r'y?(?P<year>\d{4})'
@@ -101,7 +318,7 @@ class WebDirectoryCrawler(Crawler):
         f'^.*/{YEAR_PATTERN}/?{MONTH_PATTERN}/?{DAY_OF_MONTH_PATTERN}(/.*)?$')
     DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}(/.*)?$')
 
-    def __init__(self, root_url, time_range=(None, None), include=None):
+    def __init__(self, root_url, time_range=(None, None), include=None, max_threads=1):
         """
         `root_url` is the URL of the data repository to explore.
         `time_range` is a 2-tuple of datetime.datetime objects defining the time range
@@ -109,16 +326,24 @@ class WebDirectoryCrawler(Crawler):
         `include` is a regular expression string used to filter the crawler's output.
         Only URLs matching it are returned.
         """
+        super().__init__(max_threads)
         self.root_url = urlparse(root_url)
         self.time_range = time_range
         self.include = re.compile(include) if include else None
         self.set_initial_state()
+
+    def __eq__(self, other):
+        return (
+            self.root_url == other.root_url and
+            self.time_range == other.time_range and
+            self.include == other.include)
 
     @property
     def base_url(self):
         """Get the root URL without the path"""
         return f"{self.root_url.scheme}://{self.root_url.netloc}"
 
+    # ------------- crawl ------------
     def set_initial_state(self):
         """
         The `_urls` attribute contains URLs to the resources which
@@ -126,30 +351,24 @@ class WebDirectoryCrawler(Crawler):
         The `_to_process` attribute contains URLs to pages which
         need to be searched for resources.
         """
-        self._urls = []
+        self._results = []
         self._to_process = [self.root_url.path.rstrip('/')]
 
-    def __iter__(self):
-        """Make the crawler iterable"""
-        return self
-
-    def __next__(self):
-        """Make the crawler an iterator"""
-        try:
-            # Return all resource URLs from the previously processed folder
-            result = self._urls.pop()
-        except IndexError:
-            # If no more URLs from the previously processed folder are available,
-            # process the next one
+    def crawl(self):
+        while True:
             try:
-                self._process_folder(self._to_process.pop())
-                result = self.__next__()
+                # Return all resource URLs from the previously processed folder
+                yield self._results.pop()
             except IndexError:
-                raise StopIteration
-        return result
+                # If no more URLs from the previously processed folder are available,
+                # process the next one
+                try:
+                    self._process_folder(self._to_process.pop())
+                except IndexError:
+                    break
 
     @classmethod
-    def _folder_coverage(cls, folder_path):
+    def _folder_coverage(cls, folder_path, time_zone=timezone.utc):
         """
         Find out if the folder has date info in its path.
         The maximum resolution is one day.
@@ -169,7 +388,8 @@ class WebDirectoryCrawler(Crawler):
             folder_coverage_start = datetime(
                 int(match_day.group('year')),
                 int(match_day.group('month')),
-                int(match_day.group('day')))
+                int(match_day.group('day')),
+                tzinfo=time_zone)
             folder_coverage_stop = folder_coverage_start + timedelta(days=1)
             return (folder_coverage_start, folder_coverage_stop)
 
@@ -177,7 +397,8 @@ class WebDirectoryCrawler(Crawler):
         if match_day_of_year:
             offset = timedelta(int(match_day_of_year.group('day')) - 1)
             folder_coverage_start = datetime(
-                int(match_day_of_year.group('year')), 1, 1) + offset
+                int(match_day_of_year.group('year')), 1, 1,
+                tzinfo=time_zone) + offset
             folder_coverage_stop = folder_coverage_start + timedelta(days=1)
             return (folder_coverage_start, folder_coverage_stop)
 
@@ -186,17 +407,23 @@ class WebDirectoryCrawler(Crawler):
             last_day_of_month = calendar.monthrange(
                 int(match_month.group('year')), int(match_month.group('month')))[1]
             folder_coverage_start = datetime(
-                int(match_month.group('year')), int(match_month.group('month')), 1)
+                int(match_month.group('year')),
+                int(match_month.group('month')),
+                1,
+                tzinfo=time_zone)
             folder_coverage_stop = datetime(
                 int(match_month.group('year')),
                 int(match_month.group('month')),
-                last_day_of_month) + timedelta(days=1)
+                last_day_of_month,
+                tzinfo=time_zone) + timedelta(days=1)
             return (folder_coverage_start, folder_coverage_stop)
 
         match_year = cls.YEAR_MATCHER.search(folder_path)
         if match_year:
-            folder_coverage_start = datetime(int(match_year.group('year')), 1, 1)
-            folder_coverage_stop = datetime(int(match_year.group('year')) + 1, 1, 1)
+            folder_coverage_start = datetime(int(match_year.group('year')), 1, 1,
+                                             tzinfo=time_zone)
+            folder_coverage_stop = datetime(int(match_year.group('year')) + 1, 1, 1,
+                                            tzinfo=time_zone)
             return (folder_coverage_start, folder_coverage_stop)
 
         return (folder_coverage_start, folder_coverage_stop)
@@ -214,29 +441,34 @@ class WebDirectoryCrawler(Crawler):
 
     def _list_folder_contents(self, folder_path):
         """Lists the contents of a folder. Should return absolute paths"""
-        raise NotImplementedError("_list_folder_contents is abstract in WebDirectoryCrawler")
+        raise NotImplementedError()
 
     def _is_folder(self, path):
         """Returns True if path points to a folder"""
-        raise NotImplementedError("_is_folder is abstract in WebDirectoryCrawler")
+        raise NotImplementedError()
+
+    def get_download_url(self, path):
+        """Get the download URL from a path in the repository
+        """
+        return urljoin(self.base_url, path)
 
     def _add_url_to_return(self, path):
         """
         Add a URL to the list of URLs returned by the crawler after
         checking that it fits inside the crawler's time range.
         """
-        resource_url = urljoin(self.base_url, path)
-        download_url = self.get_download_url(resource_url)
+        download_url = self.get_download_url(path)
         if download_url is not None:
-            if download_url not in self._urls:
-                self.LOGGER.debug("Adding '%s' to the list of resources.", download_url)
-                self._urls.append(download_url)
+            dataset_info = DatasetInfo(download_url)
+            if dataset_info not in self._results:
+                self.logger.debug("Adding '%s' to the list of resources.", dataset_info)
+                self._results.append(dataset_info)
 
     def _add_folder_to_process(self, path):
         """Add a folder to the list of folder which will be explored later"""
         if self._intersects_time_range(*self._folder_coverage(path)):
             if path not in self._to_process:
-                self.LOGGER.debug("Adding '%s' to the list of pages to process.", path)
+                self.logger.debug("Adding '%s' to the list of pages to process.", path)
                 self._to_process.append(path)
 
     def _process_folder(self, folder_path):
@@ -244,7 +476,7 @@ class WebDirectoryCrawler(Crawler):
         Get the contents of a folder and feed the _urls (based on includes) and _to_process
         attributes
         """
-        self.LOGGER.info("Looking for resources in '%s'...", folder_path)
+        self.logger.debug("Looking for resources in '%s'...", folder_path)
         for path in self._list_folder_contents(folder_path):
             # deselect paths which contains any of the excludes strings
             if self.EXCLUDE and self.EXCLUDE.search(path):
@@ -255,21 +487,17 @@ class WebDirectoryCrawler(Crawler):
             if self.include and self.include.search(path):
                 self._add_url_to_return(path)
 
-    def get_download_url(self, resource_url):
-        """
-        Get a download link from a resource URL, in case the URL found
-        by the crawler is not a direct download link.
-        By default, it just returns the ressource URL and can be
-        overridden in the child classes if necessary.
-        """
-        return resource_url
+    # --------- get metadata ---------
+    def get_normalized_attributes(self, dataset_info, **kwargs):
+        raise NotImplementedError()
 
 
-class LocalDirectoryCrawler(WebDirectoryCrawler):
+class LocalDirectoryCrawler(DirectoryCrawler):
     """Crawl through the contents of a local folder"""
 
-    LOGGER = logging.getLogger(__name__ + '.LocalDirectoryCrawler')
+    logger = logging.getLogger(__name__ + '.LocalDirectoryCrawler')
 
+    # ------------- crawl ------------
     def _list_folder_contents(self, folder_path):
         if self._is_folder(folder_path):
             return [os.path.join(folder_path, file_path) for file_path in os.listdir(folder_path)]
@@ -280,12 +508,19 @@ class LocalDirectoryCrawler(WebDirectoryCrawler):
     def _is_folder(self, path):
         return os.path.isdir(path)
 
+    # --------- get metadata ---------
+    def get_normalized_attributes(self, dataset_info, **kwargs):
+        raise NotImplementedError()
 
-class HTMLDirectoryCrawler(WebDirectoryCrawler):
+
+class HTMLDirectoryCrawler(DirectoryCrawler):
     """Implementation of WebDirectoryCrawler for repositories exposed as HTML pages."""
+
+    logger = logging.getLogger(__name__ + '.HTMLDirectoryCrawler')
 
     FOLDERS_SUFFIXES = None
 
+    # ------------- crawl ------------
     @staticmethod
     def _strip_folder_page(folder_path):
         """
@@ -301,7 +536,7 @@ class HTMLDirectoryCrawler(WebDirectoryCrawler):
     def _get_links(cls, html):
         """Returns the list of links contained in an HTML page, passed as a string"""
         parser = LinkExtractor()
-        cls.LOGGER.debug("Parsing HTML data.")
+        cls.logger.debug("Parsing HTML data.")
         parser.feed(html)
         return parser.links
 
@@ -326,28 +561,120 @@ class HTMLDirectoryCrawler(WebDirectoryCrawler):
         stripped_folder_path = self._strip_folder_page(folder_path)
         return self._prepend_parent_path(stripped_folder_path, self._get_links(html))
 
+    # --------- get metadata ---------
+    def get_normalized_attributes(self, dataset_info, **kwargs):
+        raise NotImplementedError()
+
 
 class OpenDAPCrawler(HTMLDirectoryCrawler):
     """
     Crawler for harvesting the data of OpenDAP
     """
-    LOGGER = logging.getLogger(__name__ + '.OpenDAPCrawler')
+    logger = logging.getLogger(__name__ + '.OpenDAPCrawler')
     FOLDERS_SUFFIXES = ('/contents.html',)
     EXCLUDE = re.compile(r'\?')
+    GLOBAL_ATTRIBUTES_NAME = 'NC_GLOBAL'
+    NAMESPACE_REGEX = r'^\{(\S+)\}Dataset$'
+
+    # --------- get metadata ---------
+    def _get_xml_namespace(self, root):
+        """Try to get the namespace for the XML tag in the document from the root tag"""
+        try:
+            namespace_prefix = re.match(self.NAMESPACE_REGEX, root.tag)[1]  # first matched group
+        except TypeError:
+            namespace_prefix = ''
+            self.logger.warning('Could not find XML namespace while reading DDX metadata')
+        return namespace_prefix
+
+    def _extract_attributes(self, root):
+        """
+        Extracts the global or specific attributes of a dataset or specific ones from a DDX document
+
+        "x_path_global" is pointing to the 'NC_GLOBAL' part of response of the DDX document to
+        obtain general information.
+        "x_path_specific" is used to extract the dataset parameter names from the DDX document.
+        """
+        self.logger.debug("Getting the dataset's global attributes.")
+        namespaces = {'default': self._get_xml_namespace(root)}
+        extracted_attributes = {}
+        x_path_global = "./default:Attribute[@name='NC_GLOBAL']/default:Attribute"
+        x_path_specific = "./default:Grid/default:Attribute[@name='standard_name']"
+        # finding the global metadata
+        for attribute in root.findall(x_path_global, namespaces):
+            extracted_attributes[attribute.get('name')] = attribute.find(
+                "./default:value", namespaces).text
+        # finding the parameters of the dataset that are declared in
+        # the online source (specific metadata)
+        # The specific ones are stored in 'raw_dataset_parameters' part of
+        # the returned dictionary("extracted_attributes")
+        extracted_attributes['raw_dataset_parameters'] = list()
+        for attribute in root.findall(x_path_specific, namespaces):
+            extracted_attributes['raw_dataset_parameters'].append(
+                attribute.find("./default:value", namespaces).text)
+        # removing the "latitude" and "longitude" from
+        # the 'raw_dataset_parameters' part of the dictionary
+        if 'latitude' in extracted_attributes['raw_dataset_parameters']:
+            extracted_attributes['raw_dataset_parameters'].remove('latitude')
+        if 'longitude' in extracted_attributes['raw_dataset_parameters']:
+            extracted_attributes['raw_dataset_parameters'].remove('longitude')
+        return extracted_attributes
+
+    @classmethod
+    def get_ddx_url(cls, url):
+        """
+        Converts the downloadable link into the link for reading meta data. In all cases,
+        this method results in a url that ends with '.ddx' which will be used in further steps
+        of ingestion.
+        """
+        if url.endswith('.ddx'):
+            return url
+        elif url.endswith('.dods'):
+            return url[:-4]+'ddx'
+        else:
+            return url + '.ddx'
+
+    def get_normalized_attributes(self, dataset_info, **kwargs):
+        """Get normalized metadata from the DDX info of the dataset located at
+        the provided URL
+        """
+        ddx_url = self.get_ddx_url(dataset_info.url)
+        # Get the metadata from the dataset as an XML tree
+        stream = io.BytesIO(utils.http_request('GET', ddx_url, stream=True).content)
+        # Get all the global attributes of the Dataset into a dictionary
+        extracted_attributes = self._extract_attributes(
+            ET.parse(stream).getroot())
+        # add the URL to the attributes passed to metanorm
+        self.add_url(dataset_info.url, extracted_attributes)
+        # Get the parameters needed to create a geospaas catalog dataset from the global attributes
+        normalized_attributes = self._metadata_handler.get_parameters(extracted_attributes)
+        normalized_attributes['geospaas_service'] = catalog_managers.OPENDAP_SERVICE
+        normalized_attributes['geospaas_service_name'] = catalog_managers.DAP_SERVICE_NAME
+
+        return normalized_attributes
 
 
-class ThreddsCrawler(HTMLDirectoryCrawler):
+class ThreddsCrawler(OpenDAPCrawler):
     """
     Crawler for harvesting the data which are provided by Thredds
     """
-    LOGGER = logging.getLogger(__name__ + '.ThreddsCrawler')
+    logger = logging.getLogger(__name__ + '.ThreddsCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
     FILES_SUFFIXES = ('.nc',)
     EXCLUDE = re.compile(r'/thredds/catalog.html$')
+    url_matcher = re.compile(r'^(.*)/(fileServer)/(.*)$')
 
-    def get_download_url(self, resource_url):
+    # --------- get metadata ---------
+    @classmethod
+    def get_ddx_url(cls, url):
+        url_match = cls.url_matcher.match(url)
+        if url_match:
+            return f"{url_match[1]}/dodsC/{url_match[3]}.ddx"
+        else:
+            raise ValueError(f"{url} is not a Thredds HTTPServer URL")
+
+    def get_download_url(self, path):
         result = None
-        links = self._get_links(self._http_get(resource_url))
+        links = self._get_links(self._http_get(urljoin(self.base_url, path)))
         for link in links:
             if "fileServer" in link and link.endswith(self.FILES_SUFFIXES):
                 result = f"{self.base_url}{link}"
@@ -355,15 +682,15 @@ class ThreddsCrawler(HTMLDirectoryCrawler):
         return result
 
 
-class FTPCrawler(WebDirectoryCrawler):
+class FTPCrawler(DirectoryCrawler):
     """
     Crawler which returns the search results of an FTP, given the URL and search
     terms
     """
-    LOGGER = logging.getLogger(__name__ + '.FTPCrawler')
+    logger = logging.getLogger(__name__ + '.FTPCrawler')
 
     def __init__(self, root_url, time_range=(None, None), include=None,
-                 username='anonymous', password='anonymous'):
+                 username='anonymous', password='anonymous', max_threads=1):
 
         if not root_url.startswith('ftp://'):
             raise ValueError("The root url must start with 'ftp://'")
@@ -372,14 +699,27 @@ class FTPCrawler(WebDirectoryCrawler):
         self.password = password
         self.ftp = None
 
-        super().__init__(root_url, time_range, include)
+        super().__init__(root_url, time_range, include, max_threads=1)
 
+    def __getstate__(self):
+        """Method used to pickle the crawler"""
+        state = self.__dict__
+        if isinstance(state['ftp'], ftplib.FTP):
+            state['ftp'] = None
+        return state
+
+    def __setstate__(self, state):
+        """Method used to unpickle the crawler"""
+        self.__dict__.update(state)
+        self.connect()
+
+    # ------------- crawl ------------
     def set_initial_state(self):
         """
         The `_urls` attribute contains URLs to the resources which will be returned by the crawler.
         The `_to_process` attribute contains URLs to pages which need to be searched for resources.
         """
-        self._urls = []
+        self._results = []
         self._to_process = [self.root_url.path or '/']
         self.connect()
 
@@ -418,7 +758,7 @@ class FTPCrawler(WebDirectoryCrawler):
                             if isinstance(error, ftplib.error_temp) and '421' not in error.args[0]:
                                 raise
                             else:
-                                crawler_instance.LOGGER.info("Re-initializing the FTP connection")
+                                crawler_instance.logger.info("Re-initializing the FTP connection")
                                 crawler_instance.connect()
                             countdown -= 1
                     if last_error:
@@ -440,6 +780,17 @@ class FTPCrawler(WebDirectoryCrawler):
         else:
             return True
 
+    # --------- get metadata ---------
+    def get_normalized_attributes(self, dataset_info, **kwargs):
+        """Gets dataset attributes using ftp"""
+        raw_attributes = {}
+        self.add_url(dataset_info.url, raw_attributes)
+        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
+        # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
+        normalized_attributes['geospaas_service_name'] = 'ftp'
+        normalized_attributes['geospaas_service'] = 'ftp'
+        return normalized_attributes
+
 
 class HTTPPaginatedAPICrawler(Crawler):
     """Base class for crawlers used on repositories exposing a paginated API over HTTP"""
@@ -450,7 +801,8 @@ class HTTPPaginatedAPICrawler(Crawler):
 
     def __init__(self, url, search_terms=None, time_range=(None, None),
                  username=None, password=None,
-                 page_size=100, initial_offset=None):
+                 page_size=100, initial_offset=None, max_threads=1):
+        super().__init__(max_threads)
         self.url = url
         self._results = None
         self.initial_offset = initial_offset or self.MIN_OFFSET
@@ -458,6 +810,14 @@ class HTTPPaginatedAPICrawler(Crawler):
             search_terms, time_range, username, password, page_size)
         self.set_initial_state()
 
+    def __eq__(self, other):
+        return (
+            self.url == other.url and
+            self.initial_offset == other.initial_offset and
+            self.request_parameters == other.request_parameters
+        )
+
+    # ------------- crawl ------------
     def set_initial_state(self):
         self.page_offset = self.initial_offset
         self._results = []
@@ -492,27 +852,22 @@ class HTTPPaginatedAPICrawler(Crawler):
             }
         }
 
-    def __iter__(self):
-        """Makes the crawler iterable"""
-        return self
-
-    def __next__(self):
-        """Makes the crawler an iterator"""
-        try:
-            # Return all resource URLs from the previously processed page
-            result = self._results.pop()
-        except IndexError:
-            # If no more URLs from the previously processed page are available, process the next one
-            if not self._get_datasets_info(self._get_next_page()):
-                self.LOGGER.debug("No more entries found at '%s' matching '%s'",
-                                  self.url, self.request_parameters['params'])
-                raise StopIteration
-            result = self.__next__()
-        return result
+    def crawl(self):
+        while True:
+            try:
+                # Return all resource URLs from the previously processed page
+                yield self._results.pop()
+            except IndexError:
+                # If no more URLs from the previously processed page are available,
+                # process the next one
+                if not self._get_datasets_info(self._get_next_page()):
+                    self.logger.debug("No more entries found at '%s' matching '%s'",
+                                    self.url, self.request_parameters['params'])
+                    break
 
     def _get_next_page(self):
         """Get the next page of search results"""
-        self.LOGGER.info("Looking for ressources at '%s', matching '%s'",
+        self.logger.debug("Looking for resources at '%s', matching '%s'",
                          self.url, self.request_parameters['params'])
         current_page = self._http_get(self.url, self.request_parameters)
         self.increment_offset()
@@ -520,162 +875,10 @@ class HTTPPaginatedAPICrawler(Crawler):
 
     def _get_datasets_info(self, page):
         """Get dataset information from the current page and add it
-        to self._results. It can be a download URL or a dictionary
-        of dataset metadata.
+        to self._results. It should be a DatasetInfo object.
         Returns True if information was found, False otherwise"""
         raise NotImplementedError()
 
-
-class CopernicusOpenSearchAPICrawler(HTTPPaginatedAPICrawler):
-    """
-    Crawler which returns the search results of an Opensearch API,
-    given the URL and search terms.
-    """
-    LOGGER = logging.getLogger(__name__ + '.CopernicusOpenSearchAPICrawler')
-    MIN_DATETIME = datetime(1000, 1, 1)
-
-    PAGE_OFFSET_NAME = 'start'
-    PAGE_SIZE_NAME = 'rows'
-    MIN_OFFSET = 0
-
-    def increment_offset(self):
-        self.page_offset += self.page_size
-
-    def _build_request_parameters(self, search_terms=None, time_range=(None, None),
-                                  username=None, password=None, page_size=100):
-        """Build a dict containing the parameters used to query the Copernicus API.
-        Results are sorted ascending, which avoids missing some
-        if products are added while the harvesting is happening
-        (it will generally be the case)
-        """
-        request_parameters = super()._build_request_parameters(
-            search_terms, time_range, username, password, page_size)
-
-        if search_terms:
-            request_parameters['params']['q'] = f"({search_terms})"
-
-        request_parameters['params']['orderby'] = 'ingestiondate asc'
-
-        # build the time condition equivalent to:
-        # start_date <= time_range[1] and end_date >= time_range[0]
-        api_date_format = '%Y-%m-%dT%H:%M:%SZ'
-        time_condition = ''
-        if time_range[1]:
-            min_date = self.MIN_DATETIME.strftime(api_date_format)
-            end_date = time_range[1].strftime(api_date_format)
-            time_condition += f"beginposition:[{min_date} TO {end_date}]"
-        if time_range[0]:
-            start_date = time_range[0].strftime(api_date_format)
-            if time_condition:
-                time_condition += ' AND '
-            time_condition += f"endposition:[{start_date} TO NOW]"
-
-        if time_condition:
-            request_parameters['params']['q'] += f" AND ({time_condition})"
-
-        if username and password:
-            request_parameters['auth'] = (username, password)
-
-        return request_parameters
-
-    def _get_datasets_info(self, page):
-        """Get links from the current page and adds them to self._results.
-        Returns True if links were found, False otherwise"""
-        entries = feedparser.parse(page)['entries']
-
-        for entry in entries:
-            self.LOGGER.debug("Adding '%s' to the list of resources.", entry['link'])
-            self._results.append(entry['link'])
-
-        return bool(entries)
-
-
-class CreodiasEOFinderCrawler(HTTPPaginatedAPICrawler):
-    """Crawler for the Creodias EO finder API"""
-
-    LOGGER = logging.getLogger(__name__ + '.CreodiasEOFinderCrawler')
-
-    PAGE_OFFSET_NAME = 'page'
-    PAGE_SIZE_NAME = 'maxRecords'
-    MIN_OFFSET = 1
-
-    def _build_request_parameters(self, search_terms=None, time_range=(None, None),
-                                  username=None, password=None, page_size=100):
-        """Build a dict containing the parameters used to query
-        the Creodias EO finder API.
-        search_terms should be a dictionary containing the search
-        parameters and their values.
-        Results are sorted ascending, which avoids missing some
-        if products are added while the harvesting is happening
-        (it will generally be the case)
-        """
-        request_parameters = super()._build_request_parameters(
-            search_terms, time_range, username, password, page_size)
-
-        if search_terms:
-            request_parameters['params'].update(**search_terms)
-
-        request_parameters['params']['sortParam'] = 'published'
-        request_parameters['params']['sortOrder'] = 'ascending'
-
-        api_date_format = '%Y-%m-%dT%H:%M:%SZ'
-        if time_range[0]:
-            request_parameters['params']['startDate'] = time_range[0].strftime(api_date_format)
-        if time_range[1]:
-            request_parameters['params']['completionDate'] = time_range[1].strftime(api_date_format)
-
-        return request_parameters
-
-    def _get_datasets_info(self, page):
-        """Get dataset attributes from the current page and
-        adds them to self._results.
-        Returns True if attributes were found, False otherwise"""
-        entries = json.loads(page)['features']
-
-        for entry in entries:
-            url = entry['properties']
-            url['geometry'] = json.dumps(entry['geometry'])
-            self.LOGGER.debug("Adding '%s' to the list of resources.",
-                              url['services']['download']['url'])
-            self._results.append(url)
-
-        return bool(entries)
-
-
-class EarthdataCMRCrawler(HTTPPaginatedAPICrawler):
-    """Crawler for the CMR Earthdata search API"""
-
-    PAGE_OFFSET_NAME = 'page_num'
-    PAGE_SIZE_NAME = 'page_size'
-    MIN_OFFSET = 1
-
-    def _build_request_parameters(self, search_terms=None, time_range=(None, None),
-                                  username=None, password=None, page_size=100):
-        request_parameters = super()._build_request_parameters(
-            search_terms, time_range, username, password, page_size)
-
-        if search_terms:
-            request_parameters['params'].update(**search_terms)
-
-        # sort by start date, ascending
-        request_parameters['params']['sort_key'] = '+start_date'
-
-        if time_range[0] or time_range[1]:
-            request_parameters['params']['temporal'] = ','.join(
-                date.isoformat() if date else ''
-                for date in time_range)
-
-        return request_parameters
-
-    def _get_datasets_info(self, page):
-        """Get dataset attributes from the current page and
-        adds them to self._results.
-        Returns True if attributes were found, False otherwise"""
-        entries = json.loads(page)['items']
-
-        for entry in entries:
-            self.LOGGER.debug("Adding '%s' to the list of resources.",
-                              entry['umm']['RelatedUrls'][0]['URL'])
-            self._results.append(entry)
-
-        return bool(entries)
+    # --------- get metadata ---------
+    def get_normalized_attributes(self, dataset_info, **kwargs):
+        raise NotImplementedError()
