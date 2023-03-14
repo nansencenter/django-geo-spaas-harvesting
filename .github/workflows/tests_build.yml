@@ -153,7 +153,7 @@ jobs:
             BASE_IMAGE=${{ env.BASE_IMAGE_NAME }}
             METANORM_VERSION=${{ env.METANORM_VERSION }}
             GEOSPAAS_HARVESTING_RELEASE=${{ steps.get_git_tag.outputs.version }}
-          push: ${{ startsWith(github.event.ref, 'refs/tags/') }}
+          push: ${{ github.event_name == 'release' }}
           tags: ${{ steps.make_docker_tags.outputs.tags }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
