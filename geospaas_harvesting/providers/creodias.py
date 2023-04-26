@@ -21,7 +21,7 @@ class CreodiasProvider(Provider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.base_url = 'https://finder.creodias.eu'
+        self.base_url = 'https://datahub.creodias.eu'
         self.search_url = f"{self.base_url}/resto/api/collections/{{collection}}/search.json"
         self._collections = None
         self.search_parameters_parser.add_arguments([
