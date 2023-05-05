@@ -9,7 +9,7 @@ import geospaas.catalog.managers as catalog_managers
 import geospaas_harvesting.utils as utils
 from geospaas_harvesting.crawlers import DatasetInfo, HTTPPaginatedAPICrawler
 from .base import Provider
-from ..arguments import Argument, ChoiceArgument, IntegerArgument, StringArgument, WKTArgument
+from ..arguments import IntegerArgument, ChoiceArgument, StringArgument, WKTArgument
 
 
 class CreodiasProvider(Provider):
@@ -29,7 +29,7 @@ class CreodiasProvider(Provider):
             CollectionArgument('collection', required=True, valid_options=self.collections),
             StringArgument('status', default='all'),
             StringArgument('dataset', default='ESA-DATASET'),
-            ProductIdentifierArgument('productIdentifier', required=False),
+            StringArgument('productIdentifier', required=False),
         ])
 
     def _make_crawler(self, parameters):
@@ -69,25 +69,12 @@ class CreodiasProvider(Provider):
         }
         """
         if self._collections is None:
-            response = utils.http_request('GET', urljoin(self.base_url, 'collections.json'))
+            response = utils.http_request(
+                'GET',
+                urljoin(self.base_url, 'stac/collections'))
             response.raise_for_status()
-
-            self._collections = {
-                collection['id']: {
-                    field['id']: field
-                    for field in collection['formFields']
-                }
-                for collection in response.json()['collections']
-            }
-
+            self._collections = [collection['id'] for collection in response.json()['collections']]
         return self._collections
-
-
-class ProductIdentifierArgument(StringArgument):
-    """Product identifiers need to be put between '%' characters
-    """
-    def parse(self, value):
-        return f"%{super().parse(value)}%"
 
 
 class CollectionArgument(ChoiceArgument):
@@ -96,37 +83,63 @@ class CollectionArgument(ChoiceArgument):
     collection being searched.
     """
 
-    def __str__(self):
-        return (Argument.__str__(self) +
-                f", valid options={list(self.valid_options.keys())}")
+    def _make_argument(self, parameter, namespaces=None):
+        """Create an Argument object from an OpenSearch parameter"""
+        name = parameter.get('name', 'unknown')
+        description = parameter.get('title', '')
+        attribute_names = set(parameter.keys())
+        options = parameter.findall('./parameters:Option', namespaces=namespaces)
+        # choice argument
+        if options:
+            return ChoiceArgument(name, description=description,
+                                  valid_options=[o.get('value') for o in options])
+        # string argument
+        elif attribute_names.issubset(('name', 'value', 'title', 'pattern')):
+            return StringArgument(name, description=description, regex=parameter.get('pattern'))
+        # integer argument
+        elif not attribute_names.isdisjoint((
+                'minExclusive', 'maxExclusive', 'minInclusive', 'maxInclusive')):
+            # IntegerArgument works only with inclusive bounds so we
+            # need to adjust the values
+            min_exclusive = parameter.get('minExclusive')
+            max_exclusive = parameter.get('maxExclusive')
+            min_inclusive = parameter.get('minInclusive')
+            max_inclusive = parameter.get('maxInclusive')
+            if min_inclusive:
+                min_value = min_inclusive
+            elif min_exclusive:
+                min_value = min_exclusive + 1
+            else:
+                min_value = None
+
+            if max_inclusive:
+                max_value = max_inclusive
+            elif max_exclusive:
+                max_value = max_exclusive - 1
+            else:
+                max_value = None
+
+            return IntegerArgument(name, description=description,
+                                   min_value=min_value, max_value=max_value)
+        else:
+            raise ValueError(f"Unknown parameter {parameter}")
+
 
     def _get_collection_parameters(self, collection):
         """Makes argument objects from the data returned by the API
         endpoint defining collections and fields
         """
-        for field_name, field_attributes in self.valid_options[collection].items():
-            if field_attributes['fieldType'] == 'select':
-                self.add_child(ChoiceArgument(
-                    field_name,
-                    required=field_attributes['required'],
-                    valid_options=[
-                        opt['value'] for opt in field_attributes['options']
-                    ]
-                ))
-            elif field_attributes['fieldType'] == 'input':
-                if field_attributes['inputType'] == 'text':
-                    self.add_child(StringArgument(
-                        field_name, required=field_attributes['required'],))
-                elif field_attributes['inputType'] == 'number':
-                    self.add_child(IntegerArgument(
-                        field_name,
-                        required=field_attributes['required'],
-                        min_value=field_attributes['min'],
-                        max_value=field_attributes['max']))
-                else:
-                    raise ValueError(f"Unknown input type {field_attributes['inputType']}")
-            else:
-                raise ValueError(f"Unknown field type {field_attributes['fieldType']}")
+        response = utils.http_request(
+            'GET',
+            f"https://datahub.creodias.eu/resto/api/collections/{collection}/describe.xml",
+            stream=True)
+        response.raise_for_status()
+
+        tree, namespaces = utils.parse_xml_get_ns(response.raw)
+        for parameter in tree.findall(
+                "./default:Url[@type='application/json']/parameters:Parameter",
+                namespaces=namespaces):
+            self.add_child(self._make_argument(parameter, namespaces=namespaces))
 
     def parse(self, value):
         collection = super().parse(value)
