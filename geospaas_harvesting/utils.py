@@ -1,9 +1,10 @@
 """Utilities module for geospaas_harvesting"""
 import os
+import xml.etree.ElementTree as ET
+from urllib.parse import urlparse
 
 import requests
 import yaml
-from urllib.parse import urlparse
 
 
 class TrustDomainSession(requests.Session):
@@ -58,3 +59,21 @@ def read_yaml_file(config_path):
     with open(config_path, 'rb') as config_stream:
         data = yaml.safe_load(config_stream)
     return data
+
+
+def parse_xml_get_ns(file):
+    """Parse an XML document and return an ElementTree and a dict of
+    namespaces
+    """
+    events = "start", "start-ns"
+    root = None
+    namespaces = {}
+    for event, elem in ET.iterparse(file, events):
+        if event == "start-ns":
+            if elem[0] in namespaces and namespaces[elem[0]] != elem[1]:
+                raise KeyError("Duplicate prefix with different URI found.")
+            namespaces[elem[0] if elem[0] else 'default'] = str(elem[1])
+        elif event == "start":
+            if root is None:
+                root = elem
+    return ET.ElementTree(root), namespaces
