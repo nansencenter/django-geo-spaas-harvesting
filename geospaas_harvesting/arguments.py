@@ -214,8 +214,10 @@ class IntegerArgument(Argument):
     type = 'integer'
 
     def __init__(self, name, **kwargs):
-        self.min_value = kwargs.pop('min_value', None)
-        self.max_value = kwargs.pop('max_value', None)
+        min_value = kwargs.pop('min_value', None)
+        max_value = kwargs.pop('max_value', None)
+        self.min_value = int(min_value) if min_value is not None else min_value
+        self.max_value = int(max_value) if max_value is not None else max_value
         super().__init__(name, **kwargs)
 
     def __eq__(self, other):
