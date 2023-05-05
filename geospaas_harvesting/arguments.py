@@ -10,6 +10,7 @@ import shapely.wkt
 class NoDefault:
     """Special class used when no default value is specified"""
 
+
 class ArgumentParser():
     """Class capable of validating if a dictionary of parameters
     matches a list of argument definitions
