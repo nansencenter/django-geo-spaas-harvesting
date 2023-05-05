@@ -4,6 +4,7 @@ import json
 import os.path
 import unittest
 import unittest.mock as mock
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 import geospaas.catalog.managers as catalog_managers
@@ -22,7 +23,7 @@ class CreodiasProviderTestCase(unittest.TestCase):
         """Test creating a crawler from parameters"""
         provider = provider_creodias.CreodiasProvider(name='test', username='user', password='pass')
         parameters = {
-            'collection': 'Sentinel1',
+            'collection': 'SENTINEL-1',
             'location': Polygon(((1, 2), (2, 3), (3, 4), (1, 2))),
             'start_time': datetime(2023, 1, 1, tzinfo=timezone.utc),
             'end_time': datetime(2023, 1, 2, tzinfo=timezone.utc),
@@ -32,7 +33,7 @@ class CreodiasProviderTestCase(unittest.TestCase):
         self.assertEqual(
             crawler,
             provider_creodias.CreodiasEOFinderCrawler(
-                'https://finder.creodias.eu/resto/api/collections/Sentinel1/search.json',
+                'https://datahub.creodias.eu/resto/api/collections/SENTINEL-1/search.json',
                 search_terms={
                     'foo': 'bar',
                     'geometry': 'POLYGON ((1 2, 2 3, 3 4, 1 2))',
@@ -55,118 +56,143 @@ class CreodiasProviderTestCase(unittest.TestCase):
                     name='test', username='user', password='pass')
                 collections = provider.collections
 
-        mock_http_request.assert_called_with('GET', 'https://finder.creodias.eu/collections.json')
-        self.assertDictEqual(
-            collections,
-            {
-                'Sentinel1': {
-                    'platform': {
-                        'id': 'platform',
-                        'displayName': 'platform',
-                        'placeholder': 'Platform',
-                        'required': False,
-                        'fieldType': 'select',
-                        'options': [
-                            {'name': 'S1A', 'value': 'S1A'},
-                            {'name': 'S1B','value': 'S1B'}
-                        ]
-                    },
-                    'swath': {
-                        'id': 'swath',
-                        'displayName': 'swath',
-                        'placeholder': 'Swath',
-                        'required': False,
-                        'fieldType': 'input',
-                        'inputType': 'text'
-                    }
-                }
-            })
-
-
-class ProductIdentifierArgumentTestCase(unittest.TestCase):
-    """Tests for ProductIdentifierArgument"""
-
-    def test_parse(self):
-        """Test parsing a value"""
-        argument = provider_creodias.ProductIdentifierArgument('productIdentifier')
-        self.assertEqual(argument.parse('123456'), '%123456%')
+        mock_http_request.assert_called_with('GET', 'https://datahub.creodias.eu/stac/collections')
+        self.assertListEqual(collections, ['SENTINEL-1'])
 
 
 class CollectionArgumentTestCase(unittest.TestCase):
     """Tests for CollectionArgument"""
+
     def test_parse(self):
         """Test parsing a collection"""
-        collections = {'Sentinel1': {}}
+        collections = ['SENTINEL-1']
         collection_argument = provider_creodias.CollectionArgument('collection',
                                                                    valid_options=collections)
         with mock.patch.object(collection_argument,
                                '_get_collection_parameters') as mock_get_collection_parameters:
-            self.assertEqual(collection_argument.parse('Sentinel1'), 'Sentinel1')
-        mock_get_collection_parameters.assert_called_once_with('Sentinel1')
+            self.assertEqual(collection_argument.parse('SENTINEL-1'), 'SENTINEL-1')
+        mock_get_collection_parameters.assert_called_once_with('SENTINEL-1')
 
     def test_get_collection_parameters(self):
         """Test populating children arguments"""
-        collections = {
-            'Sentinel1': {
-                'platform': {
-                    'id': 'platform',
-                    'displayName': 'platform',
-                    'placeholder': 'Platform',
-                    'required': False,
-                    'fieldType': 'select',
-                    'options': [
-                        {'name': 'S1A', 'value': 'S1A'},
-                        {'name': 'S1B', 'value': 'S1B'}
-                    ]
-                },
-                'swath': {
-                    'id': 'swath',
-                    'displayName': 'swath',
-                    'placeholder': 'Swath',
-                    'required': False,
-                    'fieldType': 'input',
-                    'inputType': 'text'
-                },
-                'foo': {
-                    'id': 'foo',
-                    'required': True,
-                    'min': 1,
-                    'max': 10,
-                    'fieldType': 'input',
-                    'inputType': 'number'
-                }
-            }
-        }
+        collections = ['SENTINEL-1']
         collection_argument = provider_creodias.CollectionArgument('collection',
                                                                    valid_options=collections)
-        collection_argument._get_collection_parameters('Sentinel1')
+        with open(os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                'data/creodias_eofinder/s1_describe.xml'), 'rb') as collection_file, \
+             mock.patch('geospaas_harvesting.utils.http_request') as mock_http_request:
+            mock_http_request.return_value.raw = collection_file
+            collection_argument._get_collection_parameters('SENTINEL-1')
+
         self.assertEqual(
             collection_argument.children,
             [
-                arguments.ChoiceArgument('platform', required=False, valid_options=['S1A', 'S1B']),
-                arguments.StringArgument('swath', required=False),
-                arguments.IntegerArgument('foo', required=True, min_value=1, max_value=10),
+                arguments.IntegerArgument('lon', min_value=-180, max_value=180,
+                                          description='lon description'),
+                arguments.ChoiceArgument('platform', valid_options=['S1A']),
+                arguments.StringArgument('swath'),
             ]
         )
-
-    def test_get_collection_parameters_errors(self):
-        """Test error cases for _get_collection_parameters()"""
-        with self.assertRaises(ValueError):
-            provider_creodias.CollectionArgument('collection', valid_options={
-                'Sentinel1': {'foo': {'fieldType': 'bar'}}
-            })._get_collection_parameters('Sentinel1')
-        with self.assertRaises(ValueError):
-            provider_creodias.CollectionArgument('collection', valid_options={
-                'Sentinel1': {'foo': {'fieldType': 'input', 'inputType': 'bar'}}
-            })._get_collection_parameters('Sentinel1')
 
     def test_str(self):
         """Test string representation"""
         self.assertEqual(
             str(provider_creodias.CollectionArgument('collection',
                                                      required=False,
-                                                     valid_options={'Sentinel1': {}})),
-            "collection, type=multiple choices, not required, valid options=['Sentinel1']")
+                                                     valid_options=['SENTINEL-1'])),
+            "collection, type=multiple choices, not required, valid options=['SENTINEL-1']")
+
+
+class MakeOpenSearchArgumentTestCase(unittest.TestCase):
+    """Tests for the CollectionArgument._make_argument() method"""
+
+    def setUp(self):
+        self.namespaces = {'parameters': 'http://baz/'}
+        self.collection = provider_creodias.CollectionArgument(
+            'collection',
+            valid_options=['SENTINEL-1'])
+
+    def test_make_argument_choice(self):
+        """Test creating a choice argument object from an OpenSearch
+        parameter
+        """
+        choice_param = ET.Element('{http://baz/}Parameter',
+                                  name='productType',
+                                  value='{eo:productType}')
+        choice_param.append(ET.Element('{http://baz/}Option', value='GRD'))
+        self.assertEqual(
+            self.collection._make_argument(choice_param, self.namespaces),
+            arguments.ChoiceArgument('productType', valid_options=['GRD']))
+
+    def test_make_argument_string(self):
+        """Test creating a string argument object from an OpenSearch
+        parameter
+        """
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', value='bar'), self.namespaces),
+            arguments.StringArgument('foo'))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', pattern='.*'), self.namespaces),
+            arguments.StringArgument('foo', regex='.*'))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', pattern='.*', title='bar'),
+                self.namespaces),
+            arguments.StringArgument('foo', regex='.*', description='bar'))
+
+    def test_make_argument_integer(self):
+        """Test creating an integer argument object from an OpenSearch
+        parameter
+        """
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', minInclusive=-10),
+                self.namespaces),
+            arguments.IntegerArgument('foo', min_value=-10))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', minExclusive=-10),
+                self.namespaces),
+            arguments.IntegerArgument('foo', min_value=-9))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', maxInclusive=10),
+                self.namespaces),
+            arguments.IntegerArgument('foo', max_value=10))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', maxExclusive=10),
+                self.namespaces),
+            arguments.IntegerArgument('foo', max_value=9))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', minInclusive=-10, maxInclusive=10),
+                self.namespaces),
+            arguments.IntegerArgument('foo', min_value=-10, max_value=10))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', minExclusive=-10, maxInclusive=10),
+                self.namespaces),
+            arguments.IntegerArgument('foo', min_value=-9, max_value=10))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', minExclusive=-10, maxExclusive=10),
+                self.namespaces),
+            arguments.IntegerArgument('foo', min_value=-9, max_value=9))
+        self.assertEqual(
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', name='foo', minInclusive=-10, maxExclusive=10),
+                self.namespaces),
+            arguments.IntegerArgument('foo', min_value=-10, max_value=9))
+
+    def test_make_argument_error(self):
+        """Test error cases for _get_collection_parameters()"""
+        with self.assertRaises(ValueError):
+            self.collection._make_argument(
+                ET.Element('{http://baz/}Parameter', {'foo': 'bar'}),
+                namespaces=self.namespaces)
 
 
 class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
