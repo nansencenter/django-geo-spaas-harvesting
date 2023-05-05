@@ -97,8 +97,8 @@ class SearchConfigurationTestCase(unittest.TestCase):
         self.assertDictEqual(self.search_config.common, {})
         self.assertListEqual(self.search_config.searches, [{
             'provider_name': 'creodias',
-            'collection': 'Sentinel3',
-            'processingLevel': 'LEVEL2',
+            'collection': 'SENTINEL-3',
+            'processingLevel': '2',
             'start_time': '2023-01-01',
             'end_time': '2023-01-02',
         }])
@@ -119,9 +119,9 @@ class SearchConfigurationTestCase(unittest.TestCase):
             [
                 providers_base.SearchResults(
                     crawler=providers_creodias.CreodiasEOFinderCrawler(
-                        'https://finder.creodias.eu/resto/api/collections/Sentinel3/search.json',
+                        'https://datahub.creodias.eu/resto/api/collections/SENTINEL-3/search.json',
                         search_terms={
-                            'processingLevel': 'LEVEL2',
+                            'processingLevel': '2',
                             'status': 'all',
                             'dataset': 'ESA-DATASET',
                         },

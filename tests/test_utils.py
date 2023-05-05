@@ -1,7 +1,9 @@
 """Tests for the geospaas_harvesting.utils module"""
 import io
+import os.path
 import unittest
 import unittest.mock as mock
+import xml.etree.ElementTree as ET
 
 import geospaas_harvesting.utils as utils
 
@@ -62,3 +64,32 @@ class UtilsTestCase(unittest.TestCase):
             self.assertDictEqual(
                 utils.read_yaml_file(''),
                 {'foo': 'bar', 'baz': 'qux'})
+
+    def test_xml_parsing(self):
+        """Test XML parsing and namespaces extraction"""
+        xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+            <foo xml:lang="en" xmlns="http://bar/" xmlns:ns1="http://bar/ns1/">
+                <ns1:baz attr='qux'/>
+                <ns1:baz attr='quux'/>
+            </foo>
+        """
+        xml_file = io.BytesIO(xml)
+        tree, namespaces = utils.parse_xml_get_ns(xml_file)
+        self.assertDictEqual(namespaces, {'default': 'http://bar/', 'ns1': 'http://bar/ns1/'})
+        self.assertIsInstance(tree, ET.ElementTree)
+        root = tree.getroot()
+        self.assertEqual(root.tag, '{http://bar/}foo')
+        self.assertEqual(len(list(root)), 2)
+
+    def test_xml_parsing_error(self):
+        """An exception must be raised if two namespaces have the same
+        prefix
+        """
+        xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+            <foo xml:lang="en" xmlns="http://bar/" xmlns:ns1="http://bar/ns1/">
+                <bar xmlns:ns1="http://baz/ns1/" />
+            </foo>
+        """
+        xml_file = io.BytesIO(xml)
+        with self.assertRaises(KeyError):
+            _, _ = utils.parse_xml_get_ns(xml_file)
