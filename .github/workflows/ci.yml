@@ -18,7 +18,7 @@ jobs:
           - {'python': '3.10', 'latest': false}
           - {'python': '3.11', 'latest': true}
     env:
-      BASE_IMAGE: "${{ vars.DOCKER_ORG }}/geospaas:0.0.2-slim-python${{ matrix.version.python }}"
+      BASE_IMAGE: "${{ vars.DOCKER_ORG }}/geospaas:0.0.4-python${{ matrix.version.python }}"
       IMAGE_NAME: "${{ vars.DOCKER_ORG }}/geospaas_harvesting"
       METANORM_VERSION: '4.1.0'
       GEOSPAAS_DB_HOST: 'db'
@@ -141,7 +141,7 @@ jobs:
              docker run --rm
              -v "$(pwd):/src"
              -e "GEOSPAAS_HARVESTING_RELEASE=${{ github.ref_name }}"
-             "${{ vars.DOCKER_ORG }}/geospaas:latest-slim"
+             "${{ vars.DOCKER_ORG }}/geospaas:latest"
              python setup.py sdist bdist_wheel
 
       - name: 'Deploy package to the Github release'
