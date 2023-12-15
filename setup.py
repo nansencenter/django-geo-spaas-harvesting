@@ -36,6 +36,7 @@ setuptools.setup(
         'PyYAML',
         'requests_oauthlib',
         'requests',
+        'shapely',
     ],
     package_data={'': ['*.yml']},
 )

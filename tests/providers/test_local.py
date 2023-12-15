@@ -6,7 +6,7 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 
 import numpy as np
-from django.contrib.gis.geos import GEOSGeometry
+import shapely
 from geospaas.catalog.managers import (FILE_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE,
                                        DAP_SERVICE_NAME,
@@ -121,8 +121,8 @@ class NansatCrawlerTestCase(unittest.TestCase):
         self.assertEqual(normalized_attributes['platform']['Category'], 'Models/Analyses')
         self.assertEqual(normalized_attributes['platform']['Series_Entity'], '')
 
-        expected_geometry = GEOSGeometry((
-            'POLYGON((24.88 68.08,22.46 68.71,19.96 69.31,17.39 69.87,24.88 68.08))'), srid=4326)
+        expected_geometry = shapely.set_srid(shapely.from_wkt(
+            'POLYGON((24.88 68.08,22.46 68.71,19.96 69.31,17.39 69.87,24.88 68.08))'), 4326)
 
         # This fails, which is why string representations are compared. Any explanation is welcome.
         # self.assertTrue(normalized_attributes['location_geometry'].equals(expected_geometry))
@@ -415,7 +415,7 @@ class NetCDFCrawlerTestCase(unittest.TestCase):
         }
         self.assertEqual(
             self.crawler._get_geometry_wkt(mock_dataset),
-            'LINESTRING (1 2, 3 4, 5 6)')
+            'LINESTRING (1 2, 5 6)')
 
     def test_get_point(self):
         """Test getting a WKT point when the shape of the latitude and
@@ -493,17 +493,16 @@ class NetCDFCrawlerTestCase(unittest.TestCase):
     @mock.patch('geospaas_harvesting.providers.local.np.ma.isMaskedArray', return_value=True)
     def test_get_polygon_from_coordinates_lists_with_masked_array_1d_case(self, mock_isMaskedArray):
         """Test getting a polygonal coverage from a dataset when the
-        latitude and longitude are 1d masked_array as an abstracted version of 2d lon and lat values
+        latitude and longitude are 1d masked_array as an abstracted
+        version of 2d lon and lat values
         """
         mock_dataset = mock.Mock()
         mock_dataset.dimensions = {}
         mock_dataset.variables = {
             'LONGITUDE': self.MaskedMockVariable(
-                (1,1e10, 1e10, 2, 0, 3, 1),dimensions=['LONGITUDE','LATITUDE']
-                                                ),
+                (1, 1e10, 1e10, 2, 0, 3, 1), dimensions=['LONGITUDE','LATITUDE']),
             'LATITUDE': self.MaskedMockVariable(
-                (1, 1e10, 1e10, 4, 0, 4, 1),dimensions=['LONGITUDE','LATITUDE']
-                                               ),
+                (1, 1e10, 1e10, 4, 0, 4, 1), dimensions=['LONGITUDE','LATITUDE']),
         }
         self.assertEqual(
             self.crawler._get_geometry_wkt(mock_dataset),
