@@ -6,7 +6,7 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 
 import numpy as np
-import shapely
+import shapely.wkt
 from geospaas.catalog.managers import (FILE_SERVICE_NAME,
                                        LOCAL_FILE_SERVICE,
                                        DAP_SERVICE_NAME,
@@ -121,8 +121,8 @@ class NansatCrawlerTestCase(unittest.TestCase):
         self.assertEqual(normalized_attributes['platform']['Category'], 'Models/Analyses')
         self.assertEqual(normalized_attributes['platform']['Series_Entity'], '')
 
-        expected_geometry = shapely.set_srid(shapely.from_wkt(
-            'POLYGON((24.88 68.08,22.46 68.71,19.96 69.31,17.39 69.87,24.88 68.08))'), 4326)
+        expected_geometry = shapely.wkt.loads(
+            'POLYGON((24.88 68.08,22.46 68.71,19.96 69.31,17.39 69.87,24.88 68.08))')
 
         # This fails, which is why string representations are compared. Any explanation is welcome.
         # self.assertTrue(normalized_attributes['location_geometry'].equals(expected_geometry))

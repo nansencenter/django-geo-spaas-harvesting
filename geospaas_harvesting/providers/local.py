@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import dateutil.parser
 import netCDF4
 import numpy as np
-import shapely
+import shapely.wkt
 from dateutil.tz import tzutc
 from shapely.geometry import MultiPoint
 
@@ -118,8 +118,8 @@ class NansatCrawler(LocalDirectoryCrawler):
         # Find coverage to set number of points in the geolocation
         if nansat_object.vrt.dataset.GetGCPs():
             nansat_object.reproject_gcps()
-        normalized_attributes['location_geometry'] = shapely.set_srid(shapely.from_wkt(
-            nansat_object.get_border_wkt(n_points=n_points)), 4326)
+        normalized_attributes['location_geometry'] = shapely.wkt.loads(
+            nansat_object.get_border_wkt(n_points=n_points))
 
         json_dumped_dataset_parameters = n_metadata.get('dataset_parameters', None)
         if json_dumped_dataset_parameters:
@@ -185,7 +185,7 @@ class NetCDFCrawler(LocalDirectoryCrawler):
                                         flags=['buffered']))
         else:
             raise ValueError("Could not determine the spatial coverage")
-        geometry = shapely.set_srid(MultiPoint(points).convex_hull, 4326)
+        geometry = MultiPoint(points).convex_hull
         return geometry.wkt
 
     def _get_raw_attributes(self, dataset_path):
