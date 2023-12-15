@@ -45,8 +45,12 @@ providers:
     latitude_attribute: 'lat'
   nansat:
     type: 'nansat'
-  nextsim:
+  netcdf_l:
     type: 'netcdf'
     longitude_attribute: 'longitude'
     latitude_attribute: 'latitude'
+  netcdf_L:
+    type: 'netcdf'
+    longitude_attribute: 'LONGITUDE'
+    latitude_attribute: 'LATITUDE'
 ...
