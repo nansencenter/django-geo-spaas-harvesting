@@ -1,4 +1,5 @@
 """Code for searching local files"""
+import itertools
 import json
 import logging
 import uuid
@@ -7,9 +8,9 @@ from urllib.parse import urlparse
 import dateutil.parser
 import netCDF4
 import numpy as np
+import shapely.wkt
 from dateutil.tz import tzutc
-from django.contrib.gis.geos import GEOSGeometry, LineString, MultiPoint
-from django.contrib.gis.geos.point import Point
+from shapely.geometry import MultiPoint
 
 import geospaas.catalog.managers as catalog_managers
 import pythesint as pti
@@ -117,8 +118,8 @@ class NansatCrawler(LocalDirectoryCrawler):
         # Find coverage to set number of points in the geolocation
         if nansat_object.vrt.dataset.GetGCPs():
             nansat_object.reproject_gcps()
-        normalized_attributes['location_geometry'] = GEOSGeometry(
-            nansat_object.get_border_wkt(n_points=n_points), srid=4326)
+        normalized_attributes['location_geometry'] = shapely.wkt.loads(
+            nansat_object.get_border_wkt(n_points=n_points))
 
         json_dumped_dataset_parameters = n_metadata.get('dataset_parameters', None)
         if json_dumped_dataset_parameters:
@@ -150,8 +151,8 @@ class NetCDFCrawler(LocalDirectoryCrawler):
 
     # --------- get metadata ---------
     def _get_geometry_wkt(self, dataset):
-        longitudes = dataset.variables[self.longitude_attribute]
-        latitudes = dataset.variables[self.latitude_attribute]
+        longitudes = dataset.variables[self.longitude_attribute][:]
+        latitudes = dataset.variables[self.latitude_attribute][:]
 
         lonlat_dependent_data = False
         for nc_variable_name, nc_variable_value in dataset.variables.items():
@@ -165,43 +166,26 @@ class NetCDFCrawler(LocalDirectoryCrawler):
         # longitude, the longitude and latitude arrays are combined to
         # find all the data points
         if lonlat_dependent_data:
-            points = []
-            for lon in longitudes:
-                for lat in latitudes:
-                    points.append(Point(float(lon), float(lat), srid=4326))
-            geometry = MultiPoint(points, srid=4326).convex_hull
+            valid_lon = longitudes.compressed() if np.ma.isMaskedArray(longitudes) else longitudes
+            valid_lat = latitudes.compressed() if np.ma.isMaskedArray(latitudes) else latitudes
+            points = list(itertools.product(valid_lon, valid_lat))
         # If the longitude and latitude variables have the same shape,
         # we assume that they contain the coordinates for each data
         # point
         elif longitudes.shape == latitudes.shape:
-            points = []
-            lat_fil_value = latitudes[:].fill_value if np.ma.isMaskedArray(latitudes[:]) else None
-            lon_fil_value = longitudes[:].fill_value if np.ma.isMaskedArray(longitudes[:]) else None
-            # In this case numpy.nditer() works like zip() for
-            # multi-dimensional arrays.
-            # It does not keep the masking information
-            for lon, lat in np.nditer((longitudes, latitudes), flags=['buffered']):
-                # Skip points containing masked values
-                # It needs to be excluded from coverage because of a
-                # Python optimization which the "continue" line to
-                # never be executed
-                if lon_fil_value == lon or lat_fil_value == lat:
-                    continue  # pragma: no cover
-                new_point = Point(float(lon), float(lat), srid=4326)
-                # Don't add duplicate points in trajectories
-                if not points or new_point != points[-1]:
-                    points.append(new_point)
-
-            if len(longitudes.shape) == 1:
-                if len(points) == 1:
-                    geometry = points[0]
+            masks = []
+            for l in (longitudes, latitudes):
+                if np.ma.isMaskedArray(l):
+                    masks.append(l.mask)
                 else:
-                    geometry = LineString(points, srid=4326)
-            else:
-                geometry = MultiPoint(points, srid=4326).convex_hull
+                    masks.append(np.full(l.shape, False))
+            combined_mask = np.logical_or(*masks)
+            points = np.array(np.nditer((longitudes[~combined_mask],
+                                         latitudes[~combined_mask]),
+                                        flags=['buffered']))
         else:
             raise ValueError("Could not determine the spatial coverage")
-
+        geometry = MultiPoint(points).convex_hull
         return geometry.wkt
 
     def _get_raw_attributes(self, dataset_path):
