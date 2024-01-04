@@ -135,6 +135,8 @@ class Ingester():
                                 # presence of the URI in the database is checked
                                 # before attempting to ingest.
                                 self.logger.warning("The Dataset URI '%s' was not created.", url)
+                        elif created_dataset_uri:
+                            self.logger.info("Dataset URI '%s' added to existing dataset", url)
                     except Exception:  # pylint: disable=broad-except
                         self.logger.error("Error during ingestion", exc_info=True)
                     finally:
