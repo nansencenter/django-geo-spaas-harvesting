@@ -12,21 +12,28 @@ from .base import Provider
 from ..arguments import IntegerArgument, ChoiceArgument, StringArgument, WKTArgument
 
 
-class CreodiasProvider(Provider):
-    """Entry point to search for data hosted by CREODIAS.
+class RestoProvider(Provider):
+    """Base class to search catalogs using a resto API
+    (https://github.com/jjrom/resto), for example Creodias or
+    Copernicus Data Space.
+    The base URL for the API must be provided when instantiating the
+    provider.
     The one mandatory search parameter is 'collection'.
     The list of available collections and the corresponding search
-    parameters are fetched from the Creodias API.
+    parameters are fetched from the API.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.base_url = 'https://datahub.creodias.eu'
-        self.search_url = f"{self.base_url}/resto/api/collections/{{collection}}/search.json"
+        self.url = kwargs['url'].rstrip('/')
+        self.search_url = f"{self.url}/resto/api/collections/{{collection}}/search.json"
         self._collections = None
         self.search_parameters_parser.add_arguments([
             WKTArgument('location', geometry_types=(Polygon,)),
-            CollectionArgument('collection', required=True, valid_options=self.collections),
+            CollectionArgument('collection',
+                               url=self.url,
+                               required=True,
+                               valid_options=self.collections),
             StringArgument('status', default='all'),
             StringArgument('dataset', default='ESA-DATASET'),
             StringArgument('productIdentifier', required=False),
@@ -39,7 +46,7 @@ class CreodiasProvider(Provider):
             parameters['geometry'] = location.wkt
         time_range = (parameters.pop('start_time'), parameters.pop('end_time'))
 
-        return CreodiasEOFinderCrawler(
+        return RestoCrawler(
             collection_url,
             search_terms=parameters,
             time_range=time_range,
@@ -71,7 +78,7 @@ class CreodiasProvider(Provider):
         if self._collections is None:
             response = utils.http_request(
                 'GET',
-                urljoin(self.base_url, 'stac/collections'))
+                urljoin(self.url, 'stac/collections'))
             response.raise_for_status()
             self._collections = [collection['id'] for collection in response.json()['collections']]
         return self._collections
@@ -82,6 +89,10 @@ class CollectionArgument(ChoiceArgument):
     It populates child parameters at parsing time according to the
     collection being searched.
     """
+
+    def __init__(self, name, **kwargs):
+        self.url = kwargs['url'].rstrip('/')
+        super().__init__(name, **kwargs)
 
     def _make_argument(self, parameter, namespaces=None):
         """Create an Argument object from an OpenSearch parameter"""
@@ -131,7 +142,7 @@ class CollectionArgument(ChoiceArgument):
         """
         response = utils.http_request(
             'GET',
-            f"https://datahub.creodias.eu/resto/api/collections/{collection}/describe.xml",
+            f"{self.url}/resto/api/collections/{collection}/describe.xml",
             stream=True)
         response.raise_for_status()
 
@@ -147,10 +158,10 @@ class CollectionArgument(ChoiceArgument):
         return collection
 
 
-class CreodiasEOFinderCrawler(HTTPPaginatedAPICrawler):
+class RestoCrawler(HTTPPaginatedAPICrawler):
     """Crawler for the Creodias EO finder API"""
 
-    logger = logging.getLogger(__name__ + '.CreodiasEOFinderCrawler')
+    logger = logging.getLogger(__name__ + '.RestoCrawler')
 
     PAGE_OFFSET_NAME = 'page'
     PAGE_SIZE_NAME = 'maxRecords'

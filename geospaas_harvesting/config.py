@@ -5,7 +5,7 @@ import geospaas_harvesting.providers.base as providers_base
 import geospaas_harvesting.providers.ceda as providers_ceda
 import geospaas_harvesting.providers.cmems as providers_cmems
 import geospaas_harvesting.providers.copernicus_scihub as providers_copernicus_scihub
-import geospaas_harvesting.providers.creodias as providers_creodias
+import geospaas_harvesting.providers.resto as providers_resto
 import geospaas_harvesting.providers.earthdata_cmr as providers_earthdata_cmr
 import geospaas_harvesting.providers.ftp as providers_ftp
 import geospaas_harvesting.providers.jaxa as providers_jaxa
@@ -58,7 +58,7 @@ class ProvidersArgument(DictArgument):
         'ceda': providers_ceda.CEDAProvider,
         'cmems_ftp': providers_cmems.CMEMSFTPProvider,
         'copernicus_scihub': providers_copernicus_scihub.CopernicusScihubProvider,
-        'creodias': providers_creodias.CreodiasProvider,
+        'resto': providers_resto.RestoProvider,
         'earthdata_cmr': providers_earthdata_cmr.EarthDataCMRProvider,
         'ftp': providers_ftp.FTPProvider,
         'gportal_ftp': providers_jaxa.GPortalProvider,
