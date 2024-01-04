@@ -7,12 +7,14 @@ from datetime import datetime, timezone
 import django.db
 import django.db.utils
 import django.test
+import yaml
 from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset, DatasetURI
 from geospaas.vocabularies.models import DataCenter, ISOTopicCategory, Parameter
 
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
+from . import TEST_FILES_PATH
 
 
 class IngesterTestCase(django.test.TransactionTestCase):
@@ -23,6 +25,8 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.mock_param_count = self.patcher_param_count.start()
         self.mock_param_count.return_value = 2
         self.ingester = ingesters.Ingester()
+        with open(TEST_FILES_PATH / 'dataset_metadata.yml', encoding='utf-8') as f_h:
+            self.dataset_metadata = yaml.load(f_h)
 
     def tearDown(self):
         self.patcher_param_count.stop()
@@ -73,57 +77,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         for p in parameters:
             p.save()
 
-        dataset_info = crawlers.DatasetInfo('some_url', {
-            'entry_title': 'title',
-            'entry_id': 'id',
-            'summary': 'sum-up',
-            'time_coverage_start': '2022-01-01',
-            'time_coverage_end': '2022-01-02',
-            'platform': {
-                'Series_Entity': 'Space-based Platforms',
-                'Category': '',
-                'Short_Name': '',
-                'Long_Name': '',
-            },
-            'instrument': {
-                'Short_Name': 'sar',
-                'Category': '',
-                'Class': '',
-                'Type': '',
-                'Subtype': '',
-                'Long_Name': '',
-            },
-            'location_geometry': 'POINT(10 11)',
-            'provider': {
-                'Short_Name': 'someone',
-                'Bucket_Level0': '',
-                'Bucket_Level1': '',
-                'Bucket_Level2': '',
-                'Bucket_Level3': '',
-                'Long_Name': '',
-                'Data_Center_URL': '',
-            },
-            'iso_topic_category': {'iso_topic_category': 'oceans'},
-            'gcmd_location': {
-                'Location_Category': 'vertical location',
-                'Location_Type': 'sea surface',
-                'Location_Subregion1': '',
-                'Location_Subregion2': '',
-                'Location_Subregion3': '',
-            },
-            'dataset_parameters': [
-                {
-                    'standard_name': 'parameter',
-                    'short_name': 'param',
-                    'units': 'bananas'
-                },
-                {
-                    'standard_name': 'latitude',
-                    'short_name': 'lat',
-                    'units': 'degrees_north'
-                }
-            ],
-        })
+        dataset_info = crawlers.DatasetInfo('some_url', self.dataset_metadata.copy())
 
         self.ingester._ingest_dataset(dataset_info)  # pylint: disable=protected-access
         dataset = Dataset.objects.last()
@@ -143,7 +97,6 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.assertEqual(dataset.gcmd_location.type, 'sea surface')
         self.assertListEqual(list(dataset.parameters.all()), [parameters[0]])
 
-
     def test_ingest_same_uri_twice(self):
         """Ingestion of the same URI must not happen twice and the attempt must be logged"""
         uri = 'http://test.uri/dataset'
@@ -158,6 +111,22 @@ class IngesterTestCase(django.test.TransactionTestCase):
             record.getMessage().endswith('already present in the database')
             for record in logger_cm.records)))
         self.assertEqual(Dataset.objects.count(), 1)
+
+    def test_ingest_same_dataset_different_uri(self):
+        """Ingestion of the same URI must not happen twice and the attempt must be logged"""
+        uris = ['http://test.uri1/dataset',
+                'http://test.uri2/dataset']
+        dataset_infos = [crawlers.DatasetInfo(uri, self.dataset_metadata.copy()) for uri in uris]
+
+        for dataset_info in dataset_infos:
+            self.ingester._ingest_dataset(dataset_info)
+
+        self.assertEqual(Dataset.objects.count(), 1)
+        self.assertEqual(DatasetURI.objects.count(), 2)
+        # check that both URIs have the same dataset
+        self.assertEqual(*[
+            DatasetURI.objects.get(uri=uri).dataset.entry_id
+            for uri in uris])
 
     def test_log_on_ingestion_error(self):
         """The cause of the error must be logged if an exception is raised while ingesting"""
@@ -177,6 +146,17 @@ class IngesterTestCase(django.test.TransactionTestCase):
                 self.ingester.ingest([crawlers.DatasetInfo('some_url', {})])
                 self.assertEqual(logger_cm.records[0].message,
                                  "Successfully created dataset from url: 'some_url'")
+
+    def test_log_on_ingestion_same_dataset_different_uri(self):
+        """A message must be logged when a URI is added to an existing
+        dataset
+        """
+        with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
+            mock_ingest_dataset.return_value = ('some_url', False, True)
+            with self.assertLogs(self.ingester.logger, level=logging.INFO) as logger_cm:
+                self.ingester.ingest([crawlers.DatasetInfo('some_url', {})])
+                self.assertEqual(logger_cm.records[0].message,
+                                 "Dataset URI 'some_url' added to existing dataset")
 
     def test_log_error_on_dataset_created_with_existing_uri(self):
         """

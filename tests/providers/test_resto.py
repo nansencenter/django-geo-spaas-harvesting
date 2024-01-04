@@ -12,16 +12,18 @@ import requests
 from shapely.geometry.polygon import Polygon
 
 import geospaas_harvesting.arguments as arguments
-import geospaas_harvesting.providers.creodias as provider_creodias
+import geospaas_harvesting.providers.resto as providers_resto
 from geospaas_harvesting.crawlers import DatasetInfo
 
 
-class CreodiasProviderTestCase(unittest.TestCase):
-    """Tests for CreodiasProvider"""
+class RestoProviderTestCase(unittest.TestCase):
+    """Tests for RestoProvider"""
 
     def test_make_crawler(self):
         """Test creating a crawler from parameters"""
-        provider = provider_creodias.CreodiasProvider(name='test', username='user', password='pass')
+        provider = providers_resto.RestoProvider(
+            name='test', url='https://datahub.creodias.eu',
+            username='user', password='pass')
         parameters = {
             'collection': 'SENTINEL-1',
             'location': Polygon(((1, 2), (2, 3), (3, 4), (1, 2))),
@@ -32,7 +34,7 @@ class CreodiasProviderTestCase(unittest.TestCase):
         crawler = provider._make_crawler(parameters)
         self.assertEqual(
             crawler,
-            provider_creodias.CreodiasEOFinderCrawler(
+            providers_resto.RestoCrawler(
                 'https://datahub.creodias.eu/resto/api/collections/SENTINEL-1/search.json',
                 search_terms={
                     'foo': 'bar',
@@ -52,8 +54,9 @@ class CreodiasProviderTestCase(unittest.TestCase):
             response.status_code = 200
             with mock.patch('geospaas_harvesting.utils.http_request',
                             return_value=response) as mock_http_request:
-                provider = provider_creodias.CreodiasProvider(
-                    name='test', username='user', password='pass')
+                provider = providers_resto.RestoProvider(
+                    name='test', url='https://datahub.creodias.eu',
+                    username='user', password='pass')
                 collections = provider.collections
 
         mock_http_request.assert_called_with('GET', 'https://datahub.creodias.eu/stac/collections')
@@ -66,8 +69,10 @@ class CollectionArgumentTestCase(unittest.TestCase):
     def test_parse(self):
         """Test parsing a collection"""
         collections = ['SENTINEL-1']
-        collection_argument = provider_creodias.CollectionArgument('collection',
-                                                                   valid_options=collections)
+        collection_argument = providers_resto.CollectionArgument(
+            'collection',
+            url='https://datahub.creodias.eu',
+            valid_options=collections)
         with mock.patch.object(collection_argument,
                                '_get_collection_parameters') as mock_get_collection_parameters:
             self.assertEqual(collection_argument.parse('SENTINEL-1'), 'SENTINEL-1')
@@ -76,8 +81,10 @@ class CollectionArgumentTestCase(unittest.TestCase):
     def test_get_collection_parameters(self):
         """Test populating children arguments"""
         collections = ['SENTINEL-1']
-        collection_argument = provider_creodias.CollectionArgument('collection',
-                                                                   valid_options=collections)
+        collection_argument = providers_resto.CollectionArgument(
+            'collection',
+            url='https://datahub.creodias.eu',
+            valid_options=collections)
         with open(os.path.join(os.path.dirname(os.path.dirname(__file__)),
                 'data/creodias_eofinder/s1_describe.xml'), 'rb') as collection_file, \
              mock.patch('geospaas_harvesting.utils.http_request') as mock_http_request:
@@ -97,9 +104,11 @@ class CollectionArgumentTestCase(unittest.TestCase):
     def test_str(self):
         """Test string representation"""
         self.assertEqual(
-            str(provider_creodias.CollectionArgument('collection',
-                                                     required=False,
-                                                     valid_options=['SENTINEL-1'])),
+            str(providers_resto.CollectionArgument(
+                'collection',
+                url='https://datahub.creodias.eu',
+                required=False,
+                valid_options=['SENTINEL-1'])),
             "collection, type=multiple choices, not required, valid options=['SENTINEL-1']")
 
 
@@ -108,8 +117,9 @@ class MakeOpenSearchArgumentTestCase(unittest.TestCase):
 
     def setUp(self):
         self.namespaces = {'parameters': 'http://baz/'}
-        self.collection = provider_creodias.CollectionArgument(
+        self.collection = providers_resto.CollectionArgument(
             'collection',
+            url='https://datahub.creodias.eu',
             valid_options=['SENTINEL-1'])
 
     def test_make_argument_choice(self):
@@ -195,12 +205,12 @@ class MakeOpenSearchArgumentTestCase(unittest.TestCase):
                 namespaces=self.namespaces)
 
 
-class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
-    """Tests for CreodiasEOFinderCrawler"""
+class RestoCrawlerTestCase(unittest.TestCase):
+    """Tests for RestoCrawler"""
     SEARCH_TERMS = {'param1': 'value1', 'param2': 'value2'}
 
     def setUp(self):
-        self.crawler = provider_creodias.CreodiasEOFinderCrawler('foo', self.SEARCH_TERMS)
+        self.crawler = providers_resto.RestoCrawler('foo', self.SEARCH_TERMS)
 
     def test_build_request_parameters_no_argument(self):
         """Test building the request parameters without specifying any argument"""
@@ -303,7 +313,7 @@ class CreodiasEOFinderCrawlerTestCase(unittest.TestCase):
 
     def test_get_normalized_attributes(self):
         """Test the right metadata is added when normalizing"""
-        crawler = provider_creodias.CreodiasEOFinderCrawler('https://foo')
+        crawler = providers_resto.RestoCrawler('https://foo')
         dataset_info = DatasetInfo('https://foo/bar', {'baz': 'qux'})
         with mock.patch('geospaas_harvesting.crawlers.MetadataHandler.get_parameters',
                         side_effect=lambda d: d) as mock_get_params:

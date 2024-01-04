@@ -5,4 +5,5 @@ pythesint_versions:
   gcmd_instrument: '9.1.5'
 providers:
   creodias:
-    type: 'creodias'
+    type: 'resto'
+    url: 'https://datahub.creodias.eu'

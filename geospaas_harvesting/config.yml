@@ -20,7 +20,11 @@ providers:
     username: !ENV COPERNICUS_OPEN_HUB_USERNAME
     password: !ENV COPERNICUS_OPEN_HUB_PASSWORD
   creodias:
-    type: 'creodias'
+    type: 'resto'
+    url: 'https://datahub.creodias.eu'
+  copernicus_data_space:
+    type: 'resto'
+    url: 'https://catalogue.dataspace.copernicus.eu'
   earthdata_cmr:
     type: 'earthdata_cmr'
   gportal:
