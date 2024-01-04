@@ -12,8 +12,7 @@ import geospaas_harvesting.providers.podaac as providers_podaac
 import geospaas_harvesting.providers.cmems as providers_cmems
 import geospaas_harvesting.providers.resto as providers_resto
 
-
-TEST_FILES_PATH = Path(__file__).parent / 'data' / 'configuration_files'
+from . import TEST_FILES_PATH
 
 
 class ConfigurationTestCase(unittest.TestCase):
