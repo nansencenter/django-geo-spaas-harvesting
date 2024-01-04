@@ -10,7 +10,7 @@ import geospaas_harvesting.config as config
 import geospaas_harvesting.providers.base as providers_base
 import geospaas_harvesting.providers.podaac as providers_podaac
 import geospaas_harvesting.providers.cmems as providers_cmems
-import geospaas_harvesting.providers.creodias as providers_creodias
+import geospaas_harvesting.providers.resto as providers_resto
 
 
 TEST_FILES_PATH = Path(__file__).parent / 'data' / 'configuration_files'
@@ -77,7 +77,8 @@ class ProvidersConfigurationTestCase(unittest.TestCase):
         self.assertDictEqual(providers_config.pythesint_versions, {'gcmd_instrument': '9.1.5'})
         self.assertDictEqual(
             providers_config.providers,
-            {'creodias': providers_creodias.CreodiasProvider(name='creodias')}
+            {'creodias': providers_resto.RestoProvider(name='creodias',
+                                                       url='https://datahub.creodias.eu',)}
         )
 
 
@@ -118,7 +119,7 @@ class SearchConfigurationTestCase(unittest.TestCase):
             self.search_config.create_provider_searches(),
             [
                 providers_base.SearchResults(
-                    crawler=providers_creodias.CreodiasEOFinderCrawler(
+                    crawler=providers_resto.RestoCrawler(
                         'https://datahub.creodias.eu/resto/api/collections/SENTINEL-3/search.json',
                         search_terms={
                             'processingLevel': '2',
