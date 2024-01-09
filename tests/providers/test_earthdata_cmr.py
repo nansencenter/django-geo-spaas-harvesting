@@ -53,8 +53,39 @@ class EarthDataCMRProviderTestCase(unittest.TestCase):
         self.assertEqual(
             provider._make_spatial_parameter(Point((1, 2))),
             {'point': '1.0,2.0'})
+        self.assertEqual(
+            provider._make_spatial_parameter('bounding_box=-180,60,180,90'),
+            {'bounding_box': '-180,60,180,90'})
         with self.assertRaises(ValueError):
             provider._make_spatial_parameter(MultiPoint(((1, 2), (3, 4))))
+        with self.assertRaises(ValueError):
+            provider._make_spatial_parameter('polygon:1.0,2.0,2.0,3.0,3.0,4.0,1.0,2.0')
+
+
+class EarthDataSpatialArgumentTestCase(unittest.TestCase):
+    """Tests for the Earthdata CMR spatial argument"""
+    def setUp(self):
+        self.argument = provider_earthdata_cmr.EarthDataSpatialArgument(
+            'location', geometry_types=(Polygon,))
+
+    def test_parse_wkt(self):
+        """Test parsing a WKT geometry"""
+        self.assertEqual(self.argument.parse('POLYGON((1 2,2 3,3 4,1 2))'),
+                         Polygon(((1, 2), (2, 3), (3, 4), (1, 2))))
+
+    def test_parse_raw_spatial_extent(self):
+        """Test parsing raw CMR spatial extent parameters"""
+        self.assertEqual(self.argument.parse('bounding_box=-180,60,180,90'),
+                         'bounding_box=-180,60,180,90')
+        self.assertEqual(self.argument.parse('polygon=1.0,2.0,2.0,3.0,3.0,4.0,1.0,2.0'),
+                         'polygon=1.0,2.0,2.0,3.0,3.0,4.0,1.0,2.0')
+        self.assertEqual(self.argument.parse('line=1.0,2.0,3.0,4.0'), 'line=1.0,2.0,3.0,4.0')
+        self.assertEqual(self.argument.parse('point=1.0,2.0'), 'point=1.0,2.0')
+
+        with self.assertRaises(ValueError):
+            self.argument.parse('foo=1.0,2.0')
+        with self.assertRaises(ValueError):
+            self.argument.parse('point:1.0,2.0')
 
 
 class EarthdataCMRCrawlerTestCase(unittest.TestCase):
