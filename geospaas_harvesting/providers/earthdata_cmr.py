@@ -68,7 +68,7 @@ class EarthDataSpatialArgument(WKTArgument):
         valid_prefixes = ('polygon', 'bounding_box', 'point', 'line', 'circle')
         try:
             return super().parse(value)
-        except (shapely.errors.GEOSException, ValueError) as error:
+        except (shapely.errors.ShapelyError, ValueError) as error:
             if isinstance(value, str):
                 for prefix in valid_prefixes:
                     if value.startswith(f"{prefix}=") or value.startswith(f"{prefix}[]="):
