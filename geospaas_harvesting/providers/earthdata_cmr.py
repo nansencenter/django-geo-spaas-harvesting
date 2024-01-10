@@ -1,6 +1,7 @@
 """Code for searching EarthData CMR (https://www.earthdata.nasa.gov/)"""
 import json
 
+import shapely.errors
 from shapely.geometry import LineString, Point, Polygon
 
 import geospaas.catalog.managers as catalog_managers
@@ -18,7 +19,7 @@ class EarthDataCMRProvider(Provider):
         super().__init__(*args, **kwargs)
         self.search_url = 'https://cmr.earthdata.nasa.gov/search/granules.umm_json'
         self.search_parameters_parser.add_arguments([
-            WKTArgument('location', required=False, geometry_types=(LineString, Point, Polygon)),
+            EarthDataSpatialArgument('location', required=False, geometry_types=(LineString, Point, Polygon)),
             StringArgument('short_name', required=True, description='Short name of the collection'),
             ChoiceArgument('downloadable', valid_options=['true', 'false'], default='true'),
             StringArgument('platform'),
@@ -49,9 +50,32 @@ class EarthDataCMRProvider(Provider):
             result = {'line': ','.join([f"{lon},{lat}" for lon, lat in points])}
         elif isinstance(geometry, Point):
             result = {'point': f"{geometry.xy[0][0]},{geometry.xy[1][0]}"}
+        elif isinstance(geometry, str):
+            name, value = geometry.split('=')
+            result = {name: value}
         else:
             raise ValueError(f"Unsupported geometry type {type(geometry)}")
         return result
+
+
+class EarthDataSpatialArgument(WKTArgument):
+    """Argument that provides the specific spatial format required by
+    queries to the CMR API.
+    See https://cmr.earthdata.nasa.gov/search/site/docs/search/api.html#g-spatial
+    for valid parameters.
+    """
+    def parse(self, value):
+        valid_prefixes = ('polygon', 'bounding_box', 'point', 'line', 'circle')
+        try:
+            return super().parse(value)
+        except (shapely.errors.ShapelyError, ValueError) as error:
+            if isinstance(value, str):
+                for prefix in valid_prefixes:
+                    if value.startswith(f"{prefix}=") or value.startswith(f"{prefix}[]="):
+                        return value
+            raise ValueError(
+                "location should be a geometry or a valid CMR spatial parameter"
+            ) from error
 
 
 class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
