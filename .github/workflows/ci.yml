@@ -20,7 +20,7 @@ jobs:
     env:
       BASE_IMAGE: "${{ vars.DOCKER_ORG }}/geospaas:2.5.2-python${{ matrix.python_version }}"
       IMAGE_NAME: "${{ vars.DOCKER_ORG }}/geospaas_harvesting"
-      METANORM_VERSION: '4.2.1'
+      METANORM_VERSION: '4.2.2'
       GEOSPAAS_DB_HOST: 'db'
       GEOSPAAS_DB_USER: 'test'
       GEOSPAAS_DB_PASSWORD: "${{ secrets.GEOSPAAS_DB_PASSWORD }}"
