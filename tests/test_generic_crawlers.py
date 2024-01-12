@@ -17,6 +17,7 @@ from urllib.parse import ParseResult
 
 import requests
 
+import geospaas.catalog.managers
 import geospaas_harvesting.crawlers as crawlers
 
 
@@ -609,6 +610,37 @@ class LocalDirectoryCrawlerTestCase(unittest.TestCase):
 class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
     """Tests for the HTMLDirectoryCrawler crawler"""
 
+    def test_strip_folder_page(self):
+        """_strip_folder_page() should remove the index page from a
+        folder path
+        """
+        self.assertEqual(
+            crawlers.HTMLDirectoryCrawler._strip_folder_page('/foo/bar/contents.html'),
+            '/foo/bar')
+        self.assertEqual(
+            crawlers.HTMLDirectoryCrawler._strip_folder_page('/foo/bar/'),
+            '/foo/bar')
+        self.assertEqual(
+            crawlers.HTMLDirectoryCrawler._strip_folder_page('/foo/bar'),
+            '/foo/bar')
+
+    def test_get_right_number_of_links(self):
+        """Test that the crawler gets the correct number of links from a test page"""
+        with open(os.path.join(
+                os.path.dirname(__file__), 'data', 'opendap', 'root.html')) as data_file:
+            html = data_file.read()
+        self.assertEqual(len(crawlers.HTMLDirectoryCrawler._get_links(html)), 4)
+
+        with open(os.path.join(os.path.dirname(__file__), 'data', 'empty.html')) as data_file:
+            html = data_file.read()
+        self.assertEqual(len(crawlers.HTMLDirectoryCrawler._get_links(html)), 0)
+
+    def test_link_extractor_error(self):
+        """In case of error, LinkExtractor must use a logger"""
+        parser = crawlers.LinkExtractor()
+        with self.assertLogs(parser.logger, level=logging.ERROR):
+            parser.error('some message')
+
     def test_prepend_parent_path(self):
         """
         Should prepend all the paths with the parent_path, except if they already start with it
@@ -620,12 +652,34 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
             ['/foo/bar', '/foo/baz']
         )
 
-    def test_abstract_get_normalized_attributes(self):
-        """The get_normalized_attribute is abstract in
-        HTMLDirectoryCrawler
+    def test_list_folder_contents(self):
+        """Test listing a folder's contents"""
+        with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_http_get:
+            mock_http_get.return_value = (
+                '<html>'
+                '<a href="bar/contents.html">folder/</a>'
+                '<a href="baz/">folder/</a>'
+                '<html/>')
+            crawler = crawlers.HTMLDirectoryCrawler('')
+            self.assertListEqual(
+                crawler._list_folder_contents('/foo/contents.html'),
+                ['/foo/bar/contents.html', '/foo/baz/'])
+
+    def test_get_normalized_attributes(self):
+        """Test that the attributes are gotten using metanorm, and the
+        geospaas_service attributes are set
         """
-        with self.assertRaises(NotImplementedError):
-            crawlers.HTMLDirectoryCrawler('').get_normalized_attributes(None)
+        crawler = crawlers.HTMLDirectoryCrawler('http://foo')
+        with mock.patch.object(crawler, '_metadata_handler') as mock_handler:
+            mock_handler.get_parameters.return_value = {'foo': 'bar'}
+            self.assertDictEqual(
+                    crawler.get_normalized_attributes(crawlers.DatasetInfo('ftp://uri')),
+                    {
+                        'foo': 'bar',
+                        'geospaas_service_name': geospaas.catalog.managers.HTTP_SERVICE_NAME,
+                        'geospaas_service': geospaas.catalog.managers.HTTP_SERVICE
+                    })
+            mock_handler.get_parameters.assert_called_once_with({'url': 'ftp://uri'})
 
 
 class OpenDAPCrawlerTestCase(unittest.TestCase):
@@ -738,26 +792,6 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         """Test that an exception is raised in case of HTTP error code"""
         _ = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['inexistent']['urls'][0])
         mock_error_logger.assert_called_once()
-
-    def test_get_right_number_of_links(self):
-        """Test that the crawler gets the correct number of links from a test page"""
-        links = {}
-        for sample in ('root', 'empty'):
-            data_file = open(os.path.join(
-                os.path.dirname(__file__),
-                self.TEST_DATA[sample]['file_path']))
-            html = data_file.read()
-            data_file.close()
-            links[sample] = crawlers.OpenDAPCrawler._get_links(html)
-
-        self.assertEqual(len(links['root']), 4)
-        self.assertEqual(len(links['empty']), 0)
-
-    def test_link_extractor_error(self):
-        """In case of error, LinkExtractor must use a logger"""
-        parser = crawlers.LinkExtractor()
-        with self.assertLogs(parser.logger, level=logging.ERROR):
-            parser.error('some message')
 
     def test_process_folder(self):
         """

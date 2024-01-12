@@ -318,7 +318,8 @@ class DirectoryCrawler(Crawler):
         f'^.*/{YEAR_PATTERN}/?{MONTH_PATTERN}/?{DAY_OF_MONTH_PATTERN}(/.*)?$')
     DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}(/.*)?$')
 
-    def __init__(self, root_url, time_range=(None, None), include=None, max_threads=1):
+    def __init__(self, root_url, time_range=(None, None), include=None,
+                 username=None, password=None, max_threads=1):
         """
         `root_url` is the URL of the data repository to explore.
         `time_range` is a 2-tuple of datetime.datetime objects defining the time range
@@ -330,13 +331,17 @@ class DirectoryCrawler(Crawler):
         self.root_url = urlparse(root_url)
         self.time_range = time_range
         self.include = re.compile(include) if include else None
+        self.username = username
+        self.password = password
         self.set_initial_state()
 
     def __eq__(self, other):
         return (
             self.root_url == other.root_url and
             self.time_range == other.time_range and
-            self.include == other.include)
+            self.include == other.include and
+            self.username == other.username and
+            self.password == other.password)
 
     @property
     def base_url(self):
@@ -479,7 +484,8 @@ class DirectoryCrawler(Crawler):
         self.logger.debug("Looking for resources in '%s'...", folder_path)
         for path in self._list_folder_contents(folder_path):
             # deselect paths which contains any of the excludes strings
-            if self.EXCLUDE and self.EXCLUDE.search(path):
+            if ((self.EXCLUDE and self.EXCLUDE.search(path)) or
+                    self.root_url.path.startswith(path.rstrip(f"{os.sep}/"))):
                 continue
             if self._is_folder(path):
                 self._add_folder_to_process(path)
@@ -514,11 +520,11 @@ class LocalDirectoryCrawler(DirectoryCrawler):
 
 
 class HTMLDirectoryCrawler(DirectoryCrawler):
-    """Implementation of WebDirectoryCrawler for repositories exposed as HTML pages."""
+    """Implementation of DirectoryCrawler for repositories exposed as HTML pages."""
 
     logger = logging.getLogger(__name__ + '.HTMLDirectoryCrawler')
 
-    FOLDERS_SUFFIXES = None
+    FOLDERS_SUFFIXES = ('/',)
 
     # ------------- crawl ------------
     @staticmethod
@@ -527,7 +533,7 @@ class HTMLDirectoryCrawler(DirectoryCrawler):
         Remove the index page of a folder path.
         For example: /foo/bar/contents.html becomes /foo/bar.
         """
-        return re.sub(r'/\w+\.html?$', r'', folder_path)
+        return re.sub(r'/(\w+\.html)?$', r'', folder_path)
 
     def _is_folder(self, path):
         return path.endswith(self.FOLDERS_SUFFIXES)
@@ -557,13 +563,23 @@ class HTMLDirectoryCrawler(DirectoryCrawler):
         return result
 
     def _list_folder_contents(self, folder_path):
-        html = self._http_get(f"{self.base_url}{folder_path}")
+        request_parameters = {}
+        if self.username is not None and self.password is not None:
+           request_parameters['auth'] = (self.username, self.password)
+        html = self._http_get(f"{self.base_url}{folder_path}", request_parameters)
         stripped_folder_path = self._strip_folder_page(folder_path)
         return self._prepend_parent_path(stripped_folder_path, self._get_links(html))
 
     # --------- get metadata ---------
     def get_normalized_attributes(self, dataset_info, **kwargs):
-        raise NotImplementedError()
+        """Gets dataset attributes using http"""
+        raw_attributes = {}
+        self.add_url(dataset_info.url, raw_attributes)
+        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
+        # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
+        normalized_attributes['geospaas_service_name'] = catalog_managers.HTTP_SERVICE_NAME
+        normalized_attributes['geospaas_service'] = catalog_managers.HTTP_SERVICE
+        return normalized_attributes
 
 
 class OpenDAPCrawler(HTMLDirectoryCrawler):
@@ -690,16 +706,18 @@ class FTPCrawler(DirectoryCrawler):
     logger = logging.getLogger(__name__ + '.FTPCrawler')
 
     def __init__(self, root_url, time_range=(None, None), include=None,
-                 username='anonymous', password='anonymous', max_threads=1):
-
+                 username=None, password=None, max_threads=1):
         if not root_url.startswith('ftp://'):
             raise ValueError("The root url must start with 'ftp://'")
 
-        self.username = username
-        self.password = password
+        if username is None:
+            username = 'anonymous'
+        if password is None:
+            password = 'anonymous'
         self.ftp = None
 
-        super().__init__(root_url, time_range, include, max_threads=1)
+        super().__init__(root_url, time_range, include, max_threads=1,
+                         username=username, password=password)
 
     def __getstate__(self):
         """Method used to pickle the crawler"""
