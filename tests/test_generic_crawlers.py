@@ -665,6 +665,26 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
                 crawler._list_folder_contents('/foo/contents.html'),
                 ['/foo/bar/contents.html', '/foo/baz/'])
 
+    def test_list_folder_contents_no_auth(self):
+        """If no username and password are provided, HTTP requests
+        should not have an 'auth' parameter
+        """
+        with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_http_get:
+            mock_http_get.return_value = ('<html><html/>')
+            crawler = crawlers.HTMLDirectoryCrawler('http://foo')
+            crawler._list_folder_contents('/bar')
+            mock_http_get.assert_called_once_with('http://foo/bar', {})
+
+    def test_list_folder_contents_with_auth(self):
+        """If a username and password are provided, HTTP requests
+        should have an 'auth' parameter
+        """
+        with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_http_get:
+            mock_http_get.return_value = ('<html><html/>')
+            crawler = crawlers.HTMLDirectoryCrawler('http://foo', username='user', password='pass')
+            crawler._list_folder_contents('/bar')
+        mock_http_get.assert_called_once_with('http://foo/bar', {'auth': ('user', 'pass')})
+
     def test_get_normalized_attributes(self):
         """Test that the attributes are gotten using metanorm, and the
         geospaas_service attributes are set
