@@ -8,6 +8,7 @@ import geospaas_harvesting.providers.copernicus_scihub as providers_copernicus_s
 import geospaas_harvesting.providers.resto as providers_resto
 import geospaas_harvesting.providers.earthdata_cmr as providers_earthdata_cmr
 import geospaas_harvesting.providers.ftp as providers_ftp
+import geospaas_harvesting.providers.http as providers_http
 import geospaas_harvesting.providers.jaxa as providers_jaxa
 import geospaas_harvesting.providers.local as providers_local
 import geospaas_harvesting.providers.metno as providers_metno
@@ -62,6 +63,7 @@ class ProvidersArgument(DictArgument):
         'earthdata_cmr': providers_earthdata_cmr.EarthDataCMRProvider,
         'ftp': providers_ftp.FTPProvider,
         'gportal_ftp': providers_jaxa.GPortalProvider,
+        'http': providers_http.HTTPProvider,
         'netcdf': providers_local.NetCDFProvider,
         'nansat': providers_local.NansatProvider,
         'metno': providers_metno.METNOProvider,
