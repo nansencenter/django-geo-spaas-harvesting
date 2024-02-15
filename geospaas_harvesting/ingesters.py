@@ -21,10 +21,11 @@ class Ingester():
 
     logger = logging.getLogger(__name__ + '.Ingester')
 
-    def __init__(self, max_db_threads=1):
+    def __init__(self, max_db_threads=1, update=False):
         if not isinstance(max_db_threads, int):
             raise TypeError
         self.max_db_threads = max_db_threads
+        self.update = update
 
     @staticmethod
     def _uri_exists(uri):
@@ -38,12 +39,17 @@ class Ingester():
         url = dataset_info.url
         normalized_attributes = dataset_info.metadata
 
-        created_dataset = created_dataset_uri = False
+        created_dataset = created_dataset_uri = updated_dataset = False
 
-        if self._uri_exists(url):
+        try:
+            dataset_uri = DatasetURI.objects.get(uri=url)
+        except DatasetURI.DoesNotExist:
+            dataset_uri = None
+
+        if dataset_uri and not self.update:
             self.logger.info(
                 "'%s' is already present in the database", url)
-            return (url, created_dataset, created_dataset_uri)
+            return (url, created_dataset, created_dataset_uri, updated_dataset)
 
         # Extract service information
         service = normalized_attributes.pop('geospaas_service', 'UNKNOWN')
@@ -76,20 +82,28 @@ class Ingester():
         # Create Dataset in the database. The normalized_attributes dict contains the
         # "basic parameter", which are not objects in the database.
         # The objects we just created in the database are passed separately.
-        dataset, created_dataset = Dataset.objects.get_or_create(
+        attributes = {
+            'data_center': data_center,
+            'geographic_location': geographic_location,
+            'gcmd_location': location,
+            'ISO_topic_category': iso_topic_category,
+            'source': source,
             **normalized_attributes,
-            data_center=data_center,
-            geographic_location=geographic_location,
-            gcmd_location=location,
-            ISO_topic_category=iso_topic_category,
-            source=source)
-
-        # Create the URI for the created Dataset in the database
-        _, created_dataset_uri = DatasetURI.objects.get_or_create(
-            name=service_name,
-            service=service,
-            uri=url,
-            dataset=dataset)
+        }
+        # TODO: improve, in particular detect when changes are made
+        if dataset_uri:
+            queryset = Dataset.objects.filter(id=dataset_uri.dataset.id)
+            queryset.update(**attributes)
+            dataset = queryset.first()
+            updated_dataset = True
+        else:
+            dataset, created_dataset = Dataset.objects.get_or_create(**attributes)
+            # Create the URI for the created Dataset in the database
+            _, created_dataset_uri = DatasetURI.objects.get_or_create(
+                name=service_name,
+                service=service,
+                uri=url,
+                dataset=dataset)
 
         for dataset_parameter_info in dataset_parameters_list:
             standard_name = dataset_parameter_info.get('standard_name', None)
@@ -105,9 +119,9 @@ class Ingester():
             if params.count() >= 1:
                 dataset.parameters.add(params[0])
 
-        return (url, created_dataset, created_dataset_uri)
+        return (url, created_dataset, created_dataset_uri, updated_dataset)
 
-    def ingest(self, datasets_to_ingest, *args, **kwargs):
+    def ingest(self, datasets_to_ingest):
         """Iterates over a crawler and writes the datasets to the
         database. Database access can be parallelized, although it is
         usually not necessary. The bottleneck when harvesting is
@@ -122,11 +136,11 @@ class Ingester():
             try:
                 futures = []
                 for dataset_info in datasets_to_ingest:
-                    futures.append(executor.submit(self._ingest_dataset, dataset_info))
-
+                    futures.append(executor.submit(self._ingest_dataset,
+                                                   dataset_info))
                 for future in concurrent.futures.as_completed(futures):
                     try:
-                        url, created_dataset, created_dataset_uri = future.result()
+                        url, created_dataset, created_dataset_uri, updated_dataset = future.result()
                         if created_dataset:
                             self.logger.info("Successfully created dataset from url: '%s'", url)
                             if not created_dataset_uri:
@@ -137,8 +151,10 @@ class Ingester():
                                 self.logger.warning("The Dataset URI '%s' was not created.", url)
                         elif created_dataset_uri:
                             self.logger.info("Dataset URI '%s' added to existing dataset", url)
-                    except Exception:  # pylint: disable=broad-except
-                        self.logger.error("Error during ingestion", exc_info=True)
+                        elif updated_dataset:
+                            self.logger.info("Sucessfully updated dataset for url: '%s'", url)
+                    except Exception as error:  # pylint: disable=broad-except
+                        self.logger.error("Error during ingestion: %s", str(error), exc_info=True)
                     finally:
                         futures.remove(future)  # avoid keeping finished futures in memory
             except KeyboardInterrupt:

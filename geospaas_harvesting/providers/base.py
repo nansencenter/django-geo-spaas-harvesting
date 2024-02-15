@@ -4,7 +4,7 @@ import logging
 from shapely.geometry.polygon import Polygon
 
 import geospaas_harvesting.ingesters as ingesters
-from ..arguments import ArgumentParser, DatetimeArgument, WKTArgument
+from ..arguments import ArgumentParser, DatetimeArgument, DictArgument, WKTArgument
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +69,7 @@ class Provider(FilterMixin):
             DatetimeArgument('start_time', default=None),
             DatetimeArgument('end_time', default=None),
             WKTArgument('location', geometry_types=(Polygon,)),
+            DictArgument('ingester', default={})
         ])
 
     def __repr__(self):
@@ -89,8 +90,11 @@ class Provider(FilterMixin):
         search results returned by the crawler
         """
         parsed_parameters = self.search_parameters_parser.parse(parameters)
+        ingester_params = parsed_parameters.pop('ingester')
         filters = self._make_filters(parsed_parameters)
-        return SearchResults(self._make_crawler(parsed_parameters), filters=filters)
+        return SearchResults(self._make_crawler(parsed_parameters),
+                             filters=filters,
+                             ingester=ingesters.Ingester(**ingester_params))
 
     def _make_crawler(self, parameters):
         """Create a crawler from the search parameters"""
@@ -103,10 +107,11 @@ class SearchResults():
     Provides only basic functionality for now. To be extended when
     integrating the search and harvesting process in the web UI.
     """
-    def __init__(self, crawler, filters=None):
+    def __init__(self, crawler, filters=None, ingester=None):
         self.crawler = crawler
         self.crawler_iterator = None
         self.filters = filters if filters is not None else []
+        self.ingester = ingester
 
     def __repr__(self):
         return f"SearchResults for crawler: {self.crawler}"
@@ -139,7 +144,7 @@ class SearchResults():
                 return False
         return True
 
-    def save(self):
+    def save(self, **kwargs):
         """Save the datasets matching the search to the database"""
         logger.info("%s starting ingestion", self)
-        ingesters.Ingester().ingest(self)
+        self.ingester.ingest(self, **kwargs)
