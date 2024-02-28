@@ -957,7 +957,8 @@ class ERDDAPTableCrawler(Crawler):
             yield row[0]
 
     def crawl(self):
-        attributes = [self.time_attr, self.longitude_attr, self.latitude_attr] + self.variables
+        attributes = [self.time_attr, self.longitude_attr, self.latitude_attr,
+                      self.time_qc_attr, self.position_qc_attr] + self.variables
         for dataset_id in self.get_ids():
             yield DatasetInfo(
                 f'{self.url}?{",".join(attributes)}&{self.id_attr}="{dataset_id}"',
