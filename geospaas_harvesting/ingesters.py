@@ -36,11 +36,6 @@ class Ingester():
         self.update = update
 
     @staticmethod
-    def _uri_exists(uri):
-        """Checks if the given URI already exists in the database"""
-        return DatasetURI.objects.filter(uri=uri).exists()
-
-    @staticmethod
     def _prepare_dataset_attributes(normalized_attributes):
         """Prepares the attributes needed to instantiate a Dataset"""
         # Create the objects with which the dataset has relationships
@@ -194,7 +189,9 @@ class Ingester():
                                 # occurred in _ingest_dataset(), because the
                                 # presence of the URI in the database is checked
                                 # before attempting to ingest.
-                                self.logger.error("The Dataset URI '%s' was not created.", url)
+                                self.logger.error(
+                                    "The Dataset URI '%s' was not created for dataset '%s'",
+                                    url, dataset_entry_id)
                         elif dataset_status == OperationStatus.UPDATED:
                             self.logger.info("Sucessfully updated dataset '%s' from url: '%s'",
                                              dataset_entry_id, url)
