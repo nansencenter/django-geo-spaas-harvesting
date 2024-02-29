@@ -650,7 +650,7 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
     def test_list_folder_contents(self):
         """Test listing a folder's contents"""
         with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_http_get:
-            mock_http_get.return_value = (
+            mock_http_get.return_value.text = (
                 '<html>'
                 '<a href="bar/contents.html">folder/</a>'
                 '<a href="baz/">folder/</a>'
@@ -665,7 +665,7 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         should not have an 'auth' parameter
         """
         with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_http_get:
-            mock_http_get.return_value = ('<html><html/>')
+            mock_http_get.return_value.text = '<html><html/>'
             crawler = crawlers.HTMLDirectoryCrawler('http://foo')
             crawler._list_folder_contents('/bar')
             mock_http_get.assert_called_once_with('http://foo/bar', {})
@@ -675,7 +675,7 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         should have an 'auth' parameter
         """
         with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_http_get:
-            mock_http_get.return_value = ('<html><html/>')
+            mock_http_get.return_value.text = '<html><html/>'
             crawler = crawlers.HTMLDirectoryCrawler('http://foo', username='user', password='pass')
             crawler._list_folder_contents('/bar')
         mock_http_get.assert_called_once_with('http://foo/bar', {'auth': ('user', 'pass')})
