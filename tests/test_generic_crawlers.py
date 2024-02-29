@@ -43,12 +43,6 @@ class BaseCrawlerTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             crawler.set_initial_state()
 
-    def test_exception_on_iter(self):
-        """An exception must be raised if the __iter__ method is not overloaded"""
-        base_crawler = crawlers.Crawler()
-        with self.assertRaises(NotImplementedError):
-            _ = iter(base_crawler)
-
     def test_iter(self):
         """__iter__() should return self"""
         crawler = crawlers.Crawler()
@@ -71,7 +65,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
                 http_500_error,
                 mock.Mock())
             with self.assertLogs(crawlers.Crawler.logger, level=logging.WARNING):
-                crawlers.Crawler._http_get('url')
+                crawlers.Crawler._http_get('url', max_tries=5, wait_time=30)
 
             self.assertEqual(len(mock_request.mock_calls), 5)
             self.assertListEqual(mock_sleep.mock_calls, [mock.call(30 * (2**i)) for i in range(4)])
@@ -85,8 +79,9 @@ class BaseCrawlerTestCase(unittest.TestCase):
                 mock.patch('time.sleep') as mock_sleep:
             mock_request.side_effect = requests.ConnectionError
 
-            with self.assertLogs(crawlers.Crawler.logger, level=logging.ERROR):
-                self.assertIsNone(crawlers.Crawler._http_get('url'))
+            with self.assertLogs(crawlers.Crawler.logger, level=logging.WARNING), \
+                 self.assertRaises(RuntimeError):
+                crawlers.Crawler._http_get('url')
 
             self.assertEqual(len(mock_request.mock_calls), 5)
             self.assertEqual(len(mock_sleep.mock_calls), 5)
@@ -97,7 +92,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
         """
         with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
             mock_request.side_effect = requests.TooManyRedirects
-            with self.assertLogs(crawlers.Crawler.logger, level=logging.ERROR):
+            with self.assertRaises(requests.RequestException):
                 self.assertIsNone(crawlers.Crawler._http_get('url'))
 
     def test_abstract_get_normalized_attributes(self):
