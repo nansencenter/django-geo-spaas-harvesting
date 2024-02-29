@@ -45,9 +45,11 @@ class IngesterTestCase(django.test.TransactionTestCase):
         data_center.save()
         iso_topic_category = ISOTopicCategory(name='TEST')
         iso_topic_category.save()
-        dataset = Dataset(entry_title=title,
-                          ISO_topic_category=iso_topic_category,
-                          data_center=data_center)
+        dataset = Dataset(
+            entry_id=title,
+            entry_title=title,
+            ISO_topic_category=iso_topic_category,
+            data_center=data_center)
         dataset.save()
         return (dataset, True)
 
@@ -56,16 +58,6 @@ class IngesterTestCase(django.test.TransactionTestCase):
         dataset_uri = DatasetURI(uri=uri, dataset=dataset)
         dataset_uri.save()
         return (dataset_uri, True)
-
-    def test_check_existing_uri(self):
-        """The _uri_exists() method must return True if a URI already exists, False otherwise"""
-
-        uri = 'http://test.uri/dataset'
-        self.assertFalse(self.ingester._uri_exists(uri))
-
-        dataset, _ = self._create_dummy_dataset('test')
-        self._create_dummy_dataset_uri(uri, dataset)
-        self.assertTrue(self.ingester._uri_exists(uri))
 
     def test_ingest_dataset(self):
         """Test ingesting a dataset from a DatasetInfo object"""
@@ -81,6 +73,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
 
         self.ingester._ingest_dataset(dataset_info)  # pylint: disable=protected-access
         dataset = Dataset.objects.last()
+        self.assertEqual(dataset.entry_id, 'id')
         self.assertEqual(dataset.entry_title, 'title')
         self.assertEqual(dataset.summary, 'sum-up')
         self.assertEqual(dataset.time_coverage_start,
@@ -98,18 +91,16 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.assertListEqual(list(dataset.parameters.all()), [parameters[0]])
 
     def test_ingest_same_uri_twice(self):
-        """Ingestion of the same URI must not happen twice and the attempt must be logged"""
+        """Ingestion of the same URI must not happen twice"""
         uri = 'http://test.uri/dataset'
         dataset, _ = self._create_dummy_dataset('test')
         self._create_dummy_dataset_uri(uri, dataset)
-        dataset_info = crawlers.DatasetInfo(uri, {})
+        dataset_info = crawlers.DatasetInfo(uri, {'entry_id': 'test'})
 
-        with self.assertLogs(self.ingester.logger, level=logging.INFO) as logger_cm:
-            self.ingester._ingest_dataset(dataset_info)
+        _, _, dataset_status, dataset_uri_status = self.ingester._ingest_dataset(dataset_info)
 
-        self.assertTrue(any((
-            record.getMessage().endswith('already present in the database')
-            for record in logger_cm.records)))
+        self.assertEqual(dataset_status, ingesters.OperationStatus.NOOP)
+        self.assertEqual(dataset_uri_status, ingesters.OperationStatus.NOOP)
         self.assertEqual(Dataset.objects.count(), 1)
 
     def test_ingest_same_dataset_different_uri(self):
@@ -131,32 +122,42 @@ class IngesterTestCase(django.test.TransactionTestCase):
     def test_log_on_ingestion_error(self):
         """The cause of the error must be logged if an exception is raised while ingesting"""
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
-            mock_ingest_dataset.side_effect = TypeError
+            mock_ingest_dataset.side_effect = TypeError('error message')
             with self.assertLogs(self.ingester.logger, level=logging.ERROR) as logger_cm:
                 self.ingester.ingest([crawlers.DatasetInfo(('some_url', {}))])
             self.assertEqual(logger_cm.records[0].message,
-                             "Error during ingestion")
+                             "Error during ingestion: error message")
             self.assertIs(logger_cm.records[0].exc_info[0], TypeError)
 
     def test_log_on_ingestion_success(self):
         """All ingestion successes must be logged"""
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
-            mock_ingest_dataset.return_value = ('some_url', True, True)
+            mock_ingest_dataset.return_value = (
+                'some_url',
+                'entry_id',
+                ingesters.OperationStatus.CREATED,
+                ingesters.OperationStatus.CREATED
+            )
             with self.assertLogs(self.ingester.logger, level=logging.INFO) as logger_cm:
                 self.ingester.ingest([crawlers.DatasetInfo('some_url', {})])
                 self.assertEqual(logger_cm.records[0].message,
-                                 "Successfully created dataset from url: 'some_url'")
+                                 "Successfully created dataset 'entry_id' from url: 'some_url'")
 
     def test_log_on_ingestion_same_dataset_different_uri(self):
         """A message must be logged when a URI is added to an existing
         dataset
         """
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
-            mock_ingest_dataset.return_value = ('some_url', False, True)
+            mock_ingest_dataset.return_value = (
+                'some_url',
+                'entry_id',
+                ingesters.OperationStatus.NOOP,
+                ingesters.OperationStatus.CREATED
+            )
             with self.assertLogs(self.ingester.logger, level=logging.INFO) as logger_cm:
                 self.ingester.ingest([crawlers.DatasetInfo('some_url', {})])
                 self.assertEqual(logger_cm.records[0].message,
-                                 "Dataset URI 'some_url' added to existing dataset")
+                                 "Dataset URI 'some_url' added to existing dataset 'entry_id'")
 
     def test_log_error_on_dataset_created_with_existing_uri(self):
         """
@@ -164,11 +165,16 @@ class IngesterTestCase(django.test.TransactionTestCase):
         exists in the database (this should not be possible)
         """
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
-            mock_ingest_dataset.return_value = ('some_url', True, False)
+            mock_ingest_dataset.return_value = (
+                'some_url',
+                'entry_id',
+                ingesters.OperationStatus.CREATED,
+                ingesters.OperationStatus.NOOP
+            )
             with self.assertLogs(self.ingester.logger, level=logging.WARNING) as logger_cm:
                 self.ingester.ingest([crawlers.DatasetInfo('some_url', {})])
             self.assertEqual(logger_cm.records[0].message,
-                             "The Dataset URI 'some_url' was not created.")
+                             "The Dataset URI 'some_url' was not created for dataset 'entry_id'")
 
     def test_keyboard_interruption(self):
         """Test that keyboard interrupts are managed properly"""
