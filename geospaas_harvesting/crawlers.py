@@ -91,20 +91,14 @@ class Crawler():
                 # retry only for connection errors and HTTP errors 5**
                 if (isinstance(error, requests.HTTPError) and
                         (error.response.status_code < 500 or error.response.status_code > 599)):
-                    cls.logger.error('Could not get page', exc_info=True)
                     raise
                 else:
                     last_error = error
                     cls.logger.warning('Error while sending request to %s, %d retries left',
                                        url, max_tries - try_index - 1, exc_info=True)
-            except requests.exceptions.RequestException:
-                # don't retry
-                cls.logger.error('Could not get page', exc_info=True)
-                raise
             time.sleep(wait_time)
             wait_time *= 2
-        cls.logger.error('Max retries reached for %s', url)
-        raise last_error
+        raise RuntimeError(f"Max retries reached trying to get {url}") from last_error
 
     # --------- get metadata ---------
     def get_normalized_attributes(self, dataset_info, **kwargs):
