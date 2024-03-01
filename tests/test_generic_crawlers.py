@@ -2,6 +2,7 @@
 # pylint: disable=protected-access
 
 import ftplib
+import io
 import logging
 import os
 import pickle
@@ -94,6 +95,15 @@ class BaseCrawlerTestCase(unittest.TestCase):
             mock_request.side_effect = requests.TooManyRedirects
             with self.assertRaises(requests.RequestException):
                 self.assertIsNone(crawlers.Crawler._http_get('url'))
+
+    def test_http_get_error_on_404_status(self):
+        """Test that an exception is raised in case of HTTP error code"""
+        response = requests.Response()
+        response.status_code = 404
+        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
+            mock_request.side_effect = requests.HTTPError(response=response)
+            with self.assertRaises(requests.HTTPError):
+                crawlers.Crawler._http_get('http://foo')
 
     def test_abstract_get_normalized_attributes(self):
         """get_normalized_attributes() should raise a NotImplementedError"""
@@ -792,21 +802,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         for opened_file in self.opened_files:
             opened_file.close()
 
-    def test_get_correct_html_contents(self):
-        """Test that the _http_get() method returns the correct HTML string"""
-        data_file = open(os.path.join(os.path.dirname(__file__), 'data/opendap/root.html'))
-        html = data_file.read()
-        data_file.close()
 
-        html_from_method = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['root']['urls'][0])
-
-        self.assertEqual(html, html_from_method)
-
-    @mock.patch('logging.Logger.error')
-    def test_get_html_logs_error_on_http_status(self, mock_error_logger):
-        """Test that an exception is raised in case of HTTP error code"""
-        _ = crawlers.OpenDAPCrawler._http_get(self.TEST_DATA['inexistent']['urls'][0])
-        mock_error_logger.assert_called_once()
 
     def test_process_folder(self):
         """
@@ -1115,7 +1111,10 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
         then increment the offset
         """
         crawler = crawlers.HTTPPaginatedAPICrawler('https://foo')
-        with mock.patch.object(crawler, '_http_get', return_value='foo'), \
+        response = requests.Response()
+        response.status_code = 200
+        response.raw = io.BytesIO(b'foo')
+        with mock.patch.object(crawler, '_http_get', return_value=response), \
                 self.assertLogs(crawler.logger, level=logging.DEBUG):
             self.assertEqual(crawler._get_next_page(), 'foo')
             self.assertEqual(crawler.request_parameters['params'][crawler.PAGE_OFFSET_NAME], 1)
