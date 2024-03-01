@@ -50,6 +50,11 @@ class BaseCrawlerTestCase(unittest.TestCase):
         crawler.crawl = lambda: []
         self.assertIsInstance(iter(crawler), crawlers.CrawlerIterator)
 
+    def test_abstract_crawl(self):
+        """The crawl method should raise a NotImplementedError"""
+        with self.assertRaises(NotImplementedError):
+            crawlers.Crawler().crawl()
+
     def test_http_get_retry(self):
         """Test that _http_get retries the request when a connection
         error or a server error occurs
@@ -297,6 +302,17 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
              datetime(2020, 1, 2, tzinfo=timezone.utc)))
         self.assertListEqual(crawler._results, [])
         self.assertListEqual(crawler._to_process, ['/bar.nc'])
+
+    def test_equality(self):
+        """Test equality of two DirectoryCrawler objects"""
+        self.assertEqual(
+            crawlers.DirectoryCrawler(
+                'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
+                r'.*\.nc', 'user', 'pass'),
+            crawlers.DirectoryCrawler(
+                'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
+                r'.*\.nc', 'user', 'pass'),
+        )
 
     def test_abstract_list_folder_contents(self):
         """
