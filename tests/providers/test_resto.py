@@ -21,9 +21,10 @@ class RestoProviderTestCase(unittest.TestCase):
 
     def test_make_crawler(self):
         """Test creating a crawler from parameters"""
-        provider = providers_resto.RestoProvider(
-            name='test', url='https://datahub.creodias.eu',
-            username='user', password='pass')
+        with mock.patch('geospaas_harvesting.utils.http_request'):
+            provider = providers_resto.RestoProvider(
+                name='test', url='https://datahub.creodias.eu',
+                username='user', password='pass')
         parameters = {
             'collection': 'SENTINEL-1',
             'location': Polygon(((1, 2), (2, 3), (3, 4), (1, 2))),
