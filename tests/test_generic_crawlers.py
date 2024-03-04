@@ -31,6 +31,15 @@ class DatasetInfoTestCase(unittest.TestCase):
         self.assertEqual(dataset_info.url, 'url')
         self.assertDictEqual(dataset_info.metadata, {'foo': 'bar'})
 
+    def test_equality(self):
+        """Test equality between two DatasetInfo objects"""
+        self.assertEqual(
+            crawlers.DatasetInfo('foo', {'bar': 'baz'}),
+            crawlers.DatasetInfo('foo', {'bar': 'baz'}))
+        self.assertNotEqual(
+            crawlers.DatasetInfo('foo', {'bar': 'baz'}),
+            crawlers.DatasetInfo('foo', {'bar': 'quz'}))
+
 
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
