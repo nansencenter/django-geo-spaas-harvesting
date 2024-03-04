@@ -69,27 +69,30 @@ class ProvidersConfigurationTestCase(unittest.TestCase):
 
     def test_parse_providers_config(self):
         """Test parsing a providers configuration file"""
-        providers_config = config.ProvidersConfiguration.from_file(
-            TEST_FILES_PATH / 'providers_config.yml')
-        self.assertFalse(providers_config.update_vocabularies)
-        self.assertFalse(providers_config.update_vocabularies)
-        self.assertDictEqual(providers_config.pythesint_versions, {'gcmd_instrument': '9.1.5'})
-        self.assertDictEqual(
-            providers_config.providers,
-            {'creodias': providers_resto.RestoProvider(name='creodias',
-                                                       url='https://datahub.creodias.eu',)}
-        )
+        with mock.patch('geospaas_harvesting.utils.http_request'):
+            providers_config = config.ProvidersConfiguration.from_file(
+                TEST_FILES_PATH / 'providers_config.yml')
+            self.assertFalse(providers_config.update_vocabularies)
+            self.assertFalse(providers_config.update_vocabularies)
+            self.assertDictEqual(providers_config.pythesint_versions, {'gcmd_instrument': '9.1.5'})
+            self.assertDictEqual(
+                providers_config.providers,
+                {'creodias': providers_resto.RestoProvider(name='creodias',
+                                                           url='https://datahub.creodias.eu',)})
 
 
 class SearchConfigurationTestCase(unittest.TestCase):
     """Tests for the SearchConfiguration class"""
 
     def setUp(self):
+        self.mock_http_request = mock.patch('geospaas_harvesting.utils.http_request').start()
+        self.addCleanup(mock.patch.stopall)
         self.providers_config = config.ProvidersConfiguration.from_file(
             TEST_FILES_PATH / 'providers_config.yml')
         self.search_config = config.SearchConfiguration \
             .from_file(TEST_FILES_PATH / 'search_config.yml') \
             .with_providers(self.providers_config.providers)
+        # self.mock_request = mock.patch('requests.request').start()
 
     def test_create_search_configuration(self):
         """Test making a SearchConfiguration object from files"""
@@ -114,19 +117,12 @@ class SearchConfigurationTestCase(unittest.TestCase):
     def test_create_provider_searches(self):
         """Test starting searches from a SearchConfiguration object
         """
-        self.assertListEqual(
-            self.search_config.create_provider_searches(),
-            [
-                providers_base.SearchResults(
-                    crawler=providers_resto.RestoCrawler(
-                        'https://datahub.creodias.eu/resto/api/collections/SENTINEL-3/search.json',
-                        search_terms={
-                            'processingLevel': '2',
-                            'status': 'all',
-                            'dataset': 'ESA-DATASET',
-                        },
-                        time_range=(datetime(2023, 1, 1, tzinfo=tz.utc),
-                                    datetime(2023, 1, 2, tzinfo=tz.utc))))
-            ]
-        )
-
+        with mock.patch('geospaas_harvesting.providers.resto.RestoProvider.search') as mock_search:
+            self.assertListEqual(
+                self.search_config.create_provider_searches(),
+                [mock_search.return_value])
+        mock_search.assert_called_once_with(
+            collection='SENTINEL-3',
+            processingLevel='2',
+            start_time='2023-01-01',
+            end_time='2023-01-02')

@@ -22,9 +22,9 @@ class IngestionRecoveryTestCase(django.test.TestCase):
             'geospaas_harvesting.crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH',
             self.tmp_dir.name
         ).start()
+        self.addCleanup(mock.patch.stopall)
 
     def tearDown(self):
-        self.addCleanup(mock.patch.stopall)
         self.tmp_dir = None
 
     def generate_recovery_file(self, exception_type, errors_count=1):
