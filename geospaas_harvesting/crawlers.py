@@ -923,9 +923,13 @@ class ERDDAPTableCrawler(Crawler):
     def __eq__(self, other):
         return (
             self.url == other.url and
+            self.id_attr == other.id_attr and
             self.longitude_attr == other.longitude_attr and
             self.latitude_attr == other.latitude_attr and
             self.time_attr == other.time_attr and
+            self.position_qc_attr == other.position_qc_attr and
+            self.time_qc_attr == other.time_qc_attr and
+            self.valid_qc_codes == other.valid_qc_codes and
             self.search_terms == other.search_terms and
             self.variables == other.variables
         )
