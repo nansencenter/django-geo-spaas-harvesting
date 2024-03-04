@@ -934,10 +934,7 @@ class ERDDAPTableCrawler(Crawler):
         """Nothing to do"""
 
     def get_ids(self):
-        """Fetch identifiers matching the coverage conditions.
-        `parameters` is a dictionary containing extra parameters for
-        the request
-        """
+        """Fetch identifiers matching the search terms"""
         url = f"{self.url}?{self.id_attr}&distinct()"
         kwargs = {}
         url = '&'.join([url] + self.search_terms)
@@ -951,8 +948,11 @@ class ERDDAPTableCrawler(Crawler):
             yield row[0]
 
     def crawl(self):
-        attributes = [self.time_attr, self.longitude_attr, self.latitude_attr,
-                      self.time_qc_attr, self.position_qc_attr] + self.variables
+        attributes = [self.time_attr, self.longitude_attr, self.latitude_attr]
+        for qc_attr in (self.time_qc_attr, self.position_qc_attr):
+            if qc_attr:
+                attributes.append(qc_attr)
+        attributes.extend(self.variables)
         for dataset_id in self.get_ids():
             yield DatasetInfo(
                 f'{self.url}?{",".join(attributes)}&{self.id_attr}="{dataset_id}"',
@@ -964,27 +964,30 @@ class ERDDAPTableCrawler(Crawler):
         """
         return not self.valid_qc_codes or qc_value in self.valid_qc_codes
 
-    def get_coverage(self, dataset_id):
-        """Get the temporal and spatial coverage for a specific dataset
-        """
+    def _make_coverage_url(self):
+        """"""
         qc_attributes = ','.join(c for c in (self.time_qc_attr, self.position_qc_attr) if c)
         if qc_attributes:
             qc_attributes = f",{qc_attributes}"
+        return (f'{self.url}?{self.time_attr},{self.longitude_attr},{self.latitude_attr}' +
+                qc_attributes +
+                f'&distinct()&orderBy("{self.time_attr}")')
 
-        url = (f'{self.url}?{self.time_attr},{self.longitude_attr},{self.latitude_attr}' +
-               qc_attributes +
-               f'&distinct()&orderBy("{self.time_attr}")')
-
+    def get_coverage(self, dataset_id):
+        """Get the temporal and spatial coverage for a specific dataset
+        """
         try:
-            response = self._http_get(url, request_parameters={
+            response = self._http_get(self._make_coverage_url(), request_parameters={
                 'params': {self.id_attr: f'"{dataset_id}"'}
             })
-        except requests.HTTPError:
+        except requests.HTTPError as error:
             self.logger.error("Could not get coverage for dataset %s: %s",
-                              dataset_id, response.content)
+                              dataset_id, error.response.content)
             raise
         rows = response.json()['table']['rows']
 
+        # build the trajectory and get the first time with valid QC
+        # (the query results are sorted by time)
         time_coverage_start = None
         trajectory = []
         for row in rows:
@@ -993,6 +996,7 @@ class ERDDAPTableCrawler(Crawler):
             if self._check_qc(row[4]):
                 trajectory.append((row[1], row[2]))
 
+        # get the last time with valid QC
         time_coverage_end = None
         for row in rows[::-1]:
             if self._check_qc(row[3]):
@@ -1004,22 +1008,26 @@ class ERDDAPTableCrawler(Crawler):
 
         return ((time_coverage_start, time_coverage_end), trajectory)
 
-    def get_product_metadata(self):
-        """Get the product's metadata"""
+    def _make_product_metadata_url(self):
+        """Generate the product metadata URL from the base data URL"""
         match = re.match(r'^(https?://.*)/tabledap/(.*)\.json$', self.url)
         if match:
-            url = f"{match.group(1)}/info/{match.group(2)}/index.json"
+            return f"{match.group(1)}/info/{match.group(2)}/index.json"
         else:
             raise RuntimeError(f"Unable to get product metadata URL from {self.url}")
+
+    def get_product_metadata(self):
+        """Get the product's metadata"""
+        url = self._make_product_metadata_url()
         try:
-            response = utils.http_request('GET', url)
+            response = self._http_get(url)
         except requests.HTTPError:
             self.logger.info("Could not get product metadata from %s", url)
             raise
         return response.json()
 
     def get_normalized_attributes(self, dataset_info, **kwargs):
-        """Gets dataset attributes using http"""
+        """Use metanorm to normalize a DatasetInfo's raw attributes"""
         raw_attributes = dataset_info.metadata
         self.add_url(dataset_info.url, raw_attributes)
         coverage = self.get_coverage(dataset_info.metadata['entry_id'])
