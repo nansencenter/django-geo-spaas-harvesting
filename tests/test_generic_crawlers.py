@@ -320,8 +320,14 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
                 r'.*\.nc', 'user', 'pass'),
             crawlers.DirectoryCrawler(
                 'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
+                r'.*\.nc', 'user', 'pass'))
+        self.assertNotEqual(
+            crawlers.DirectoryCrawler(
+                'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
                 r'.*\.nc', 'user', 'pass'),
-        )
+            crawlers.DirectoryCrawler(
+                'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
+                r'.*\.nc', 'user', 'password'))
 
     def test_abstract_list_folder_contents(self):
         """
