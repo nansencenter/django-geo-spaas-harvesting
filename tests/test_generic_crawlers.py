@@ -1318,3 +1318,254 @@ class FTPCrawlerTestCase(unittest.TestCase):
                         'geospaas_service': 'ftp'
                     })
             mock_handler.get_parameters.assert_called_once_with({'url': 'ftp://uri'})
+
+
+class ERDDAPTableCrawlerTestCase(unittest.TestCase):
+    """Tests for ERDDAPTableCrawler"""
+
+    TEST_DATA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'erddap')
+
+    def test_url_check(self):
+        """ERDDAPTableCrawler's url should end with .json"""
+        with self.assertRaises(ValueError):
+            crawlers.ERDDAPTableCrawler('http://foo', 'bar')
+
+    def test_equality(self):
+        """Test equality of two DirectoryCrawler objects"""
+        self.assertEqual(
+            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number'),
+            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number'))
+        self.assertNotEqual(
+            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number'),
+            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number',
+                                        longitude_attr='lon', latitude_attr='lat'))
+
+    def test_get_ids(self):
+        """Test gettings identifiers which match search terms"""
+        response_path = os.path.join(self.TEST_DATA_PATH, 'ids.json')
+        response = requests.Response()
+        response.status_code = 200
+        response.raw = open(response_path, 'rb')
+        crawler = crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number',
+                                              search_terms=['time>=2024-01-01T00:00:00Z',
+                                                            'time<=2024-01-01T01:00:00Z'])
+        with mock.patch.object(crawler, '_http_get', return_value=response):
+            ids = crawler.get_ids()
+            self.assertListEqual(
+                list(ids),
+                ["3901480", "5905121", "5905267", "5905498", "5905533", "5905765", "5905878",
+                 "5906337", "5906912", "5906993", "6902906", "6903060"])
+        response.raw.close()
+
+    def test_get_ids_error(self):
+        """An error message must be logged if an error happens when
+        fetching IDs
+        """
+        error = requests.HTTPError(response=mock.Mock(content='error message'))
+        crawler = crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number')
+        with mock.patch.object(crawler, '_http_get', side_effect=error):
+            with self.assertLogs(logger=crawler.logger, level=logging.ERROR), \
+                 self.assertRaises(requests.HTTPError):
+                list(crawler.get_ids())
+
+    def test_crawl(self):
+        """Test the DatasetInfo objects returned by the crawler"""
+        ids = ["3901480", "5905121", "5905267"]
+        crawler = crawlers.ERDDAPTableCrawler(
+            'http://foo/ArgoFloats.json', 'platform_number',
+            position_qc_attr='position_qc', variables=['foo', 'bar'])
+        with mock.patch.object(crawler, 'get_ids', return_value=ids):
+            self.assertListEqual(
+                list(crawler.crawl()),
+                [
+                    crawlers.DatasetInfo(
+                        'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
+                        '&platform_number="3901480"',
+                        {'entry_id': '3901480'}),
+                    crawlers.DatasetInfo(
+                        'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
+                        '&platform_number="5905121"',
+                        {'entry_id': '5905121'}),
+                    crawlers.DatasetInfo(
+                        'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
+                        '&platform_number="5905267"',
+                        {'entry_id': '5905267'}),
+                ])
+
+    def test_check_qc(self):
+        """Test the QC validation"""
+        crawler = crawlers.ERDDAPTableCrawler('foo.json', 'bar', valid_qc_codes=('1', '2'))
+        self.assertTrue(crawler._check_qc('1'))
+        self.assertTrue(crawler._check_qc('2'))
+        self.assertFalse(crawler._check_qc('0'))
+        self.assertFalse(crawler._check_qc('3'))
+        self.assertFalse(crawler._check_qc(1))
+
+    def test_make_coverage_url(self):
+        """Test making the URL to get a dataset's temporal and spatial
+        coverage
+        """
+        self.assertEqual(
+            crawlers.ERDDAPTableCrawler('https://foo.json', 'id',
+                                        longitude_attr='lon', latitude_attr='lat', time_attr='time',
+                                        position_qc_attr='pos_qc',
+                                        variables=['bar', 'baz'])._make_coverage_url(),
+            'https://foo.json?time,lon,lat,pos_qc&distinct()&orderBy("time")'
+        )
+
+    def test_get_coverage(self):
+        """Test getting the temporal and spatial coverage for one
+        dataset
+        """
+        crawler = crawlers.ERDDAPTableCrawler(
+            'https://foo.json', 'platform_number',
+            longitude_attr='longitude', latitude_attr='latitude',
+            time_attr='time',
+            position_qc_attr='position_qc', time_qc_attr='time_qc')
+
+        response = requests.Response()
+        response.status_code = 200
+        response.raw = open(os.path.join(self.TEST_DATA_PATH, 'coverage.json'), 'rb')
+
+        expected_trajectory = [
+            (-11.863, -0.126),
+            (-13.83, -0.035),
+            (-15.744, 0.68),
+            (-16.674, 0.76),
+            (-17.133, 1.21),
+            (-17.74, 1.403),
+            (-17.734, 1.263),
+            (-17.189, 1.756),
+            (-16.437, 1.191),
+            (-16.039, 1.409),
+            (-15.451, 1.177),
+            (-15.075, 1.132),
+            (-14.329, 1.182),
+            (-13.586, 1.285),
+            (-13.488, 1.766),
+            (-13.593, 2.086),
+            (-14.115, 2.533),
+            (-15.016, 2.923),
+            (-15.901, 3.11),
+            (-16.634, 3.042),
+            (-16.874, 3.115),
+            (-17.081, 3.125),
+            (-17.515, 3.171),
+            (-17.623, 3.318),
+            (-17.668, 3.358),
+            (-17.332, 3.699),
+            (-16.714, 3.96),
+            (-15.962, 4.15),
+            (-15.254, 3.998),
+            (-14.585, 4.127),
+            (-14.048, 4.175),
+            (-13.926, 4.17),
+            (-13.769, 4.183),
+            (-13.47, 4.276),
+            (-13.134, 4.322),
+            (-12.887, 4.221),
+            (-12.702, 4.292),
+            (-12.415, 4.275),
+            (-12.116, 4.126),
+            (-11.792, 3.997),
+            (-11.3, 3.732),
+            (-10.925, 3.94),
+            (-10.152, 3.852),
+            (-9.558, 4.015),
+            (-9.756, 4.6),
+            (-10.046, 5.203),
+            (-9.934, 5.179),
+            (-9.612, 4.975),
+        ]
+
+        with mock.patch.object(crawler, '_http_get', return_value=response) as mock_http_get:
+            self.assertTupleEqual(
+                crawler.get_coverage('13858'),
+                (("1997-07-28T20:26:20Z", "1998-12-27T20:00:25Z"), expected_trajectory))
+        mock_http_get.assert_called_once_with(
+            crawler._make_coverage_url(),
+            request_parameters={'params': {'platform_number': '"13858"'}})
+        response.raw.close()
+
+    def test_get_coverage_error(self):
+        """`get_coverage` must raise an exception when the coverage
+        cannot be determined
+        """
+        crawler = crawlers.ERDDAPTableCrawler(
+            'https://foo.json', 'platform_number', valid_qc_codes=(1,))
+        with mock.patch.object(crawler, '_http_get') as mock_http_get:
+            mock_http_get.return_value.json.return_value = {
+                'table': {
+                    'rows': [
+                        ["1997-07-28T20:26:20Z", -11.863, -0.126, "3", "1"],
+                        ["1997-08-09T01:52:41Z", -13.83, -0.035, "5", "1"],
+                        ["1997-08-19T20:44:44Z", -15.744, 0.68, "3", "1"],
+                        ["1997-08-30T20:12:43Z", -16.674, 0.76, "4", "1"],
+                        ["1997-09-10T21:03:19Z", -17.133, 1.21, "4", "1"],
+                    ]
+                }
+            }
+            with self.assertRaises(RuntimeError):
+                crawler.get_coverage('123456')
+
+    def test_get_coverage_http_error(self):
+        """`get_coverage` must raise an exception when an HTTP error
+        happens
+        """
+        crawler = crawlers.ERDDAPTableCrawler('https://foo.json', 'platform_number')
+        error = requests.HTTPError(response=mock.MagicMock())
+        with mock.patch.object(crawler, '_http_get', side_effect=error):
+            with self.assertRaises(requests.HTTPError), \
+                 self.assertLogs(crawler.logger, logging.ERROR):
+                crawler.get_coverage('123456')
+
+    def test_make_product_metadata_url(self):
+        """Test creating the URL to a product's metadata"""
+        self.assertEqual(
+            crawlers.ERDDAPTableCrawler(
+                'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', 'id'
+            )._make_product_metadata_url(),
+            'https://erddap.ifremer.fr/erddap/info/ArgoFloats/index.json')
+
+        with self.assertRaises(RuntimeError):
+            crawlers.ERDDAPTableCrawler('https://foo.json', 'id')._make_product_metadata_url()
+
+    def test_get_product_metadata(self):
+        """Test getting a product's metadata"""
+        crawler = crawlers.ERDDAPTableCrawler(
+            'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', 'id')
+        with mock.patch.object(crawler, '_http_get') as mock_http_get:
+            result = crawler.get_product_metadata()
+        self.assertEqual(result, mock_http_get.return_value.json.return_value)
+        mock_http_get.assert_called_with(crawler._make_product_metadata_url())
+
+    def test_get_product_metadata_http_error(self):
+        """`get_coverage` must raise an exception when an HTTP error
+        happens
+        """
+        crawler = crawlers.ERDDAPTableCrawler(
+            'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', 'id')
+        error = requests.HTTPError
+        with mock.patch.object(crawler, '_http_get', side_effect=error):
+            with self.assertRaises(error), self.assertLogs(crawler.logger, logging.ERROR):
+                crawler.get_product_metadata()
+
+    def test_get_normalized_attributes(self):
+        """Test attributes normalization"""
+        dataset_info = crawlers.DatasetInfo('https://foo.json?id=bar', {'entry_id': 'bar'})
+        crawler = crawlers.ERDDAPTableCrawler('https://foo.json', 'id')
+        with mock.patch.object(crawler, 'get_coverage') as mock_get_coverage, \
+             mock.patch.object(crawler, 'get_product_metadata') as mock_get_product_metadata, \
+             mock.patch.object(crawler._metadata_handler, 'get_parameters') as mock_get_parameters:
+            mock_get_coverage.return_value = (('date1', 'date2'), [(1, 2), (3, 4)])
+            mock_get_product_metadata.return_value = {'baz': 'qux'}
+            mock_get_parameters.return_value = {'key1': 'value1', 'key2': 'value2'}
+            result = crawler.get_normalized_attributes(dataset_info)
+        self.assertDictEqual(
+            result,
+            {
+                'key1': 'value1',
+                'key2': 'value2',
+                'geospaas_service_name': geospaas.catalog.managers.HTTP_SERVICE_NAME,
+                'geospaas_service': geospaas.catalog.managers.HTTP_SERVICE
+            })
