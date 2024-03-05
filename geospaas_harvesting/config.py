@@ -5,8 +5,8 @@ import geospaas_harvesting.providers.base as providers_base
 import geospaas_harvesting.providers.ceda as providers_ceda
 import geospaas_harvesting.providers.cmems as providers_cmems
 import geospaas_harvesting.providers.copernicus_scihub as providers_copernicus_scihub
-import geospaas_harvesting.providers.resto as providers_resto
 import geospaas_harvesting.providers.earthdata_cmr as providers_earthdata_cmr
+import geospaas_harvesting.providers.erddap as providers_erddap
 import geospaas_harvesting.providers.ftp as providers_ftp
 import geospaas_harvesting.providers.http as providers_http
 import geospaas_harvesting.providers.jaxa as providers_jaxa
@@ -14,6 +14,7 @@ import geospaas_harvesting.providers.local as providers_local
 import geospaas_harvesting.providers.metno as providers_metno
 import geospaas_harvesting.providers.noaa as providers_noaa
 import geospaas_harvesting.providers.podaac as providers_podaac
+import geospaas_harvesting.providers.resto as providers_resto
 from .arguments import ArgumentParser, BooleanArgument, DictArgument, ListArgument
 from .utils import read_yaml_file
 
@@ -59,18 +60,18 @@ class ProvidersArgument(DictArgument):
         'ceda': providers_ceda.CEDAProvider,
         'cmems_ftp': providers_cmems.CMEMSFTPProvider,
         'copernicus_scihub': providers_copernicus_scihub.CopernicusScihubProvider,
-        'resto': providers_resto.RestoProvider,
         'earthdata_cmr': providers_earthdata_cmr.EarthDataCMRProvider,
         'ftp': providers_ftp.FTPProvider,
         'gportal_ftp': providers_jaxa.GPortalProvider,
         'http': providers_http.HTTPProvider,
-        'netcdf': providers_local.NetCDFProvider,
-        'nansat': providers_local.NansatProvider,
         'metno': providers_metno.METNOProvider,
+        'nansat': providers_local.NansatProvider,
+        'netcdf': providers_local.NetCDFProvider,
         'noaa': providers_noaa.NOAAProvider,
         'podaac': providers_podaac.PODAACProvider,
+        'resto': providers_resto.RestoProvider,
+        'tabledap': providers_erddap.ERDDAPTableProvider,
     }
-    valid_settings = {'type', 'username', 'password'}
 
     def parse(self, value):
         """Go through the list of provider settings and create the

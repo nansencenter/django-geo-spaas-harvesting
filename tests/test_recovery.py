@@ -29,7 +29,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
 
     def generate_recovery_file(self, exception_type, errors_count=1):
         """Generate recovery file"""
-        crawler_iterator = crawlers.CrawlerIterator(mock.Mock(), [])
+        crawler_iterator = crawlers.CrawlerIterator(mock.MagicMock())
         to_pickle = [
             (crawlers.DatasetInfo(f'http://foo{i}'), exception_type(f'bar{i}'))
             for i in range(errors_count)

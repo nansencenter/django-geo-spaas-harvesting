@@ -144,10 +144,14 @@ class SearchResultsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.crawler = mock.MagicMock()
+        self.ingester = mock.MagicMock()
         self.mock_dataset_infos = [mock.Mock(), mock.Mock()]
         self.crawler.__iter__.return_value = iter(self.mock_dataset_infos)
         self.filter = mock.MagicMock()
-        self.search_results = providers_base.SearchResults(self.crawler, [self.filter])
+        self.search_results = providers_base.SearchResults(
+            crawler=self.crawler,
+            filters=[self.filter],
+            ingester=self.ingester)
 
     def test_repr(self):
         """Check the string representation of a SearchResults object"""
@@ -196,7 +200,6 @@ class SearchResultsTestCase(unittest.TestCase):
 
     def test_save(self):
         """Test saving the search results to the database"""
-        with mock.patch('geospaas_harvesting.ingesters.Ingester.ingest') as mock_ingest:
-            with self.assertLogs(providers_base.logger, level=logging.INFO):
-                self.search_results.save()
-        mock_ingest.assert_called_once()
+        with self.assertLogs(providers_base.logger, level=logging.INFO):
+            self.search_results.save()
+        self.ingester.ingest.assert_called_once()

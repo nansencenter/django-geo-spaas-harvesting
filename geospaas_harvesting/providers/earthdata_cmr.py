@@ -1,5 +1,6 @@
 """Code for searching EarthData CMR (https://www.earthdata.nasa.gov/)"""
 import json
+import logging
 
 import shapely.errors
 from shapely.geometry import LineString, Point, Polygon
@@ -66,16 +67,23 @@ class EarthDataSpatialArgument(WKTArgument):
     """
     def parse(self, value):
         valid_prefixes = ('polygon', 'bounding_box', 'point', 'line', 'circle')
+        geos_logger = logging.getLogger('shapely.geos')
+        result = None
         try:
-            return super().parse(value)
+            geos_logger.disabled = True
+            result = super().parse(value)
+            geos_logger.disabled = False
         except (shapely.errors.ShapelyError, ValueError) as error:
             if isinstance(value, str):
                 for prefix in valid_prefixes:
                     if value.startswith(f"{prefix}=") or value.startswith(f"{prefix}[]="):
-                        return value
-            raise ValueError(
-                "location should be a geometry or a valid CMR spatial parameter"
-            ) from error
+                        result = value
+                        break
+            if result is None:
+                raise ValueError(
+                    "location should be a geometry or a valid CMR spatial parameter"
+                ) from error
+        return result
 
 
 class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):

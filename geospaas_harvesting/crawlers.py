@@ -21,10 +21,10 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 import requests
+import shapely.geometry
 
 import geospaas_harvesting.utils as utils
 import geospaas.catalog.managers as catalog_managers
-
 from metanorm.handlers import MetadataHandler
 from metanorm.normalizers.geospaas import GeoSPaaSMetadataNormalizer
 
@@ -61,7 +61,7 @@ class Crawler():
 
     # ------------- crawl ------------
     def __iter__(self):
-        return CrawlerIterator(self, self.crawl(), max_threads=self.max_threads)
+        return CrawlerIterator(self, max_threads=self.max_threads)
 
     def crawl(self):
         """Generator which crawls through a dataset repository and yields
@@ -77,35 +77,28 @@ class Crawler():
         raise NotImplementedError()
 
     @classmethod
-    def _http_get(cls, url, request_parameters=None):
-        """Returns the contents of a Web page as a string"""
+    def _http_get(cls, url, request_parameters=None, max_tries=5, wait_time=5):
+        """Sends an HTTP GET request, retry in case of failure"""
         cls.logger.debug("Getting page: '%s'", url)
 
-        max_tries = 5
-        wait_time = 30
+        last_error = None
         for try_index in range(max_tries):
             try:
                 response = utils.http_request('GET', url, **request_parameters or {})
                 response.raise_for_status()
-                return response.text
+                return response
             except (requests.ConnectionError, requests.HTTPError, requests.Timeout) as error:
                 # retry only for connection errors and HTTP errors 5**
                 if (isinstance(error, requests.HTTPError) and
                         (error.response.status_code < 500 or error.response.status_code > 599)):
-                    cls.logger.error('Could not get page', exc_info=True)
-                    return None
-                cls.logger.warning('Error while sending request to %s, %d retries left',
-                                   url, max_tries - try_index - 1, exc_info=True)
-            except requests.exceptions.RequestException:
-                # don't retry
-                cls.logger.error('Could not get page', exc_info=True)
-                return None
-
+                    raise
+                else:
+                    last_error = error
+                    cls.logger.warning('Error while sending request to %s, %d retries left',
+                                       url, max_tries - try_index - 1, exc_info=True)
             time.sleep(wait_time)
             wait_time *= 2
-
-        cls.logger.error('Max retries reached for %s', url)
-        return None
+        raise RuntimeError(f"Max retries reached trying to get {url}") from last_error
 
     # --------- get metadata ---------
     def get_normalized_attributes(self, dataset_info, **kwargs):
@@ -135,12 +128,11 @@ class CrawlerIterator():
     MAX_FAILED = 500000  # max number of failed objects per recovery file
     RECOVERY_SUFFIX = 'failed_ingestions.pickle'
 
-    def __init__(self, crawler, dataset_infos, max_threads=1):
+    def __init__(self, crawler, max_threads=1):
         """Initializes the iterator and creates a managing thread which
         will in turn spawn normalization threads
         """
         self.crawler = crawler
-        self.dataset_infos = dataset_infos
         self.max_threads = max_threads
 
         self._results = queue.Queue(self.QUEUE_SIZE)
@@ -192,7 +184,7 @@ class CrawlerIterator():
                     max_workers=self.max_threads,
                     thread_name_prefix=self.__class__.__name__) as executor:
                 futures = []
-                for dataset_info in self.dataset_infos:
+                for dataset_info in self.crawler.crawl():
                     futures.append(executor.submit(
                         self._thread_get_normalized_attributes,
                         dataset_info,
@@ -236,7 +228,8 @@ class CrawlerIterator():
             self.logger.error("Could not get metadata for '%s'", dataset_info.url, exc_info=True)
             self._failed.put((dataset_info, error), block=True)
         else:
-            self._results.put(DatasetInfo(dataset_info.url, normalized_attributes))
+            dataset_info.metadata = normalized_attributes
+            self._results.put(dataset_info)
 
     def _thread_manage_failed_normalizing(self):
         """Watches the `_failed` queue and put the incoming failed
@@ -566,7 +559,7 @@ class HTMLDirectoryCrawler(DirectoryCrawler):
         request_parameters = {}
         if self.username is not None and self.password is not None:
            request_parameters['auth'] = (self.username, self.password)
-        html = self._http_get(f"{self.base_url}{folder_path}", request_parameters)
+        html = self._http_get(f"{self.base_url}{folder_path}", request_parameters).text
         stripped_folder_path = self._strip_folder_page(folder_path)
         return self._prepend_parent_path(stripped_folder_path, self._get_links(html))
 
@@ -576,7 +569,6 @@ class HTMLDirectoryCrawler(DirectoryCrawler):
         raw_attributes = {}
         self.add_url(dataset_info.url, raw_attributes)
         normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-        # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
         normalized_attributes['geospaas_service_name'] = catalog_managers.HTTP_SERVICE_NAME
         normalized_attributes['geospaas_service'] = catalog_managers.HTTP_SERVICE
         return normalized_attributes
@@ -690,7 +682,7 @@ class ThreddsCrawler(OpenDAPCrawler):
 
     def get_download_url(self, path):
         result = None
-        links = self._get_links(self._http_get(urljoin(self.base_url, path)))
+        links = self._get_links(self._http_get(urljoin(self.base_url, path)).text)
         for link in links:
             if "fileServer" in link and link.endswith(self.FILES_SUFFIXES):
                 result = f"{self.base_url}{link}"
@@ -887,12 +879,12 @@ class HTTPPaginatedAPICrawler(Crawler):
         """Get the next page of search results"""
         self.logger.debug("Looking for resources at '%s', matching '%s'",
                          self.url, self.request_parameters['params'])
-        current_page = self._http_get(self.url, self.request_parameters)
+        current_page = self._http_get(self.url, self.request_parameters).text
         self.increment_offset()
         return current_page
 
     def _get_datasets_info(self, page):
-        """Get dataset information from the current page and add it
+        """Get datasets information from the current page and add it
         to self._results. It should be a DatasetInfo object.
         Returns True if information was found, False otherwise"""
         raise NotImplementedError()
@@ -900,3 +892,154 @@ class HTTPPaginatedAPICrawler(Crawler):
     # --------- get metadata ---------
     def get_normalized_attributes(self, dataset_info, **kwargs):
         raise NotImplementedError()
+
+
+class ERDDAPTableCrawler(Crawler):
+    """Crawler for ERDDAP tabledap APIs"""
+
+    logger = logging.getLogger(__name__ + '.ERDDAPTableCrawler')
+
+    def __init__(self, url,
+                 id_attr,
+                 longitude_attr='longitude', latitude_attr='latitude', time_attr='time',
+                 position_qc_attr='', time_qc_attr='', valid_qc_codes=None,
+                 search_terms=None, variables=None,
+                 max_threads=1):
+        super().__init__(max_threads)
+        if url.rstrip('/').endswith('.json'):
+            self.url = url
+        else:
+            raise ValueError("The URL should end with .json")
+        self.id_attr = id_attr
+        self.longitude_attr = longitude_attr
+        self.latitude_attr = latitude_attr
+        self.time_attr = time_attr
+        self.position_qc_attr = position_qc_attr
+        self.time_qc_attr = time_qc_attr
+        self.valid_qc_codes = valid_qc_codes
+        self.search_terms = search_terms if search_terms is not None else []
+        self.variables = variables if variables else []
+
+    def __eq__(self, other):
+        return (
+            self.url == other.url and
+            self.id_attr == other.id_attr and
+            self.longitude_attr == other.longitude_attr and
+            self.latitude_attr == other.latitude_attr and
+            self.time_attr == other.time_attr and
+            self.position_qc_attr == other.position_qc_attr and
+            self.time_qc_attr == other.time_qc_attr and
+            self.valid_qc_codes == other.valid_qc_codes and
+            self.search_terms == other.search_terms and
+            self.variables == other.variables
+        )
+
+    def set_initial_state(self):
+        """Nothing to do"""
+
+    def get_ids(self):
+        """Fetch identifiers matching the search terms"""
+        url = f"{self.url}?{self.id_attr}&distinct()"
+        kwargs = {}
+        url = '&'.join([url] + self.search_terms)
+        try:
+            response = self._http_get(url, max_tries=1, **kwargs)
+        except requests.HTTPError as error:
+            self.logger.error("Could not list dataset identifiers at %s: %s",
+                              url, error.response.content, exc_info=True)
+            raise
+        for row in response.json()['table']['rows']:
+            yield row[0]
+
+    def crawl(self):
+        attributes = [self.time_attr, self.longitude_attr, self.latitude_attr]
+        for qc_attr in (self.time_qc_attr, self.position_qc_attr):
+            if qc_attr:
+                attributes.append(qc_attr)
+        attributes.extend(self.variables)
+        for dataset_id in self.get_ids():
+            yield DatasetInfo(
+                f'{self.url}?{",".join(attributes)}&{self.id_attr}="{dataset_id}"',
+                {'entry_id': dataset_id})
+
+    def _check_qc(self, qc_value):
+        """Return True if the QC value indicates valid data or the
+        valid codes are unknown
+        """
+        return not self.valid_qc_codes or qc_value in self.valid_qc_codes
+
+    def _make_coverage_url(self):
+        """"""
+        qc_attributes = ','.join(c for c in (self.time_qc_attr, self.position_qc_attr) if c)
+        if qc_attributes:
+            qc_attributes = f",{qc_attributes}"
+        return (f'{self.url}?{self.time_attr},{self.longitude_attr},{self.latitude_attr}' +
+                qc_attributes +
+                f'&distinct()&orderBy("{self.time_attr}")')
+
+    def get_coverage(self, dataset_id):
+        """Get the temporal and spatial coverage for a specific dataset
+        """
+        try:
+            response = self._http_get(self._make_coverage_url(), request_parameters={
+                'params': {self.id_attr: f'"{dataset_id}"'}
+            })
+        except requests.HTTPError as error:
+            self.logger.error("Could not get coverage for dataset %s: %s",
+                              dataset_id, error.response.content)
+            raise
+        rows = response.json()['table']['rows']
+
+        # build the trajectory and get the first time with valid QC
+        # (the query results are sorted by time)
+        time_coverage_start = None
+        trajectory = []
+        for row in rows:
+            if time_coverage_start is None and self._check_qc(row[3]):
+                time_coverage_start = row[0]
+            if self._check_qc(row[4]):
+                trajectory.append((row[1], row[2]))
+
+        # get the last time with valid QC
+        time_coverage_end = None
+        for row in rows[::-1]:
+            if self._check_qc(row[3]):
+                time_coverage_end = row[0]
+                break
+
+        if time_coverage_start is None or time_coverage_end is None or not trajectory:
+            raise RuntimeError(f"Could not determine coverage for dataset {dataset_id}")
+
+        return ((time_coverage_start, time_coverage_end), trajectory)
+
+    def _make_product_metadata_url(self):
+        """Generate the product metadata URL from the base data URL"""
+        match = re.match(r'^(https?://.*)/tabledap/(.*)\.json$', self.url)
+        if match:
+            return f"{match.group(1)}/info/{match.group(2)}/index.json"
+        else:
+            raise RuntimeError(f"Unable to get product metadata URL from {self.url}")
+
+    def get_product_metadata(self):
+        """Get the product's metadata"""
+        url = self._make_product_metadata_url()
+        try:
+            response = self._http_get(url)
+        except requests.HTTPError:
+            self.logger.info("Could not get product metadata from %s", url)
+            raise
+        return response.json()
+
+    def get_normalized_attributes(self, dataset_info, **kwargs):
+        """Use metanorm to normalize a DatasetInfo's raw attributes"""
+        raw_attributes = dataset_info.metadata
+        self.add_url(dataset_info.url, raw_attributes)
+        coverage = self.get_coverage(dataset_info.metadata['entry_id'])
+        raw_attributes['temporal_coverage'] = coverage[0]
+        raw_attributes['trajectory'] = shapely.geometry.LineString(coverage[1]).wkt
+        raw_attributes['product_metadata'] = self.get_product_metadata()
+
+        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
+        normalized_attributes['geospaas_service_name'] = catalog_managers.HTTP_SERVICE_NAME
+        normalized_attributes['geospaas_service'] = catalog_managers.HTTP_SERVICE
+        return normalized_attributes
