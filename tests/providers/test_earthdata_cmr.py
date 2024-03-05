@@ -75,18 +75,17 @@ class EarthDataSpatialArgumentTestCase(unittest.TestCase):
 
     def test_parse_raw_spatial_extent(self):
         """Test parsing raw CMR spatial extent parameters"""
-        with self.assertLogs('shapely.geos'):
-            self.assertEqual(self.argument.parse('bounding_box=-180,60,180,90'),
-                            'bounding_box=-180,60,180,90')
-            self.assertEqual(self.argument.parse('polygon=1.0,2.0,2.0,3.0,3.0,4.0,1.0,2.0'),
-                            'polygon=1.0,2.0,2.0,3.0,3.0,4.0,1.0,2.0')
-            self.assertEqual(self.argument.parse('line=1.0,2.0,3.0,4.0'), 'line=1.0,2.0,3.0,4.0')
-            self.assertEqual(self.argument.parse('point=1.0,2.0'), 'point=1.0,2.0')
+        self.assertEqual(self.argument.parse('bounding_box=-180,60,180,90'),
+                        'bounding_box=-180,60,180,90')
+        self.assertEqual(self.argument.parse('polygon=1.0,2.0,2.0,3.0,3.0,4.0,1.0,2.0'),
+                        'polygon=1.0,2.0,2.0,3.0,3.0,4.0,1.0,2.0')
+        self.assertEqual(self.argument.parse('line=1.0,2.0,3.0,4.0'), 'line=1.0,2.0,3.0,4.0')
+        self.assertEqual(self.argument.parse('point=1.0,2.0'), 'point=1.0,2.0')
 
-            with self.assertRaises(ValueError):
-                self.argument.parse('foo=1.0,2.0')
-            with self.assertRaises(ValueError):
-                self.argument.parse('point:1.0,2.0')
+        with self.assertRaises(ValueError):
+            self.argument.parse('foo=1.0,2.0')
+        with self.assertRaises(ValueError):
+            self.argument.parse('point:1.0,2.0')
 
 
 class EarthdataCMRCrawlerTestCase(unittest.TestCase):
