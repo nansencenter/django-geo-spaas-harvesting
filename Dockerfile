@@ -10,26 +10,6 @@ RUN pip install --upgrade --no-cache-dir \
     'requests_oauthlib==1.3.*' \
     'tblib'
 
-RUN python -c 'import pythesint; pythesint.update_all_vocabularies( \
-{ \
-    "gcmd_instrument": "9.1.5", \
-    "gcmd_science_keyword": "9.1.5", \
-    "gcmd_provider": "9.1.5", \
-    "gcmd_platform": "9.1.5", \
-    "gcmd_location": "9.1.5", \
-    "gcmd_horizontalresolutionrange": "9.1.5", \
-    "gcmd_verticalresolutionrange": "9.1.5", \
-    "gcmd_temporalresolutionrange": "9.1.5", \
-    "gcmd_project": "9.1.5", \
-    "gcmd_rucontenttype": "9.1.5", \
-    "mmd_access_constraints": "v3.2", \
-    "mmd_activity_type": "v3.2", \
-    "mmd_areas": "v3.2", \
-    "mmd_operstatus": "v3.2", \
-    "mmd_platform_type": "v3.2", \
-    "mmd_use_constraint_type": "v3.2", \
-})'
-
 FROM base
 
 ARG GEOSPAAS_HARVESTING_RELEASE='0.0.0dev'
