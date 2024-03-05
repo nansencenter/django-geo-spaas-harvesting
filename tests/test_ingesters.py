@@ -9,8 +9,10 @@ import django.db.utils
 import django.test
 import yaml
 from django.contrib.gis.geos.geometry import GEOSGeometry
-from geospaas.catalog.models import Dataset, DatasetURI
-from geospaas.vocabularies.models import DataCenter, ISOTopicCategory, Parameter
+from geospaas.catalog.models import (Dataset, DatasetURI, GCMDLocation, GeographicLocation,
+                                     ISOTopicCategory, Source)
+from geospaas.vocabularies.models import (DataCenter, ISOTopicCategory, Parameter, Instrument,
+                                          Platform)
 
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
@@ -27,6 +29,10 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.ingester = ingesters.Ingester()
         with open(TEST_FILES_PATH / 'dataset_metadata.yml', encoding='utf-8') as f_h:
             self.dataset_metadata = yaml.load(f_h)
+        self.dataset_metadata['time_coverage_start'] = datetime.strptime(
+            self.dataset_metadata['time_coverage_start'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        self.dataset_metadata['time_coverage_end'] = datetime.strptime(
+            self.dataset_metadata['time_coverage_end'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
 
     def tearDown(self):
         self.patcher_param_count.stop()
@@ -58,6 +64,69 @@ class IngesterTestCase(django.test.TransactionTestCase):
         dataset_uri = DatasetURI(uri=uri, dataset=dataset)
         dataset_uri.save()
         return (dataset_uri, True)
+
+    def _prepare_dataset_attributes(self):
+        """Test preparing the attributes needed to create a Dataset"""
+        self.maxDiff = None
+        normalized_attributes = self.dataset_metadata.copy()
+        dataset_attributes, dataset_parameters_list = (
+            ingesters.Ingester._prepare_dataset_attributes(normalized_attributes))
+        self.assertDictEqual(
+            dataset_attributes,
+            {
+                'entry_title': 'title',
+                'entry_id': 'id',
+                'summary': 'sum-up',
+                'time_coverage_start': datetime(2022, 1, 1, tzinfo=timezone.utc),
+                'time_coverage_end': datetime(2022, 1, 2, tzinfo=timezone.utc),
+                'data_center': DataCenter.objects.get(short_name='someone'),
+                'geographic_location': GeographicLocation.objects.get(
+                    geometry=GEOSGeometry('POINT(10 11)', srid=4326)),
+                'gcmd_location': GCMDLocation.objects.get(
+                    category='vertical location', type='sea surface'),
+                'ISO_topic_category': ISOTopicCategory.objects.get(name='oceans'),
+                'source': Source.objects.get(
+                    instrument=Instrument.objects.get(short_name='sar'),
+                    platform=Platform.objects.get(series_entity='Space-based Platforms')),
+            })
+        self.assertListEqual(
+            dataset_parameters_list,
+            [
+                Parameter.get(standard_name='parameter', short_name='param', units='bananas'),
+                Parameter.get(standard_name='latitude', short_name='lat', units='degrees_north')
+            ])
+
+    def test_create_dataset(self):
+        """Test creating a dataset from normalized attributes"""
+        normalized_attributes = self.dataset_metadata.copy()
+        ingesters.Ingester._create_dataset(normalized_attributes)
+        datasets = Dataset.objects.all()
+        self.assertEqual(datasets.count(), 1)
+        dataset = datasets.get()
+        self.assertEqual(dataset.entry_id, 'id')
+        self.assertEqual(dataset.entry_title, 'title')
+
+    def test_update_dataset(self):
+        """Test updating an existing dataset"""
+        normalized_attributes = self.dataset_metadata.copy()
+        dataset, _ = ingesters.Ingester._create_dataset(normalized_attributes)
+        normalized_attributes['entry_title'] = 'new title'
+        ingesters.Ingester._update_dataset(dataset, normalized_attributes)
+        datasets = Dataset.objects.all()
+        self.assertEqual(datasets.count(), 1)
+        dataset = datasets.get()
+        self.assertEqual(dataset.entry_id, 'id')
+        self.assertEqual(dataset.entry_title, 'new title')
+
+    def test_add_dataset_parameters(self):
+        """Test adding parameters to a dataset"""
+        dataset, _ = self._create_dummy_dataset('test')
+        Parameter(standard_name='parameter', short_name='param', units='bananas').save()
+        ingesters.Ingester._add_dataset_parameters(
+            dataset,
+            [{'standard_name': 'parameter', 'short_name': 'param', 'units': 'bananas'}])
+        self.assertEqual(dataset.parameters.count(), 1)
+        self.assertEqual(dataset.parameters.get().short_name, 'param')
 
     def test_ingest_dataset(self):
         """Test ingesting a dataset from a DatasetInfo object"""
@@ -119,6 +188,26 @@ class IngesterTestCase(django.test.TransactionTestCase):
             DatasetURI.objects.get(uri=uri).dataset.entry_id
             for uri in uris])
 
+    def test_ingest_update(self):
+        """Test updating a dataset while ingesting"""
+        uri = 'http://test.uri/dataset'
+        normalized_attributes = self.dataset_metadata.copy()
+        dataset, _ = ingesters.Ingester._create_dataset(normalized_attributes)
+        self._create_dummy_dataset_uri(uri, dataset)
+        normalized_attributes['summary'] = 'foo'
+        dataset_info = crawlers.DatasetInfo(uri, normalized_attributes)
+        ingester = ingesters.Ingester(update=True)
+
+        (uri , dataset_entry_id,
+         dataset_status, dataset_uri_status) = ingester._ingest_dataset(dataset_info)
+
+        self.assertEqual(dataset_status, ingesters.OperationStatus.UPDATED)
+        self.assertEqual(dataset_uri_status, ingesters.OperationStatus.NOOP)
+        self.assertEqual(Dataset.objects.count(), 1)
+        dataset = Dataset.objects.get(entry_id=dataset_entry_id)
+        self.assertEqual(dataset.entry_id, 'id')
+        self.assertEqual(dataset.summary, 'foo')
+
     def test_log_on_ingestion_error(self):
         """The cause of the error must be logged if an exception is raised while ingesting"""
         with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
@@ -142,6 +231,34 @@ class IngesterTestCase(django.test.TransactionTestCase):
                 self.ingester.ingest([crawlers.DatasetInfo('some_url', {})])
                 self.assertEqual(logger_cm.records[0].message,
                                  "Successfully created dataset 'entry_id' from url: 'some_url'")
+
+    def test_log_on_update(self):
+        """Test logging a successful update"""
+        with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
+            mock_ingest_dataset.return_value = (
+                'some_url',
+                'entry_id',
+                ingesters.OperationStatus.UPDATED,
+                ingesters.OperationStatus.NOOP
+            )
+            with self.assertLogs(self.ingester.logger, level=logging.INFO) as logger_cm:
+                self.ingester.ingest([crawlers.DatasetInfo('some_url', {})])
+                self.assertEqual(logger_cm.records[0].message,
+                                 "Sucessfully updated dataset 'entry_id' from url: 'some_url'")
+
+    def test_log_existing_dataset(self):
+        """Test logging a successful update"""
+        with mock.patch.object(ingesters.Ingester, '_ingest_dataset') as mock_ingest_dataset:
+            mock_ingest_dataset.return_value = (
+                'some_url',
+                'entry_id',
+                ingesters.OperationStatus.NOOP,
+                ingesters.OperationStatus.NOOP
+            )
+            with self.assertLogs(self.ingester.logger, level=logging.INFO) as logger_cm:
+                self.ingester.ingest([crawlers.DatasetInfo('some_url', {})])
+                self.assertEqual(logger_cm.records[0].message,
+                                 "Dataset 'entry_id' with URI 'some_url' already exists")
 
     def test_log_on_ingestion_same_dataset_different_uri(self):
         """A message must be logged when a URI is added to an existing
