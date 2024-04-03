@@ -28,7 +28,7 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.mock_param_count.return_value = 2
         self.ingester = ingesters.Ingester()
         with open(TEST_FILES_PATH / 'dataset_metadata.yml', encoding='utf-8') as f_h:
-            self.dataset_metadata = yaml.load(f_h)
+            self.dataset_metadata = yaml.safe_load(f_h)
         self.dataset_metadata['time_coverage_start'] = datetime.strptime(
             self.dataset_metadata['time_coverage_start'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
         self.dataset_metadata['time_coverage_end'] = datetime.strptime(
