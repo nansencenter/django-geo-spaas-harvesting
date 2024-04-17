@@ -169,6 +169,32 @@ class EarthdataCMRCrawlerTestCase(unittest.TestCase):
                 }
             })
 
+    def test_find_download_url(self):
+        """Test finding a download URL in an entry"""
+        entry = {
+            'umm': {
+                'RelatedUrls': [
+                    {'URL': 'https://foo/bar.json', 'Type': 'EXTENDED METADATA'},
+                    {'URL': 'https://foo/bar.nc', 'Type': 'GET DATA'},
+                    {'URL': 'https://baz/bar.nc', 'Type': 'GET DATA'},
+                    {'URL': 'https://foo/qux.png', 'Type': 'DIRECT DOWNLOAD'},
+                ]
+            }
+        }
+        self.assertEqual(self.crawler._find_download_url(entry), 'https://foo/bar.nc')
+
+    def test_find_download_url_no_get_data(self):
+        """Test finding a download URL in an entry when no GET DATA type is available"""
+        entry = {
+            'umm': {
+                'RelatedUrls': [
+                    {'URL': 'https://foo/bar.nc', 'Type': 'DOWNLOAD'},
+                    {'URL': 'https://baz/bar.nc', 'Type': 'DOWNLOAD'},
+                ]
+            }
+        }
+        self.assertEqual(self.crawler._find_download_url(entry), 'https://foo/bar.nc')
+
     def test_get_datasets_info(self):
         """_get_datasets_info() should extract datasets information
         from a response page
