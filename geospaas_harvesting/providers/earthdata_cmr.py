@@ -112,6 +112,14 @@ class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
 
         return request_parameters
 
+    def _find_download_url(self, entry):
+        """Return the first URL whose type is 'GET DATA'"""
+        urls = entry['umm']['RelatedUrls']
+        for url in urls:
+            if url.get('Type', '').lower() == 'get data':
+                return url['URL']
+        return urls[0]['URL']
+
     def _get_datasets_info(self, page):
         """Get dataset attributes from the current page and
         adds them to self._results.
@@ -119,7 +127,7 @@ class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
         entries = json.loads(page)['items']
 
         for entry in entries:
-            url = entry['umm']['RelatedUrls'][0]['URL']
+            url = self._find_download_url(entry)
             self.logger.debug("Adding '%s' to the list of resources.", url)
             self._results.append(DatasetInfo(url, entry))
 
