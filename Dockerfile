@@ -12,14 +12,9 @@ RUN pip install --upgrade --no-cache-dir \
 
 FROM base
 
-ARG GEOSPAAS_HARVESTING_RELEASE='0.0.0dev'
-WORKDIR /tmp/setup
-COPY setup.py README.md ./
-COPY geospaas_harvesting ./geospaas_harvesting
-RUN python setup.py bdist_wheel && \
-    pip install -v dist/geospaas_harvesting-*.whl && \
-    cd .. && rm -rf setup/
-WORKDIR /
+COPY . /tmp/setup
+RUN pip install /tmp/setup && \
+    rm -rf /tmp/setup
 
 ENTRYPOINT ["python"]
-CMD ["-m", "geospaas_harvesting.harvest"]
+CMD ["-m", "geospaas_harvesting.cli"]
