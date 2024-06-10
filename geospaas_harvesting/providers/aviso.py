@@ -1,11 +1,11 @@
-"""Code for searching MET NO data (https://thredds.met.no/thredds)"""
+"""Code for searching AVISO data (https://tds.aviso.altimetry.fr/thredds)"""
 from .base import Provider, TimeFilterMixin
 from ..arguments import StringArgument
 from ..crawlers import ThreddsCrawler
 
 
 class AVISOProvider(TimeFilterMixin, Provider):
-    """Provider for MET NO's Thredds"""
+    """Provider for AVISO's Thredds"""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = 'https://tds.aviso.altimetry.fr/thredds'
@@ -19,5 +19,7 @@ class AVISOProvider(TimeFilterMixin, Provider):
             '/'.join((self.url, parameters['directory'].lstrip('/'))),
             time_range=(parameters['start_time'], parameters['end_time']),
             include=parameters.get('include'),
-            max_threads=30
+            max_threads=30,
+            username=self.username,
+            password=self.password,
         )
