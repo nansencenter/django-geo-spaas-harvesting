@@ -36,5 +36,5 @@ dependencies = [
 urls = {Repository = "https://github.com/nansencenter/django-geo-spaas-harvesting"}
 dynamic = ["version"]
 
-[tool.setuptools]
-packages = ["geospaas_harvesting"]
+[tool.setuptools.packages.find]
+include = ["geospaas_harvesting*"]
