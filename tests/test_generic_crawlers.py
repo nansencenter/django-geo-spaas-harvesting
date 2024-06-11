@@ -80,7 +80,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
                 http_500_error,
                 mock.Mock())
             with self.assertLogs(crawlers.Crawler.logger, level=logging.WARNING):
-                crawlers.Crawler._http_get('url', max_tries=5, wait_time=30)
+                crawlers.Crawler()._http_get('url', max_tries=5, wait_time=30)
 
             self.assertEqual(len(mock_request.mock_calls), 5)
             self.assertListEqual(mock_sleep.mock_calls, [mock.call(30 * (2**i)) for i in range(4)])
@@ -96,7 +96,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
 
             with self.assertLogs(crawlers.Crawler.logger, level=logging.WARNING), \
                  self.assertRaises(RuntimeError):
-                crawlers.Crawler._http_get('url')
+                crawlers.Crawler()._http_get('url')
 
             self.assertEqual(len(mock_request.mock_calls), 5)
             self.assertEqual(len(mock_sleep.mock_calls), 5)
@@ -108,7 +108,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
         with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
             mock_request.side_effect = requests.TooManyRedirects
             with self.assertRaises(requests.RequestException):
-                self.assertIsNone(crawlers.Crawler._http_get('url'))
+                self.assertIsNone(crawlers.Crawler()._http_get('url'))
 
     def test_http_get_error_on_404_status(self):
         """Test that an exception is raised in case of HTTP error code"""
@@ -117,7 +117,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
         with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
             mock_request.side_effect = requests.HTTPError(response=response)
             with self.assertRaises(requests.HTTPError):
-                crawlers.Crawler._http_get('http://foo')
+                crawlers.Crawler()._http_get('http://foo')
 
     def test_abstract_get_normalized_attributes(self):
         """get_normalized_attributes() should raise a NotImplementedError"""
@@ -328,6 +328,31 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
             crawlers.DirectoryCrawler(
                 'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
                 r'.*\.nc', 'user', 'password'))
+
+    def test_http_get_with_auth(self):
+        """If no username and password are provided, HTTP requests
+        should not have an 'auth' parameter
+        """
+        crawler = crawlers.DirectoryCrawler('', username='user', password='pass')
+        with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_get:
+            crawler._http_get('http://foo/bar')
+            crawler._http_get('http://foo/bar', request_parameters={'quz': 'qux'})
+        mock_get.assert_has_calls((
+            mock.call('http://foo/bar', request_parameters={'auth': ('user', 'pass')},
+                      max_tries=5, wait_time=5),
+            mock.call('http://foo/bar', request_parameters={'quz': 'qux', 'auth': ('user', 'pass')},
+                      max_tries=5, wait_time=5),
+        ))
+
+    def test_http_get_no_auth(self):
+        """If no username and password are provided, HTTP requests
+        should not have an 'auth' parameter
+        """
+        crawler = crawlers.DirectoryCrawler('')
+        with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_get:
+            crawler._http_get('http://foo/bar')
+        mock_get.assert_called_with('http://foo/bar', request_parameters=None,
+                                    max_tries=5, wait_time=5)
 
     def test_abstract_list_folder_contents(self):
         """
@@ -709,7 +734,8 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
             mock_http_get.return_value.text = '<html><html/>'
             crawler = crawlers.HTMLDirectoryCrawler('http://foo')
             crawler._list_folder_contents('/bar')
-            mock_http_get.assert_called_once_with('http://foo/bar', {})
+            mock_http_get.assert_called_once_with('http://foo/bar', request_parameters={},
+                                                  max_tries=5, wait_time=5)
 
     def test_list_folder_contents_with_auth(self):
         """If a username and password are provided, HTTP requests
@@ -719,7 +745,9 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
             mock_http_get.return_value.text = '<html><html/>'
             crawler = crawlers.HTMLDirectoryCrawler('http://foo', username='user', password='pass')
             crawler._list_folder_contents('/bar')
-        mock_http_get.assert_called_once_with('http://foo/bar', {'auth': ('user', 'pass')})
+        mock_http_get.assert_called_once_with('http://foo/bar',
+                                              request_parameters={'auth': ('user', 'pass')},
+                                              max_tries=5, wait_time=5)
 
     def test_get_normalized_attributes(self):
         """Test that the attributes are gotten using metanorm, and the

@@ -76,10 +76,9 @@ class Crawler():
         """
         raise NotImplementedError()
 
-    @classmethod
-    def _http_get(cls, url, request_parameters=None, max_tries=5, wait_time=5):
+    def _http_get(self, url, request_parameters=None, max_tries=5, wait_time=5):
         """Sends an HTTP GET request, retry in case of failure"""
-        cls.logger.debug("Getting page: '%s'", url)
+        self.logger.debug("Getting page: '%s'", url)
 
         last_error = None
         for try_index in range(max_tries):
@@ -94,8 +93,8 @@ class Crawler():
                     raise
                 else:
                     last_error = error
-                    cls.logger.warning('Error while sending request to %s, %d retries left',
-                                       url, max_tries - try_index - 1, exc_info=True)
+                    self.logger.warning('Error while sending request to %s, %d retries left',
+                                        url, max_tries - try_index - 1, exc_info=True)
             time.sleep(wait_time)
             wait_time *= 2
         raise RuntimeError(f"Max retries reached trying to get {url}") from last_error
@@ -336,6 +335,14 @@ class DirectoryCrawler(Crawler):
             self.username == other.username and
             self.password == other.password)
 
+    def _http_get(self, url, request_parameters=None, max_tries=5, wait_time=5):
+        if self.username is not None and self.password is not None:
+           if request_parameters is None:
+               request_parameters = {}
+           request_parameters['auth'] = (self.username, self.password)
+        return super()._http_get(url, request_parameters=request_parameters,
+                                 max_tries=max_tries, wait_time=wait_time)
+
     @property
     def base_url(self):
         """Get the root URL without the path"""
@@ -557,8 +564,6 @@ class HTMLDirectoryCrawler(DirectoryCrawler):
 
     def _list_folder_contents(self, folder_path):
         request_parameters = {}
-        if self.username is not None and self.password is not None:
-           request_parameters['auth'] = (self.username, self.password)
         html = self._http_get(f"{self.base_url}{folder_path}", request_parameters).text
         stripped_folder_path = self._strip_folder_page(folder_path)
         return self._prepend_parent_path(stripped_folder_path, self._get_links(html))
@@ -647,10 +652,9 @@ class OpenDAPCrawler(HTMLDirectoryCrawler):
         """
         ddx_url = self.get_ddx_url(dataset_info.url)
         # Get the metadata from the dataset as an XML tree
-        stream = io.BytesIO(utils.http_request('GET', ddx_url, stream=True).content)
+        stream = io.BytesIO(self._http_get(ddx_url, request_parameters={'stream': True}).content)
         # Get all the global attributes of the Dataset into a dictionary
-        extracted_attributes = self._extract_attributes(
-            ET.parse(stream).getroot())
+        extracted_attributes = self._extract_attributes(ET.parse(stream).getroot())
         # add the URL to the attributes passed to metanorm
         self.add_url(dataset_info.url, extracted_attributes)
         # Get the parameters needed to create a geospaas catalog dataset from the global attributes

@@ -1,6 +1,7 @@
 """Configuration management"""
 import logging
 
+import geospaas_harvesting.providers.aviso as providers_aviso
 import geospaas_harvesting.providers.base as providers_base
 import geospaas_harvesting.providers.ceda as providers_ceda
 import geospaas_harvesting.providers.cmems as providers_cmems
@@ -57,6 +58,7 @@ class ProvidersArgument(DictArgument):
     }
     """
     provider_types = {
+        'aviso': providers_aviso.AVISOProvider,
         'ceda': providers_ceda.CEDAProvider,
         'cmems_ftp': providers_cmems.CMEMSFTPProvider,
         'copernicus_scihub': providers_copernicus_scihub.CopernicusScihubProvider,
