@@ -1,1 +1,1 @@
-include **.yml
+recursive-include geospaas_harvesting **.yml
