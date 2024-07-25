@@ -48,8 +48,6 @@ class CMEMSCrawler(Crawler):
                  username=None, password=None, max_threads=1):
         super().__init__(max_threads)
         self.cmems_product_id = cmems_product_id
-        # the paths to the list of dataset files will be stored in the
-        # keys of self.cmems_dataset_ids
         self.cmems_dataset_ids = cmems_dataset_ids
         self.time_range = time_range
         self.username = username
@@ -58,6 +56,14 @@ class CMEMSCrawler(Crawler):
         self._tmpdir = tempfile.TemporaryDirectory()
         self._dataset_lists = {}
         self._normalizer = None
+
+    def __eq__(self, other):
+        return (
+            self.cmems_product_id == other.cmems_product_id and
+            self.cmems_dataset_ids == other.cmems_dataset_ids and
+            self.time_range == other.time_range and
+            self.username == other.username and
+            self.password == other.password)
 
     def make_filter(self):
         """Create a regular expression based on a time range.
