@@ -8,7 +8,7 @@ providers:
     username: 'anonymous'
     password: ''
   cmems:
-    type: 'cmems_ftp'
+    type: 'cmems'
     username: !ENV CMEMS_USERNAME
     password: !ENV CMEMS_PASSWORD
   cmems_in_situ:
