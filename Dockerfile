@@ -5,6 +5,7 @@ FROM ${BASE_IMAGE} as base
 ARG METANORM_VERSION
 RUN pip install --upgrade --no-cache-dir \
     https://github.com/nansencenter/metanorm/releases/download/${METANORM_VERSION}/metanorm-${METANORM_VERSION}-py3-none-any.whl \
+    'copernicusmarine' \
     'feedparser==6.0.*' \
     'graypy==2.1.*' \
     'requests_oauthlib==1.3.*' \
