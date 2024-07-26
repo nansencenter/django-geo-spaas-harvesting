@@ -52,9 +52,10 @@ class CMEMSCrawler(Crawler):
         self.time_range = time_range
         self.username = username
         self.password = password
+        # initialized in self.set_initial_state()
         self._product_info = None
-        self._tmpdir = tempfile.TemporaryDirectory()
-        self._dataset_lists = {}
+        self._tmpdir = None
+        self._dataset_lists = None
         self._normalizer = None
 
     def __eq__(self, other):
@@ -132,6 +133,8 @@ class CMEMSCrawler(Crawler):
     def set_initial_state(self):
         """Download lists of dataset files
         """
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._dataset_lists = {}
         raw_product_info = copernicusmarine.describe(
             include_description=True,
             include_datasets=True,
