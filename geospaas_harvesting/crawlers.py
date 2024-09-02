@@ -908,6 +908,7 @@ class ERDDAPTableCrawler(Crawler):
 
     def __init__(self, url,
                  id_attr,
+                 entry_id_prefix='',
                  longitude_attr='longitude', latitude_attr='latitude', time_attr='time',
                  position_qc_attr='', time_qc_attr='', valid_qc_codes=None,
                  search_terms=None, variables=None,
@@ -918,6 +919,7 @@ class ERDDAPTableCrawler(Crawler):
         else:
             raise ValueError("The URL should end with .json")
         self.id_attr = id_attr
+        self.entry_id_prefix = entry_id_prefix
         self.longitude_attr = longitude_attr
         self.latitude_attr = latitude_attr
         self.time_attr = time_attr
@@ -967,7 +969,7 @@ class ERDDAPTableCrawler(Crawler):
         for dataset_id in self.get_ids():
             yield DatasetInfo(
                 f'{self.url}?{",".join(attributes)}&{self.id_attr}="{dataset_id}"',
-                {'entry_id': dataset_id})
+                {'remote_id': dataset_id})
 
     def _check_qc(self, qc_value):
         """Return True if the QC value indicates valid data or the
@@ -1041,7 +1043,8 @@ class ERDDAPTableCrawler(Crawler):
         """Use metanorm to normalize a DatasetInfo's raw attributes"""
         raw_attributes = dataset_info.metadata
         self.add_url(dataset_info.url, raw_attributes)
-        coverage = self.get_coverage(dataset_info.metadata['entry_id'])
+        coverage = self.get_coverage(dataset_info.metadata['remote_id'])
+        raw_attributes['entry_id'] = f"{self.entry_id_prefix}{dataset_info.metadata['remote_id']}"
         raw_attributes['temporal_coverage'] = coverage[0]
         raw_attributes['trajectory'] = shapely.geometry.LineString(coverage[1]).wkt
         raw_attributes['product_metadata'] = self.get_product_metadata()
