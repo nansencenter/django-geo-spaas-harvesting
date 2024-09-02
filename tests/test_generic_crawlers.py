@@ -1409,15 +1409,15 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
                     crawlers.DatasetInfo(
                         'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
                         '&platform_number="3901480"',
-                        {'entry_id': '3901480'}),
+                        {'remote_id': '3901480'}),
                     crawlers.DatasetInfo(
                         'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
                         '&platform_number="5905121"',
-                        {'entry_id': '5905121'}),
+                        {'remote_id': '5905121'}),
                     crawlers.DatasetInfo(
                         'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
                         '&platform_number="5905267"',
-                        {'entry_id': '5905267'}),
+                        {'remote_id': '5905267'}),
                 ])
 
     def test_check_qc(self):
@@ -1580,7 +1580,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
 
     def test_get_normalized_attributes(self):
         """Test attributes normalization"""
-        dataset_info = crawlers.DatasetInfo('https://foo.json?id=bar', {'entry_id': 'bar'})
+        dataset_info = crawlers.DatasetInfo('https://foo.json?id=bar', {'remote_id': 'bar'})
         crawler = crawlers.ERDDAPTableCrawler('https://foo.json', 'id')
         with mock.patch.object(crawler, 'get_coverage') as mock_get_coverage, \
              mock.patch.object(crawler, 'get_product_metadata') as mock_get_product_metadata, \
