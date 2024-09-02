@@ -9,6 +9,7 @@ class ERDDAPTableProvider(Provider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = kwargs['url'].rstrip('/')
+        self.entry_id_prefix = kwargs.get('entry_id_prefix', '')
         self.id_attr = kwargs['id_attr']
         self.longitude_attr = kwargs['longitude_attr']
         self.latitude_attr = kwargs['latitude_attr']
@@ -28,6 +29,7 @@ class ERDDAPTableProvider(Provider):
         return ERDDAPTableCrawler(
             self.url,
             self.id_attr,
+            entry_id_prefix=self.entry_id_prefix,
             longitude_attr=self.longitude_attr,
             latitude_attr=self.latitude_attr,
             time_attr=self.time_attr,
