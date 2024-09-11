@@ -14,7 +14,7 @@ class ERDDAPTableProviderTest(unittest.TestCase):
     def setUp(self):
         self.provider = ERDDAPTableProvider(
             url='https://foo.json',
-            id_attr='id',
+            id_attrs=['id'],
             longitude_attr='lon',
             latitude_attr='lat',
             time_attr='time',
@@ -35,7 +35,7 @@ class ERDDAPTableProviderTest(unittest.TestCase):
                 'search_terms': ['platform_number="123456"']}),
             ERDDAPTableCrawler(
                 'https://foo.json',
-                'id',
+                ['id'],
                 longitude_attr='lon',
                 latitude_attr='lat',
                 time_attr='time',

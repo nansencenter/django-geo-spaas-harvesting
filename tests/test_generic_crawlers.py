@@ -1362,16 +1362,16 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
     def test_url_check(self):
         """ERDDAPTableCrawler's url should end with .json"""
         with self.assertRaises(ValueError):
-            crawlers.ERDDAPTableCrawler('http://foo', 'bar')
+            crawlers.ERDDAPTableCrawler('http://foo', ['bar'])
 
     def test_equality(self):
         """Test equality of two DirectoryCrawler objects"""
         self.assertEqual(
-            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number'),
-            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number'))
+            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', ['platform_number']),
+            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', ['platform_number']))
         self.assertNotEqual(
-            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number'),
-            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number',
+            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', ['platform_number']),
+            crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', ['platform_number'],
                                         longitude_attr='lon', latitude_attr='lat'))
 
     def test_get_ids(self):
@@ -1380,15 +1380,15 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
         response = requests.Response()
         response.status_code = 200
         response.raw = open(response_path, 'rb')
-        crawler = crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number',
+        crawler = crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', ['platform_number'],
                                               search_terms=['time>=2024-01-01T00:00:00Z',
                                                             'time<=2024-01-01T01:00:00Z'])
         with mock.patch.object(crawler, '_http_get', return_value=response):
             ids = crawler.get_ids()
             self.assertListEqual(
                 list(ids),
-                ["3901480", "5905121", "5905267", "5905498", "5905533", "5905765", "5905878",
-                 "5906337", "5906912", "5906993", "6902906", "6903060"])
+                [["3901480"], ["5905121"], ["5905267"], ["5905498"], ["5905533"], ["5905765"],
+                 ["5905878"], ["5906337"], ["5906912"], ["5906993"], ["6902906"], ["6903060"]])
         response.raw.close()
 
     def test_get_ids_error(self):
@@ -1396,7 +1396,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
         fetching IDs
         """
         error = requests.HTTPError(response=mock.Mock(content='error message'))
-        crawler = crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', 'platform_number')
+        crawler = crawlers.ERDDAPTableCrawler('http://foo/ArgoFloats.json', ['platform_number'])
         with mock.patch.object(crawler, '_http_get', side_effect=error):
             with self.assertLogs(logger=crawler.logger, level=logging.ERROR), \
                  self.assertRaises(requests.HTTPError):
@@ -1404,9 +1404,9 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
 
     def test_crawl(self):
         """Test the DatasetInfo objects returned by the crawler"""
-        ids = ["3901480", "5905121", "5905267"]
+        ids = [["3901480"], ["5905121"], ["5905267"]]
         crawler = crawlers.ERDDAPTableCrawler(
-            'http://foo/ArgoFloats.json', 'platform_number',
+            'http://foo/ArgoFloats.json', ['platform_number'],
             position_qc_attr='position_qc', variables=['foo', 'bar'])
         with mock.patch.object(crawler, 'get_ids', return_value=ids):
             self.assertListEqual(
@@ -1415,20 +1415,20 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
                     crawlers.DatasetInfo(
                         'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
                         '&platform_number="3901480"',
-                        {'remote_id': '3901480'}),
+                        {'id_attributes': {'platform_number': '3901480'}}),
                     crawlers.DatasetInfo(
                         'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
                         '&platform_number="5905121"',
-                        {'remote_id': '5905121'}),
+                        {'id_attributes': {'platform_number': '5905121'}}),
                     crawlers.DatasetInfo(
                         'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
                         '&platform_number="5905267"',
-                        {'remote_id': '5905267'}),
+                        {'id_attributes': {'platform_number': '5905267'}}),
                 ])
 
     def test_check_qc(self):
         """Test the QC validation"""
-        crawler = crawlers.ERDDAPTableCrawler('foo.json', 'bar', valid_qc_codes=('1', '2'))
+        crawler = crawlers.ERDDAPTableCrawler('foo.json', ['bar'], valid_qc_codes=('1', '2'))
         self.assertTrue(crawler._check_qc('1'))
         self.assertTrue(crawler._check_qc('2'))
         self.assertFalse(crawler._check_qc('0'))
@@ -1440,7 +1440,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
         coverage
         """
         self.assertEqual(
-            crawlers.ERDDAPTableCrawler('https://foo.json', 'id',
+            crawlers.ERDDAPTableCrawler('https://foo.json', ['id'],
                                         longitude_attr='lon', latitude_attr='lat', time_attr='time',
                                         position_qc_attr='pos_qc',
                                         variables=['bar', 'baz'])._make_coverage_url(),
@@ -1452,7 +1452,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
         dataset
         """
         crawler = crawlers.ERDDAPTableCrawler(
-            'https://foo.json', 'platform_number',
+            'https://foo.json', ['platform_number'],
             longitude_attr='longitude', latitude_attr='latitude',
             time_attr='time',
             position_qc_attr='position_qc', time_qc_attr='time_qc')
@@ -1514,7 +1514,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
 
         with mock.patch.object(crawler, '_http_get', return_value=response) as mock_http_get:
             self.assertTupleEqual(
-                crawler.get_coverage('13858'),
+                crawler.get_coverage({'platform_number': '13858'}),
                 (("1997-07-28T20:26:20Z", "1998-12-27T20:00:25Z"), expected_trajectory))
         mock_http_get.assert_called_once_with(
             crawler._make_coverage_url(),
@@ -1526,7 +1526,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
         cannot be determined
         """
         crawler = crawlers.ERDDAPTableCrawler(
-            'https://foo.json', 'platform_number', valid_qc_codes=(1,))
+            'https://foo.json', ['platform_number'], valid_qc_codes=(1,))
         with mock.patch.object(crawler, '_http_get') as mock_http_get:
             mock_http_get.return_value.json.return_value = {
                 'table': {
@@ -1540,34 +1540,34 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
                 }
             }
             with self.assertRaises(RuntimeError):
-                crawler.get_coverage('123456')
+                crawler.get_coverage({'platform_number': '123456'})
 
     def test_get_coverage_http_error(self):
         """`get_coverage` must raise an exception when an HTTP error
         happens
         """
-        crawler = crawlers.ERDDAPTableCrawler('https://foo.json', 'platform_number')
+        crawler = crawlers.ERDDAPTableCrawler('https://foo.json', ['platform_number'])
         error = requests.HTTPError(response=mock.MagicMock())
         with mock.patch.object(crawler, '_http_get', side_effect=error):
             with self.assertRaises(requests.HTTPError), \
                  self.assertLogs(crawler.logger, logging.ERROR):
-                crawler.get_coverage('123456')
+                crawler.get_coverage({'platform_number': '123456'})
 
     def test_make_product_metadata_url(self):
         """Test creating the URL to a product's metadata"""
         self.assertEqual(
             crawlers.ERDDAPTableCrawler(
-                'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', 'id'
+                'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', ['id']
             )._make_product_metadata_url(),
             'https://erddap.ifremer.fr/erddap/info/ArgoFloats/index.json')
 
         with self.assertRaises(RuntimeError):
-            crawlers.ERDDAPTableCrawler('https://foo.json', 'id')._make_product_metadata_url()
+            crawlers.ERDDAPTableCrawler('https://foo.json', ['id'])._make_product_metadata_url()
 
     def test_get_product_metadata(self):
         """Test getting a product's metadata"""
         crawler = crawlers.ERDDAPTableCrawler(
-            'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', 'id')
+            'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', ['id'])
         with mock.patch.object(crawler, '_http_get') as mock_http_get:
             result = crawler.get_product_metadata()
         self.assertEqual(result, mock_http_get.return_value.json.return_value)
@@ -1578,7 +1578,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
         happens
         """
         crawler = crawlers.ERDDAPTableCrawler(
-            'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', 'id')
+            'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', ['id'])
         error = requests.HTTPError
         with mock.patch.object(crawler, '_http_get', side_effect=error):
             with self.assertRaises(error), self.assertLogs(crawler.logger, logging.ERROR):
@@ -1586,8 +1586,9 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
 
     def test_get_normalized_attributes(self):
         """Test attributes normalization"""
-        dataset_info = crawlers.DatasetInfo('https://foo.json?id=bar', {'remote_id': 'bar'})
-        crawler = crawlers.ERDDAPTableCrawler('https://foo.json', 'id')
+        dataset_info = crawlers.DatasetInfo('https://foo.json?id=bar',
+                                            {'id_attributes': {'platform_number':'bar'}})
+        crawler = crawlers.ERDDAPTableCrawler('https://foo.json', ['id'])
         with mock.patch.object(crawler, 'get_coverage') as mock_get_coverage, \
              mock.patch.object(crawler, 'get_product_metadata') as mock_get_product_metadata, \
              mock.patch.object(crawler._metadata_handler, 'get_parameters') as mock_get_parameters:
