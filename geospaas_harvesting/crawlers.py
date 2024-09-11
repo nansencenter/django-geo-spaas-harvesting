@@ -1036,7 +1036,7 @@ class ERDDAPTableCrawler(Crawler):
                 break
 
         if time_coverage_start is None or time_coverage_end is None or not trajectory:
-            raise RuntimeError(f"Could not determine coverage for dataset {dataset_id}")
+            raise RuntimeError(f"Could not determine coverage for dataset {id_attributes}")
 
         return ((time_coverage_start, time_coverage_end), trajectory)
 
