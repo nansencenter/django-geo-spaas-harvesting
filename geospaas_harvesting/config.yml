@@ -57,10 +57,11 @@ providers:
     type: 'netcdf'
     longitude_attribute: 'LONGITUDE'
     latitude_attribute: 'LATITUDE'
-  argo:
+  argo_profile:
     type: 'tabledap'
     url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json'
-    id_attr: 'platform_type'
+    entry_id_prefix: 'argo_profile_'
+    id_attrs: ['platform_number', 'cycle_number']
     longitude_attr: 'longitude'
     latitude_attr: 'latitude'
     time_attr: 'time'
@@ -68,6 +69,7 @@ providers:
     time_qc_attr: 'time_qc'
     valid_qc_codes: ['1', '2', '8']
     variables:
+    - 'platform_number'
     - 'cycle_number'
     - 'pres'
     - 'pres_qc'
@@ -84,16 +86,57 @@ providers:
     - 'psal_adjusted'
     - 'psal_adjusted_qc'
     - 'psal_adjusted_error'
+  argo_trajectory:
+    type: 'tabledap'
+    url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json'
+    entry_id_prefix: 'argo_trajectory_'
+    id_attrs: ['platform_number']
+    longitude_attr: 'longitude'
+    latitude_attr: 'latitude'
+    time_attr: 'time'
+    position_qc_attr: 'position_qc'
+    time_qc_attr: 'time_qc'
+    valid_qc_codes: ['1', '2', '8']
+    variables:
+    - 'platform_number'
+  bioargo_profile:
+    type: 'tabledap'
+    url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats-synthetic-BGC.json'
+    entry_id_prefix: 'bioargo_profile_'
+    id_attrs: ['platform_number', 'cycle_number']
+    longitude_attr: 'longitude'
+    latitude_attr: 'latitude'
+    time_attr: 'time'
+    position_qc_attr: 'position_qc'
+    time_qc_attr: 'time_qc'
+    valid_qc_codes: ['1', '2', '8']
+    variables:
+    - 'platform_number'
+    - 'cycle_number'
+    - 'pres'
+    - 'pres_qc'
+    - 'pres_adjusted'
+    - 'pres_adjusted_qc'
+    - 'pres_adjusted_error'
     - 'doxy'
     - 'doxy_qc'
-    - 'temp_doxy'
-    - 'temp_doxy_qc'
-    - 'molar_doxy'
-    - 'molar_doxy_qc'
-    - 'turbidity'
-    - 'turbidity_qc'
+    - 'doxy_adjusted'
+    - 'doxy_adjusted_qc'
     - 'chla'
     - 'chla_qc'
-    - 'nitrate'
-    - 'nitrate_qc'
+    - 'chla_adjusted'
+    - 'chla_adjusted_qc'
+  bioargo_trajectory:
+    type: 'tabledap'
+    url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats-synthetic-BGC.json'
+    entry_id_prefix: 'bioargo_trajectory_'
+    id_attrs: ['platform_number']
+    longitude_attr: 'longitude'
+    latitude_attr: 'latitude'
+    time_attr: 'time'
+    position_qc_attr: 'position_qc'
+    time_qc_attr: 'time_qc'
+    valid_qc_codes: ['1', '2', '8']
+    variables:
+    - 'platform_number'
 ...

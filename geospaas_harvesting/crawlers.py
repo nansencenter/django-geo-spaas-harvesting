@@ -904,7 +904,7 @@ class ERDDAPTableCrawler(Crawler):
     logger = logging.getLogger(__name__ + '.ERDDAPTableCrawler')
 
     def __init__(self, url,
-                 id_attr,
+                 id_attrs,
                  entry_id_prefix='',
                  longitude_attr='longitude', latitude_attr='latitude', time_attr='time',
                  position_qc_attr='', time_qc_attr='', valid_qc_codes=None,
@@ -915,7 +915,7 @@ class ERDDAPTableCrawler(Crawler):
             self.url = url
         else:
             raise ValueError("The URL should end with .json")
-        self.id_attr = id_attr
+        self.id_attrs = id_attrs
         self.entry_id_prefix = entry_id_prefix
         self.longitude_attr = longitude_attr
         self.latitude_attr = latitude_attr
@@ -929,7 +929,7 @@ class ERDDAPTableCrawler(Crawler):
     def __eq__(self, other):
         return (
             self.url == other.url and
-            self.id_attr == other.id_attr and
+            self.id_attrs == other.id_attrs and
             self.longitude_attr == other.longitude_attr and
             self.latitude_attr == other.latitude_attr and
             self.time_attr == other.time_attr and
@@ -945,7 +945,7 @@ class ERDDAPTableCrawler(Crawler):
 
     def get_ids(self):
         """Fetch identifiers matching the search terms"""
-        url = f"{self.url}?{self.id_attr}&distinct()"
+        url = f"{self.url}?{','.join(self.id_attrs)}&distinct()"
         kwargs = {}
         url = '&'.join([url] + self.search_terms)
         try:
@@ -955,7 +955,20 @@ class ERDDAPTableCrawler(Crawler):
                               url, error.response.content, exc_info=True)
             raise
         for row in response.json()['table']['rows']:
-            yield row[0]
+            yield row[:len(self.id_attrs)]
+
+    def _make_condition_parameters(self, parameters):
+        """Prepare the parameters to filter a query using the id
+        attributes. Necessary because the API requires different
+        formats depending on the type of parameter
+        """
+        params = {}
+        for key, value in parameters.items():
+            if isinstance(value, str):
+                params[key] = f'"{value}"'
+            else:
+                params[key] = value
+        return params
 
     def crawl(self):
         attributes = [self.time_attr, self.longitude_attr, self.latitude_attr]
@@ -963,10 +976,15 @@ class ERDDAPTableCrawler(Crawler):
             if qc_attr:
                 attributes.append(qc_attr)
         attributes.extend(self.variables)
-        for dataset_id in self.get_ids():
+        for id_values in self.get_ids():
+            id_attrs = dict(zip(self.id_attrs, id_values))
+            id_condition = '&'.join(
+                f"{id_attr}={id_value}"
+                for id_attr, id_value in self._make_condition_parameters(id_attrs).items()
+            )
             yield DatasetInfo(
-                f'{self.url}?{",".join(attributes)}&{self.id_attr}="{dataset_id}"',
-                {'remote_id': dataset_id})
+                f'{self.url}?{",".join(attributes)}&{id_condition}',
+                {'id_attributes': id_attrs})
 
     def _check_qc(self, qc_value):
         """Return True if the QC value indicates valid data or the
@@ -983,16 +1001,16 @@ class ERDDAPTableCrawler(Crawler):
                 qc_attributes +
                 f'&distinct()&orderBy("{self.time_attr}")')
 
-    def get_coverage(self, dataset_id):
+    def get_coverage(self, id_attributes):
         """Get the temporal and spatial coverage for a specific dataset
         """
         try:
             response = self._http_get(self._make_coverage_url(), request_parameters={
-                'params': {self.id_attr: f'"{dataset_id}"'}
+                'params': self._make_condition_parameters(id_attributes)
             })
         except requests.HTTPError as error:
             self.logger.error("Could not get coverage for dataset %s: %s",
-                              dataset_id, error.response.content)
+                              id_attributes, error.response.content)
             raise
         rows = response.json()['table']['rows']
 
@@ -1003,8 +1021,9 @@ class ERDDAPTableCrawler(Crawler):
         for row in rows:
             if time_coverage_start is None and self._check_qc(row[3]):
                 time_coverage_start = row[0]
-            if self._check_qc(row[4]):
-                trajectory.append((row[1], row[2]))
+            point = (row[1], row[2])
+            if point not in trajectory and self._check_qc(row[4]):
+                trajectory.append(point)
 
         # get the last time with valid QC
         time_coverage_end = None
@@ -1040,10 +1059,13 @@ class ERDDAPTableCrawler(Crawler):
         """Use metanorm to normalize a DatasetInfo's raw attributes"""
         raw_attributes = dataset_info.metadata
         self.add_url(dataset_info.url, raw_attributes)
-        coverage = self.get_coverage(dataset_info.metadata['remote_id'])
-        raw_attributes['entry_id'] = f"{self.entry_id_prefix}{dataset_info.metadata['remote_id']}"
+        coverage = self.get_coverage(dataset_info.metadata['id_attributes'])
+        raw_attributes['entry_id'] = (
+            self.entry_id_prefix +
+            '_'.join(map(str, dataset_info.metadata['id_attributes'].values()))
+        )
         raw_attributes['temporal_coverage'] = coverage[0]
-        raw_attributes['trajectory'] = shapely.geometry.LineString(coverage[1]).wkt
+        raw_attributes['trajectory'] = shapely.geometry.MultiPoint(coverage[1]).wkt
         raw_attributes['product_metadata'] = self.get_product_metadata()
 
         normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
