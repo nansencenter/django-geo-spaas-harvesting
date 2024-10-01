@@ -11,7 +11,7 @@ import copernicusmarine
 import pythesint
 from copernicusmarine.catalogue_parser.catalogue_parser import MARINE_DATA_STORE_STAC_BASE_URL
 
-import geospaas_harvesting.providers.utils as providers_utils
+import geospaas_harvesting.providers.metadata_utils as providers_utils
 from geospaas.catalog.managers import HTTP_SERVICE, HTTP_SERVICE_NAME
 from .base import Provider, TimeFilterMixin
 from ..arguments import  ChoiceArgument, PathArgument, StringArgument, ListArgument
