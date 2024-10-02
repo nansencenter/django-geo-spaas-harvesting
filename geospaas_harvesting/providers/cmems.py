@@ -150,14 +150,14 @@ class CMEMSCrawler(Crawler):
         for cmems_dataset in self._product_info['datasets']:
             dataset_id = cmems_dataset['dataset_id']
             if self.cmems_dataset_ids is None or dataset_id in self.cmems_dataset_ids:
-                list_file = Path(self._tmpdir.name) / f"{dataset_id}.txt"
+                list_file = Path(self._tmpdir.name, f"{dataset_id}.txt")
                 if list_file.exists():
                     list_file.unlink()
                 copernicusmarine.get(dataset_id=dataset_id,
-                                    create_file_list=str(list_file),
-                                    regex=self.make_filter(),
-                                    username=self.username,
-                                    password=self.password)
+                                     create_file_list=str(list_file),
+                                     regex=self.make_filter(),
+                                     username=self.username,
+                                     password=self.password)
                 self._dataset_lists[dataset_id] = list_file
 
     def _get_cmems_dataset_properties(self, cmems_dataset_id):
