@@ -207,10 +207,12 @@ class CMEMSMetadataNormalizer():
         """Returns attributes which can be used to instantiate a
         GeoSPaaS dataset
         """
-        entry_id = providers_utils.NC_H5_FILENAME_MATCHER.search(dataset_info.url).group(1)
+        entry_id = self.get_entry_id(dataset_info)
         time_coverage = self.get_time_coverage(entry_id)
         platform, instrument = self.get_source(dataset_info)
-        normalized_attributes = {
+        service, service_name = self.get_service(dataset_info)
+
+        return {
             'entry_title': self._product_info['title'],
             'entry_id': entry_id,
             'summary': self.get_summary(dataset_info),
@@ -219,15 +221,18 @@ class CMEMSMetadataNormalizer():
             'platform': platform,
             'instrument': instrument,
             'location_geometry': self.get_location_geometry(dataset_info),
-            'provider': pythesint.get_gcmd_provider('CMEMS'),
-            'iso_topic_category': pythesint.get_iso19115_topic_category('Oceans'),
-            'gcmd_location': pythesint.get_gcmd_location('SEA SURFACE'),
+            'provider': self.get_provider(dataset_info),
+            'iso_topic_category': self.get_iso_topic_category(dataset_info),
+            'gcmd_location': self.get_gcmd_location(dataset_info),
             'dataset_parameters': self.get_dataset_parameters(dataset_info),
-            'geospaas_service_name': HTTP_SERVICE_NAME,
-            'geospaas_service': HTTP_SERVICE,
+            'geospaas_service_name': service_name,
+            'geospaas_service': service,
         }
 
-        return normalized_attributes
+    @providers_utils.raises((AttributeError, TypeError))
+    def get_entry_id(self, dataset_info):
+        """Extract entry_id from URL"""
+        return providers_utils.NC_H5_FILENAME_MATCHER.search(dataset_info.url).group(1)
 
     def get_summary(self, dataset_info):
         """Build a summary from metadata fields"""
@@ -347,6 +352,18 @@ class CMEMSMetadataNormalizer():
         bbox = dataset_info.metadata['variables'][0]['bbox']
         return providers_utils.wkt_polygon_from_wgs84_limits(bbox[3], bbox[1], bbox[2], bbox[0])
 
+    def get_provider(self, dataset_info):
+        """Get the data provider"""
+        return pythesint.get_gcmd_provider('CMEMS')
+
+    def get_iso_topic_category(self, dataset_info):
+        """Get ISO 19115 topic category"""
+        return pythesint.get_iso19115_topic_category('Oceans')
+
+    def get_gcmd_location(self, dataset_info):
+        """Get the GCMD location"""
+        return pythesint.get_gcmd_location('OCEAN')
+
     def get_dataset_parameters(self, dataset_info):
         """Get a list of normalized dataset variables"""
         variables = []
@@ -364,3 +381,8 @@ class CMEMSMetadataNormalizer():
             if variable_dict not in variables:
                 variables.append(variable_dict)
         return variables
+
+    def get_service(self, dataset_info):
+        """Get the type of the repository where the data is hosted
+        """
+        return (HTTP_SERVICE, HTTP_SERVICE_NAME)
