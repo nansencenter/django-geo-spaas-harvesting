@@ -257,7 +257,8 @@ class CMEMSMetadataNormalizer():
                 lambda time: (time, time + relativedelta(months=1))
             ),
             (
-                re.compile(rf'^mercatorpsy4v3r1_gl12_mean_{providers_utils.YEARMONTH_REGEX}'),
+                re.compile(
+                    rf'^mercatorpsy4v3r1_gl12_mean_{providers_utils.YEARMONTH_REGEX}($|[^0-9])'),
                 lambda time: (time, time + relativedelta(months=1))
             ),
             (
@@ -277,7 +278,7 @@ class CMEMSMetadataNormalizer():
                 lambda time: (time, time + relativedelta(months=1))
             ),
             (
-                re.compile(rf"/{providers_utils.YEARMONTHDAY_REGEX}" +
+                re.compile(rf"^{providers_utils.YEARMONTHDAY_REGEX}" +
                            r"_mm-12km-NERSC-MODEL-TOPAZ4B-ARC-RAN.*"),
                 lambda time: (
                     datetime(time.year, time.month, 1, tzinfo=time.tzinfo),
@@ -295,7 +296,7 @@ class CMEMSMetadataNormalizer():
                 lambda time: (time, time + relativedelta(months=1))
             ),
             (
-                re.compile(rf'^mfwamglocep_{providers_utils.YEARMONTHDAY_REGEX}00_R[0-9]{8}'),
+                re.compile(rf'^mfwamglocep_{providers_utils.YEARMONTHDAY_REGEX}00_R[0-9]{{8}}'),
                 lambda time: (time, time + relativedelta(hours=24))
             ),
             (
@@ -304,12 +305,12 @@ class CMEMSMetadataNormalizer():
             ),
             # generic 1 day coverage
             (
-                re.compile(rf'(^|[-_.:]){providers_utils.YEARMONTHDAY_REGEX}[-_.:T]'),
+                re.compile(rf'(^|[-_.:]){providers_utils.YEARMONTHDAY_REGEX}([-_.:T]|$)'),
                 lambda time: (time, time + relativedelta(days=1))
             ),
             # generic 1 month coverage
             (
-                re.compile(rf'(^|[-_.:]){providers_utils.YEARMONTH_REGEX}[-_.:T]'),
+                re.compile(rf'(^|[-_.:]){providers_utils.YEARMONTH_REGEX}([-_.:T]|$)'),
                 lambda time: (time, time + relativedelta(months=1))
             ),
         )
