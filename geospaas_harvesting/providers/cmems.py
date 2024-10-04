@@ -332,7 +332,8 @@ class CMEMSMetadataNormalizer():
                 source = sources[0]
                 break
         if source is None:
-            raise RuntimeError(f"could not find source in {vocabulary_name}")
+            raise providers_utils.MetadataNormalizationError(
+                f"could not find source in {vocabulary_name}")
         return source
 
     def get_source(self, dataset_info):
