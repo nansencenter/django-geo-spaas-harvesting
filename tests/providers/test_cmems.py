@@ -255,7 +255,6 @@ class CMEMSMetadataNormalizerTestCase(unittest.TestCase):
 
     def test_get_normalized_attributes(self):
         """Test getting normalized attributes from dataset metadata"""
-        dataset_info = DatasetInfo('foo')
         mock_normalizer = mock.MagicMock()
         mock_normalizer.get_time_coverage.return_value = (mock.Mock(), mock.Mock())
         mock_normalizer.get_source.return_value = (mock.Mock(), mock.Mock())
