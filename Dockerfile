@@ -1,6 +1,6 @@
 ARG BASE_IMAGE=nansencenter/geospaas:latest
 
-FROM ${BASE_IMAGE} as base
+FROM ${BASE_IMAGE} AS base
 
 ARG METANORM_VERSION
 RUN pip install --upgrade --no-cache-dir \
@@ -10,6 +10,9 @@ RUN pip install --upgrade --no-cache-dir \
     'graypy==2.1.*' \
     'requests_oauthlib==1.3.*' \
     'tblib'
+
+ARG PYTHESINT_VERSION=''
+RUN bash -c "[ -n '$PYTHESINT_VERSION' ] && pip install --upgrade 'pythesint==$PYTHESINT_VERSION' || true"
 
 FROM base
 
