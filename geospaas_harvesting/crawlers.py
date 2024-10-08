@@ -46,6 +46,9 @@ class DatasetInfo():
         self.url = url
         self.metadata = metadata
 
+    def __repr__(self):
+        return f"DatasetInfo(url='{self.url}', metadata={self.metadata})"
+
     def __eq__(self, other):
         return self.url == other.url and self.metadata == other.metadata
 

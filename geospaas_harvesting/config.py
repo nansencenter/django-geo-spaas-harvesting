@@ -60,7 +60,7 @@ class ProvidersArgument(DictArgument):
     provider_types = {
         'aviso': providers_aviso.AVISOProvider,
         'ceda': providers_ceda.CEDAProvider,
-        'cmems_ftp': providers_cmems.CMEMSFTPProvider,
+        'cmems': providers_cmems.CMEMSProvider,
         'copernicus_scihub': providers_copernicus_scihub.CopernicusScihubProvider,
         'earthdata_cmr': providers_earthdata_cmr.EarthDataCMRProvider,
         'ftp': providers_ftp.FTPProvider,

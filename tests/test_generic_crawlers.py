@@ -40,6 +40,12 @@ class DatasetInfoTestCase(unittest.TestCase):
             crawlers.DatasetInfo('foo', {'bar': 'baz'}),
             crawlers.DatasetInfo('foo', {'bar': 'quz'}))
 
+    def test_representation(self):
+        """Test string reprensentation of DatasetInfo objects"""
+        self.assertEqual(
+            repr(crawlers.DatasetInfo('https://foo', {'a': 1})),
+            "DatasetInfo(url='https://foo', metadata={'a': 1})")
+
 
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""

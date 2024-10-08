@@ -47,14 +47,14 @@ class ProvidersArgumentTestCase(unittest.TestCase):
         """Test parsing a providers argument"""
         providers_arg = {
             'podaac': {'type': 'podaac'},
-            'cmems': {'type': 'cmems_ftp', 'username': 'user', 'password': 'pass'}
+            'cmems': {'type': 'cmems', 'username': 'user', 'password': 'pass'}
         }
         parsed_providers = config.ProvidersArgument('providers').parse(providers_arg)
         self.assertDictEqual(
             parsed_providers,
             {
                 'podaac': providers_podaac.PODAACProvider(name='podaac'),
-                'cmems': providers_cmems.CMEMSFTPProvider(
+                'cmems': providers_cmems.CMEMSProvider(
                     name='cmems', username='user', password='pass'),
             })
 
