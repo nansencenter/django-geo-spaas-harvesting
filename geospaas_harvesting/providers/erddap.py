@@ -9,7 +9,8 @@ class ERDDAPTableProvider(Provider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = kwargs['url'].rstrip('/')
-        self.id_attr = kwargs['id_attr']
+        self.entry_id_prefix = kwargs.get('entry_id_prefix', '')
+        self.id_attrs = kwargs['id_attrs']
         self.longitude_attr = kwargs['longitude_attr']
         self.latitude_attr = kwargs['latitude_attr']
         self.time_attr = kwargs['time_attr']
@@ -27,7 +28,8 @@ class ERDDAPTableProvider(Provider):
         search_terms.extend(self._make_temporal_condition(time_range))
         return ERDDAPTableCrawler(
             self.url,
-            self.id_attr,
+            self.id_attrs,
+            entry_id_prefix=self.entry_id_prefix,
             longitude_attr=self.longitude_attr,
             latitude_attr=self.latitude_attr,
             time_attr=self.time_attr,
