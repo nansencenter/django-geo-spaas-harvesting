@@ -1402,6 +1402,17 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
                  self.assertRaises(requests.HTTPError):
                 list(crawler.get_ids())
 
+    def test__make_condition_parameters(self):
+        """Check that string parameters get quotes"""
+        self.assertDictEqual(
+            crawlers.ERDDAPTableCrawler('url.json', ['id_attr'])._make_condition_parameters({
+                'a': 'foo',
+                'b': 1,
+                'c': True
+            }),
+            {'a': '"foo"', 'b': 1, 'c': True}
+        )
+
     def test_crawl(self):
         """Test the DatasetInfo objects returned by the crawler"""
         ids = [["3901480"], ["5905121"], ["5905267"]]
