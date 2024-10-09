@@ -1,0 +1,28 @@
+# Dependency requirements that can be used to build a working environment.
+# For example, this is used to build the Docker image.
+
+# strict requirements
+metanorm @ git+https://github.com/nansencenter/metanorm@4.5.2
+pythesint==1.7.0
+
+# loose requirements
+copernicusmarine==1.*
+django-geo-spaas==2.*
+django==3.*
+feedparser==6.*
+feedparser==6.0.*
+graypy==2.*
+graypy==2.1.*
+nansat==1.*
+netCDF4==1.*
+numpy==1.*
+oauthlib==3.*
+python-dateutil==2.*
+PyYAML==5.*
+requests_oauthlib==1.*
+requests_oauthlib==1.3.*
+requests==2.*
+shapely==2.*
+
+# necessary for running unit tests in parallel
+tblib
