@@ -27,7 +27,7 @@ dependencies = [
     "netCDF4",
     "numpy",
     "oauthlib",
-    "pythesint",
+    "pythesint>=1.7.0",
     "python-dateutil",
     "PyYAML",
     "requests_oauthlib",
