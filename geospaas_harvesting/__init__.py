@@ -1,9 +1,12 @@
 """This module provides means to gather metadata about various datasets
 into the GeoSPaaS catalog
 """
+
+import importlib
 import logging.config
 import os
 import os.path
+import pkgutil
 import sys
 import yaml
 
@@ -20,3 +23,11 @@ except FileNotFoundError:  # pragma: no cover
 if logging_configuration:
     logging.config.dictConfig(logging_configuration)
     logging.captureWarnings(True)
+
+# import plugins
+discovered_plugins = {
+    name: importlib.import_module(name)
+    for finder, name, ispkg
+    in pkgutil.iter_modules()
+    if name.startswith('geospaas_harvesting_')
+}

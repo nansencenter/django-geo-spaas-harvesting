@@ -9,6 +9,8 @@ from ..crawlers import FTPCrawler
 class NOAAProvider(TimeFilterMixin, Provider):
     """Provider for NOAA FTP servers"""
 
+    type = 'noaa'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = "ftp://{server}.ncep.noaa.gov"

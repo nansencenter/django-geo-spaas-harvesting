@@ -16,6 +16,9 @@ class EarthDataCMRProvider(Provider):
     properly validated because of the massive amount of collections
     available through this API. This needs to be refined.
     """
+
+    type = 'earthdata_cmr'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.search_url = 'https://cmr.earthdata.nasa.gov/search/granules.umm_json'

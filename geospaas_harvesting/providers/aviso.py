@@ -6,6 +6,9 @@ from ..crawlers import ThreddsCrawler
 
 class AVISOProvider(TimeFilterMixin, Provider):
     """Provider for AVISO's Thredds"""
+
+    type = 'aviso'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = 'https://tds.aviso.altimetry.fr/thredds'

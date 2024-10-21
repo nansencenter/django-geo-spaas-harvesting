@@ -17,6 +17,9 @@ from ..arguments import ChoiceArgument, StringArgument, WKTArgument
 
 class CopernicusScihubProvider(Provider):
     """Provider for the Copernicus Scihub APIs"""
+
+    type = 'copernicus_scihub'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.search_url = 'https://apihub.copernicus.eu/apihub/search'

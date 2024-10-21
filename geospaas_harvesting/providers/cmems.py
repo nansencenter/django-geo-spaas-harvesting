@@ -21,6 +21,8 @@ from ..crawlers import Crawler, DatasetInfo, FTPCrawler
 class CMEMSProvider(Provider):
     """Provider for CMEMS using the copernicusmarine package"""
 
+    type = 'cmems'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.search_parameters_parser.add_arguments([

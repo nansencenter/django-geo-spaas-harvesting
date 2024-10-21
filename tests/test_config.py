@@ -3,11 +3,8 @@
 import logging
 import unittest
 import unittest.mock as mock
-from datetime import datetime, timezone as tz
-from pathlib import Path
 
 import geospaas_harvesting.config as config
-import geospaas_harvesting.providers.base as providers_base
 import geospaas_harvesting.providers.podaac as providers_podaac
 import geospaas_harvesting.providers.cmems as providers_cmems
 import geospaas_harvesting.providers.resto as providers_resto
@@ -58,10 +55,17 @@ class ProvidersArgumentTestCase(unittest.TestCase):
                     name='cmems', username='user', password='pass'),
             })
 
-    def test_parse_error(self):
+    def test_parse_config_error(self):
         """Test error handling when parsing wrong configuration"""
         with self.assertLogs(config.logger, level=logging.ERROR):
-            _ = config.ProvidersArgument('providers').parse({'foo': {}})
+            config.ProvidersArgument('providers').parse({'foo': {}})
+
+    def test_parse_no_provider_found(self):
+        """Test error handling when no provider matches the requested
+        type
+        """
+        with self.assertLogs(config.logger, level=logging.ERROR):
+            config.ProvidersArgument('providers').parse({'foo': {'type': 'foo'}})
 
 
 class ProvidersConfigurationTestCase(unittest.TestCase):

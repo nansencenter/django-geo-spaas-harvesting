@@ -1,26 +1,35 @@
 """Configuration management"""
+import importlib
 import logging
+import pkgutil
 
-import geospaas_harvesting.providers.aviso as providers_aviso
-import geospaas_harvesting.providers.base as providers_base
-import geospaas_harvesting.providers.ceda as providers_ceda
-import geospaas_harvesting.providers.cmems as providers_cmems
-import geospaas_harvesting.providers.copernicus_scihub as providers_copernicus_scihub
-import geospaas_harvesting.providers.earthdata_cmr as providers_earthdata_cmr
-import geospaas_harvesting.providers.erddap as providers_erddap
-import geospaas_harvesting.providers.ftp as providers_ftp
-import geospaas_harvesting.providers.http as providers_http
-import geospaas_harvesting.providers.jaxa as providers_jaxa
-import geospaas_harvesting.providers.local as providers_local
-import geospaas_harvesting.providers.metno as providers_metno
-import geospaas_harvesting.providers.noaa as providers_noaa
-import geospaas_harvesting.providers.podaac as providers_podaac
-import geospaas_harvesting.providers.resto as providers_resto
+import geospaas_harvesting
 from .arguments import ArgumentParser, BooleanArgument, DictArgument, ListArgument
+from .providers.base import Provider
 from .utils import read_yaml_file
 
 
+def import_provider_modules():
+    """Import provider classes from core modules and plugins"""
+    imported = []
+    for base_module in [geospaas_harvesting, *geospaas_harvesting.discovered_plugins.values()]:
+        for _, name, ispkg in pkgutil.iter_modules(base_module.__path__):
+            if name == 'providers':
+                providers = importlib.import_module(f"{base_module.__name__}.{name}")
+                imported.append(providers)
+                if ispkg:
+                    for _, provider_name, _ in pkgutil.iter_modules(providers.__path__):
+                        imported.append(
+                            importlib.import_module(f"{providers.__name__}.{provider_name}"))
+    return imported
+
+
+import_provider_modules()
 logger = logging.getLogger(__name__)
+
+
+class NoProviderFoundError(Exception):
+    """No provider class was found"""
 
 
 class Configuration():
@@ -57,23 +66,19 @@ class ProvidersArgument(DictArgument):
             'password': 'pass123'
     }
     """
-    provider_types = {
-        'aviso': providers_aviso.AVISOProvider,
-        'ceda': providers_ceda.CEDAProvider,
-        'cmems': providers_cmems.CMEMSProvider,
-        'copernicus_scihub': providers_copernicus_scihub.CopernicusScihubProvider,
-        'earthdata_cmr': providers_earthdata_cmr.EarthDataCMRProvider,
-        'ftp': providers_ftp.FTPProvider,
-        'gportal_ftp': providers_jaxa.GPortalProvider,
-        'http': providers_http.HTTPProvider,
-        'metno': providers_metno.METNOProvider,
-        'nansat': providers_local.NansatProvider,
-        'netcdf': providers_local.NetCDFProvider,
-        'noaa': providers_noaa.NOAAProvider,
-        'podaac': providers_podaac.PODAACProvider,
-        'resto': providers_resto.RestoProvider,
-        'tabledap': providers_erddap.ERDDAPTableProvider,
-    }
+    provider_classes = Provider.__subclasses__()
+
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+
+    def _find_provider(self, provider_type):
+        """Try to find a provider matching the `provider_type` in the
+        Provider subclasses
+        """
+        for provider_class in self.provider_classes:
+            if provider_class.type == provider_type:
+                return provider_class
+        raise NoProviderFoundError(f"No provider found of type {provider_type}")
 
     def parse(self, value):
         """Go through the list of provider settings and create the
@@ -84,14 +89,15 @@ class ProvidersArgument(DictArgument):
         for provider_name, provider_settings in providers_dict.items():
             try:
                 _providers[provider_name] = (
-                    self.provider_types[provider_settings['type']](
+                    self._find_provider(provider_settings['type'])(
                         name=provider_name,
                         **provider_settings,
                     ))
             except KeyError as error:
                 logger.error('Missing setting for provider: %s', error.args[0])
+            except NoProviderFoundError as error:
+                logger.error(error.args[0])
         return _providers
-
 
 class ProvidersConfiguration(Configuration):
     """Configuration manager for providers"""
@@ -110,7 +116,7 @@ class SearchConfiguration(Configuration):
 
     def __init__(self):
         self.providers = None
-        common_argument_parser = providers_base.Provider().search_parameters_parser
+        common_argument_parser = Provider().search_parameters_parser
         self.config_arguments_parser = ArgumentParser([
             DictArgument(
                 'common', argument_parser=common_argument_parser),

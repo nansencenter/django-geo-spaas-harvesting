@@ -9,6 +9,8 @@ from ..crawlers import FTPCrawler
 class CEDAProvider(TimeFilterMixin, Provider):
     """Provider for CEDA FTP server"""
 
+    type = 'ceda'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = "ftp://anon-ftp.ceda.ac.uk"
