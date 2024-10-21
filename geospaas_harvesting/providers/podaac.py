@@ -6,6 +6,9 @@ from ..crawlers import OpenDAPCrawler
 
 class PODAACProvider(TimeFilterMixin, Provider):
     """Provider for PODAAC's OpenDAP"""
+
+    type = 'podaac'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = 'https://opendap.jpl.nasa.gov/opendap'

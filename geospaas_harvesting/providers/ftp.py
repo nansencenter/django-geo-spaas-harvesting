@@ -9,6 +9,8 @@ from ..crawlers import FTPCrawler
 class FTPProvider(TimeFilterMixin, Provider):
     """Generic FTP provider"""
 
+    type = 'ftp'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.search_parameters_parser.add_arguments([

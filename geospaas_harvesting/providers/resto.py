@@ -23,6 +23,8 @@ class RestoProvider(Provider):
     parameters are fetched from the API.
     """
 
+    type = 'resto'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = kwargs['url'].rstrip('/')

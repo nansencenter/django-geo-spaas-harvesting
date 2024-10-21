@@ -6,6 +6,9 @@ from ..crawlers import ThreddsCrawler
 
 class METNOProvider(TimeFilterMixin, Provider):
     """Provider for MET NO's Thredds"""
+
+    type = 'metno'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = 'https://thredds.met.no/thredds'

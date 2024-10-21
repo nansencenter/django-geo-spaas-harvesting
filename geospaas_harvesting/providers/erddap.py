@@ -6,6 +6,9 @@ from ..crawlers import ERDDAPTableCrawler
 
 class ERDDAPTableProvider(Provider):
     """Provider for tabledap APIs"""
+
+    type = 'tabledap'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = kwargs['url'].rstrip('/')

@@ -9,6 +9,8 @@ from ..crawlers import HTMLDirectoryCrawler
 class HTTPProvider(TimeFilterMixin, Provider):
     """Generic HTTP directory provider"""
 
+    type = 'http'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.search_parameters_parser.add_arguments([
