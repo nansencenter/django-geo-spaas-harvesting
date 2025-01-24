@@ -122,8 +122,9 @@ class CMEMSCrawler(Crawler):
                 months_regex.append(f"{month:02d}({days_regex})")
 
             years_regex.append(f"({year}({'|'.join(months_regex)}))")
+            full_regex = '|'.join(years_regex)
 
-        return f".*_({'|'.join(years_regex)})_.*"
+        return f"^(.*_({full_regex})_.*)|({full_regex}.*)$"
 
     @staticmethod
     def _find_dict_in_list(dicts_list, key, value):
