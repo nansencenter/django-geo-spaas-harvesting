@@ -1,5 +1,6 @@
 """Code for searching CMEMS data (https://marine.copernicus.eu/)"""
 import calendar
+import logging
 import re
 import tempfile
 from datetime import datetime
@@ -202,6 +203,8 @@ class CMEMSCrawler(Crawler):
 class CMEMSMetadataNormalizer():
     """Normalizer for CMEMS datasets"""
 
+    logger = logging.getLogger(__name__ + '.CMEMSMetadataNormalizer')
+
     def __init__(self, product_info):
         self._product_info = product_info
 
@@ -373,13 +376,21 @@ class CMEMSMetadataNormalizer():
         variables = []
         variable_dict = None
         for variable in dataset_info.metadata['variables']:
+            if variable['standard_name']:
+                search_name = variable['standard_name']
+            elif variable['short_name']:
+                search_name = variable['short_name']
+            else:
+                self.logger.error('No available name for the following variable, skipping: %s',
+                                  variable)
+                continue
+
             try:
-                variable_dict = providers_utils.get_cf_or_wkv_standard_name(
-                    variable['standard_name'])
+                variable_dict = providers_utils.get_cf_or_wkv_standard_name(search_name)
             except IndexError:
                 try:
                     variable_dict = pythesint.vocabularies['cf_standard_name'].fuzzy_search(
-                            variable['standard_name'])[0]
+                        search_name)[0]
                 except IndexError:
                     continue
             if variable_dict not in variables:
