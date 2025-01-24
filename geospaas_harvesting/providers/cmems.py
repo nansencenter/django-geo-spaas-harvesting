@@ -377,10 +377,12 @@ class CMEMSMetadataNormalizer():
         variables = []
         variable_dict = None
         for variable in dataset_info.metadata['variables']:
-            if variable['standard_name']:
-                search_name = variable['standard_name']
-            elif variable['short_name']:
-                search_name = variable['short_name']
+            standard_name = variable.get('standard_name')
+            short_name = variable.get('short_name')
+            if standard_name:
+                search_name = standard_name
+            elif short_name:
+                search_name = short_name
             else:
                 self.logger.error('No available name for the following variable, skipping: %s',
                                   variable)
