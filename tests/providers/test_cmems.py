@@ -1,5 +1,6 @@
 # pylint: disable=protected-access
 """Tests for the CMEMS provider"""
+import logging
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
@@ -554,17 +555,20 @@ class CMEMSMetadataNormalizerTestCase(unittest.TestCase):
                         '.get_cf_or_wkv_standard_name') as mock_get_cf_wkv, \
              mock.patch('pythesint.vocabularies', vocabularies):
 
-            mock_get_cf_wkv.side_effect = ('variable_1', IndexError, IndexError)
+            mock_get_cf_wkv.side_effect = ('variable_1', IndexError, IndexError, 'variable_4')
             vocabularies['cf_standard_name'].fuzzy_search.side_effect = (
                 IndexError, ['variable_3', 'varrriable_3'])
 
-            self.assertListEqual(
-                self.normalizer.get_dataset_parameters(DatasetInfo('foo', {
-                    'variables': ({'standard_name': 'var1'},
-                                  {'standard_name': 'var2'},
-                                  {'standard_name': 'var3'})
-                })),
-                ['variable_1', 'variable_3'])
+            with self.assertLogs(logger=self.normalizer.logger, level=logging.ERROR):
+                self.assertListEqual(
+                    self.normalizer.get_dataset_parameters(DatasetInfo('foo', {
+                        'variables': ({'standard_name': 'var1'},
+                                    {'standard_name': 'var2'},
+                                    {'standard_name': 'var3'},
+                                    {'short_name': 'v4'},
+                                    {'foo': 'bar'})
+                    })),
+                    ['variable_1', 'variable_3', 'variable_4'])
 
     def test_get_service(self):
         """Test retrieval of the type of repository where the data is
