@@ -307,7 +307,7 @@ class CMEMSMetadataNormalizer():
             ),
             # generic 1 day coverage
             (
-                re.compile(rf'(^|[-_.:]){providers_utils.YEARMONTHDAY_REGEX}([-_.:T]|$)'),
+                re.compile(rf'(^|[-_.:]){providers_utils.YEARMONTHDAY_REGEX}(\d{{6}})?([-_.:T]|$)'),
                 lambda time: (time, time + relativedelta(days=1))
             ),
             # generic 1 month coverage
