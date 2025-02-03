@@ -1,5 +1,6 @@
 # pylint: disable=protected-access
 """Tests for the CMEMS provider"""
+import logging
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone
@@ -58,38 +59,43 @@ class CMEMSCrawlerTestCase(unittest.TestCase):
         """Test making a regular expression matching a time range
         """
         mock_crawler = mock.Mock()
+        regex_template = "^(.*_({regex})_.*)|({regex}.*)$"
 
         mock_crawler.time_range = (datetime(2024, 9, 1),
                                    datetime(2024, 9, 2))
         self.assertEqual(
              CMEMSCrawler.make_filter(mock_crawler),
-             '.*_((2024(09(01|02))))_.*')
+             regex_template.format(regex='(2024(09(01|02)))'))
 
         mock_crawler.time_range = (datetime(2024, 9, 1),
                                    datetime(2024, 10, 15))
         self.assertEqual(
              CMEMSCrawler.make_filter(mock_crawler),
-             '.*_((2024(09(01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24'
-             '|25|26|27|28|29|30)|10(01|02|03|04|05|06|07|08|09|10|11|12|13|14|15))))_.*')
+             regex_template.format(regex=(
+                 '(2024(09(01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|16|17|18|19|20|21|22|23'
+                 '|24|25|26|27|28|29|30)|10(01|02|03|04|05|06|07|08|09|10|11|12|13|14|15)))'
+             )))
 
         mock_crawler.time_range = (datetime(2024, 11, 1),
                                    datetime(2025, 1, 1))
         self.assertEqual(
              CMEMSCrawler.make_filter(mock_crawler),
-             '.*_((202412[0-3][0-9])|(2024(11(01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|16|17|'
-             '18|19|20|21|22|23|24|25|26|27|28|29|30)))|(2025(01(01))))_.*')
+             regex_template.format(regex=(
+                    '(202412[0-3][0-9])|(2024(11(01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|'
+                    '16|17|18|19|20|21|22|23|24|25|26|27|28|29|30)))|(2025(01(01)))')))
 
         mock_crawler.time_range = (datetime(2023, 12, 30),
                                    datetime(2024, 1, 2))
         self.assertEqual(
              CMEMSCrawler.make_filter(mock_crawler),
-             '.*_((2023(12(30|31)))|(2024(01(01|02))))_.*')
+             regex_template.format(regex=('(2023(12(30|31)))|(2024(01(01|02)))')))
 
         mock_crawler.time_range = (datetime(2023, 12, 30),
                                    datetime(2025, 1, 2))
         self.assertEqual(
              CMEMSCrawler.make_filter(mock_crawler),
-             '.*_((2023(12(30|31)))|(2024[0-9]{4})|(2025(01(01|02))))_.*')
+             regex_template.format(regex=(
+                 '(2023(12(30|31)))|(2024[0-9]{4})|(2025(01(01|02)))')))
 
         mock_crawler.time_range = (None, None)
         self.assertIsNone(CMEMSCrawler.make_filter(mock_crawler))
@@ -549,17 +555,20 @@ class CMEMSMetadataNormalizerTestCase(unittest.TestCase):
                         '.get_cf_or_wkv_standard_name') as mock_get_cf_wkv, \
              mock.patch('pythesint.vocabularies', vocabularies):
 
-            mock_get_cf_wkv.side_effect = ('variable_1', IndexError, IndexError)
+            mock_get_cf_wkv.side_effect = ('variable_1', IndexError, IndexError, 'variable_4')
             vocabularies['cf_standard_name'].fuzzy_search.side_effect = (
                 IndexError, ['variable_3', 'varrriable_3'])
 
-            self.assertListEqual(
-                self.normalizer.get_dataset_parameters(DatasetInfo('foo', {
-                    'variables': ({'standard_name': 'var1'},
-                                  {'standard_name': 'var2'},
-                                  {'standard_name': 'var3'})
-                })),
-                ['variable_1', 'variable_3'])
+            with self.assertLogs(logger=self.normalizer.logger, level=logging.ERROR):
+                self.assertListEqual(
+                    self.normalizer.get_dataset_parameters(DatasetInfo('foo', {
+                        'variables': ({'standard_name': 'var1'},
+                                    {'standard_name': 'var2'},
+                                    {'standard_name': 'var3'},
+                                    {'short_name': 'v4'},
+                                    {'foo': 'bar'})
+                    })),
+                    ['variable_1', 'variable_3', 'variable_4'])
 
     def test_get_service(self):
         """Test retrieval of the type of repository where the data is
