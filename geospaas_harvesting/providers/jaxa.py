@@ -9,6 +9,8 @@ from ..crawlers import FTPCrawler
 class GPortalProvider(TimeFilterMixin, Provider):
     """Provider for JAXA GPortal FTP server"""
 
+    type = 'gportal_ftp'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.url = "ftp://ftp.gportal.jaxa.jp"

@@ -26,6 +26,8 @@ class NansatProvider(TimeFilterMixin, Provider):
     """Provider for local files with metadata provided by Nansat
     """
 
+    type = 'nansat'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.search_parameters_parser.add_arguments([
@@ -44,6 +46,8 @@ class NansatProvider(TimeFilterMixin, Provider):
 class NetCDFProvider(TimeFilterMixin, Provider):
     """Provider for local files with metadata extracted directly using
     """
+
+    type = 'netcdf'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
