@@ -302,8 +302,9 @@ class CMEMSMetadataNormalizer():
                 lambda time: (time, time + relativedelta(months=1))
             ),
             (
-                re.compile(rf'^mfwamglocep_{providers_utils.YEARMONTHDAY_REGEX}00_R[0-9]{{8}}'),
-                lambda time: (time, time + relativedelta(hours=24))
+                re.compile(rf'^mfwamglocep_{providers_utils.YEARMONTHDAY_REGEX}' +
+                           r'(?P<hour>(00|12))_R[0-9]{8}_(00|12)H'),
+                lambda time: (time, time + relativedelta(hours=12))
             ),
             (
                 re.compile(rf'^mercatorbiomer4v2r1_global_mean_{providers_utils.YEARMONTH_REGEX}$'),
@@ -349,7 +350,7 @@ class CMEMSMetadataNormalizer():
             *self._product_info['sources'],
         )
         platform = self._search_source('gcmd_platform', search_strings)
-        if platform['Category'] == 'Models':
+        if 'Models' in platform['Category']:
             instrument = pythesint.get_gcmd_instrument('Computer')
         else:
             instrument = self._search_source('gcmd_instrument', search_strings)
