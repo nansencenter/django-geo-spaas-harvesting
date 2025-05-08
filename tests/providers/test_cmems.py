@@ -449,9 +449,9 @@ class CMEMSMetadataNormalizerTestCase(unittest.TestCase):
             (datetime(2020, 11, 1, tzinfo=timezone.utc),
              datetime(2020, 12, 1, tzinfo=timezone.utc)))
         self.assertTupleEqual(
-            self.normalizer.get_time_coverage('mfwamglocep_2021020200_R20210203'),
-            (datetime(2021, 2, 2, tzinfo=timezone.utc),
-             datetime(2021, 2, 3, tzinfo=timezone.utc)))
+            self.normalizer.get_time_coverage('mfwamglocep_2025040100_R20250402_00H'),
+            (datetime(2025, 4, 1, tzinfo=timezone.utc),
+             datetime(2025, 4, 1, 12, tzinfo=timezone.utc)))
         self.assertTupleEqual(
             self.normalizer.get_time_coverage('mercatorbiomer4v2r1_global_mean_20230103'),
             (datetime(2023, 1, 3, tzinfo=timezone.utc),
