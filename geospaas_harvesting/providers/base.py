@@ -1,10 +1,12 @@
 """Base classes for use by providers"""
 import logging
 
+import django.db.models as models
 from shapely.geometry.polygon import Polygon
 
 import geospaas_harvesting.ingesters as ingesters
-from ..arguments import ArgumentParser, DatetimeArgument, DictArgument, WKTArgument
+import geospaas_harvesting.normalizers as normalizers
+from ..arguments import ArgumentParser, DatetimeArgument, DictArgument, StringArgument, WKTArgument
 
 
 logger = logging.getLogger(__name__)
@@ -20,9 +22,30 @@ class FilterMixin():
     with search capabilities).
     """
 
-    def _make_filters(self, parsed_parameters):  # pylint: disable=unused-argument
+    def make_filters(self, parsed_parameters):  # pylint: disable=unused-argument
         """No filters by default"""
         return []
+    
+    def _filter(self, dataset_info):
+        """Apply all the filters to the DatasetInfo object and returns
+        False if any filter returns False
+        """
+        for filter_ in self.filters:
+            if not filter_(dataset_info):
+                return False
+        return True
+    
+    def filter(self, filters, dataset_infos):
+        """Apply filters to an iterator of DatasetInfo and yield the
+        valid ones
+        """
+        for dataset_info in dataset_infos:
+            valid = True
+            for filter_ in filters:
+                if not filter_(dataset_info):
+                    valid = False
+            if valid:
+                yield dataset_info
 
 
 class TimeFilterMixin(FilterMixin):
@@ -39,7 +62,7 @@ class TimeFilterMixin(FilterMixin):
         """Compares a DatasetInfo's time coverage to the stored value"""
         return dataset_info.metadata['time_coverage_start'] <= self._mixin_end_time
 
-    def _make_filters(self, parsed_parameters):
+    def make_filters(self, parsed_parameters):
         """Check that the search parameters' time range and the
         dataset's time range intersect.
         """
@@ -53,27 +76,32 @@ class TimeFilterMixin(FilterMixin):
         return filters
 
 
+# class Provider(models.Model, FilterMixin):
 class Provider(FilterMixin):
     """Base class for Providers. Child classes should add their
     specific parameters to the 'search_parameters' attribute in the
     form of Argument objects.
-    They should also implement the _make_crawler() method.
+    They should also implement the make_crawler() method.
     """
+    name = models.CharField(max_length=100)
+    normalizer_name = models.CharField(max_length=100)
+
+    class Meta:
+        abstract = True
 
     def __init__(self, *args, **kwargs):
-        self.name = kwargs.get('name', 'unknown')
-        self.username = kwargs.get('username')
-        self.password = kwargs.get('password')
-
+        # super(models.Model).__init__(*args, **kwargs)
         self.search_parameters_parser = ArgumentParser([
             DatetimeArgument('start_time', default=None),
             DatetimeArgument('end_time', default=None),
             WKTArgument('location', geometry_types=(Polygon,)),
-            DictArgument('ingester', default={})
+            DictArgument('ingester', default={}),
+            StringArgument('username', default=None),
+            StringArgument('password', default=None),
         ])
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(name={self.name}, username={self.username}, password=*)"
+        return f"{self.__class__.__name__}(name={self.name})"
 
     def __str__(self):
         return f"{self.name} provider, {str(self.search_parameters_parser)}"
@@ -81,9 +109,7 @@ class Provider(FilterMixin):
     def __eq__(self, other):
         return (
             type(self) is type(other) and
-            self.name == other.name and
-            self.username == other.username and
-            self.password == other.password)
+            self.name == other.name)
 
     def search(self, **parameters):
         """Returns a Search object which can be used to explore the
@@ -91,14 +117,30 @@ class Provider(FilterMixin):
         """
         parsed_parameters = self.search_parameters_parser.parse(parameters)
         ingester_params = parsed_parameters.pop('ingester')
-        filters = self._make_filters(parsed_parameters)
-        return SearchResults(self._make_crawler(parsed_parameters),
-                             filters=filters,
-                             ingester=ingesters.Ingester(**ingester_params))
+        
+        crawler = self.make_crawler(parsed_parameters)
+        filters = self.make_filters(parsed_parameters)
+        normalizer = self.make_normalizer()
 
-    def _make_crawler(self, parameters):
+        results_iterator = normalizer.normalize_stream(
+            self.filter(filters, crawler)
+        )
+        return SearchResults(
+            results_iterator,
+            ingesters.Ingester(**ingester_params),
+        )
+
+    def make_crawler(self, parameters):
         """Create a crawler from the search parameters"""
         raise NotImplementedError()
+
+    def make_normalizer(self):
+        """Get MetadataNormalizer class from index and instantiate it
+        """
+        try:
+            return normalizers.index[self.normalizer_name]()
+        except KeyError:
+            raise ValueError(f"Unknown normalizer {self.normalizer_name}")
 
 
 class SearchResults():
@@ -107,42 +149,19 @@ class SearchResults():
     Provides only basic functionality for now. To be extended when
     integrating the search and harvesting process in the web UI.
     """
-    def __init__(self, crawler, filters=None, ingester=None):
-        self.crawler = crawler
-        self.crawler_iterator = None
-        self.filters = filters if filters is not None else []
+    def __init__(self, results_iterator, ingester=None):
+        self.results_iterator = results_iterator
         self.ingester = ingester
+        self._cached_results = []
 
-    def __repr__(self):
-        return f"SearchResults for crawler: {self.crawler}"
-
-    def __eq__(self, other):
-        return self.crawler == other.crawler and self.filters == other.filters
+    # def __repr__(self):
+    #     return f"SearchResults for crawler: {self.crawler}"
 
     def __iter__(self):
-        self.crawler.set_initial_state()
-        self.crawler_iterator = iter(self.crawler)
         return self
 
     def __next__(self):
-        """Look for the next dataset_info returned by the crawler which
-        matches the filters
-        """
-        # will be interrupted by the StopIteration when arriving at the
-        # end of the crawler
-        while True:
-            next_dataset_info = next(self.crawler_iterator)
-            if self._filter(next_dataset_info):
-                return next_dataset_info
-
-    def _filter(self, dataset_info):
-        """Apply all the filters to the DatasetInfo object and returns
-        False if any filter returns False
-        """
-        for filter_ in self.filters:
-            if not filter_(dataset_info):
-                return False
-        return True
+        return next(self.results_iterator)
 
     def save(self, **kwargs):
         """Save the datasets matching the search to the database"""

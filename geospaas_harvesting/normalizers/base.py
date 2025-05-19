@@ -1,0 +1,273 @@
+"""Module containing the base class for GeoSPaaS normalizers"""
+import logging
+import os
+import queue
+import threading
+import pickle
+import concurrent.futures
+from datetime import datetime
+from pathlib import Path
+
+from geospaas.catalog.models import Dataset, DatasetURI
+from geospaas.vocabularies.models import Parameter
+
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+
+class MetadataNormalizer():
+    """Base class for all metadata normalizers"""
+
+    name = None
+
+    def normalize(self, dataset_info):
+        dataset = Dataset(
+            entry_id=self.get_entry_id(dataset_info),
+            time_coverage_start=self.get_time_coverage_start(dataset_info),
+            time_coverage_end=self.get_time_coverage_end(dataset_info),
+            location=self.get_location_geometry(dataset_info),
+            entry_title=self.get_entry_title(dataset_info),
+            summary=self.get_summary(dataset_info),
+        )
+        for keyword in self.get_keywords(dataset_info):
+            dataset.keywords.add(keyword)
+        for parameter in self.get_dataset_parameters(dataset_info):
+            dataset.parameters.add(parameter)
+
+        dataset_uri = DatasetURI(uri=dataset_info.url, dataset=dataset)
+
+        return (dataset, dataset_uri)
+
+    def normalize_stream(self, dataset_infos):
+        """"""
+        return StreamMetadataNormalizer(self, dataset_infos)
+
+    def get_entry_id(self, dataset_info):
+        """Get the entry ID from the raw metadata"""
+        raise NotImplementedError
+
+    def get_time_coverage_start(self, dataset_info):
+        """Get the start of the time coverage from the raw metadata"""
+        raise NotImplementedError
+
+    def get_time_coverage_end(self, dataset_info):
+        """Get the end of the time coverage from the raw metadata"""
+        raise NotImplementedError
+    
+    def get_location_geometry(self, dataset_info):
+        """Get the location geometry (in WKT or GeoJSON) from the raw
+        metadata
+        """
+        raise NotImplementedError
+
+    def get_entry_title(self, dataset_info):
+        """Get the entry title from the raw metadata"""
+        return ''
+
+    def get_summary(self, dataset_info):
+        """Get the summary from the raw metadata"""
+        return ''
+
+    def get_keywords(self, dataset_info):
+        """Find relevant keywords"""
+        return []
+
+    # def get_platform(self, dataset_info):
+    #     """Get the platform from the raw metadata"""
+    #     return None
+
+    # def get_instrument(self, dataset_info):
+    #     """Get the instrument from the raw metadata"""
+    #     return None
+
+    # def get_provider(self, dataset_info):
+    #     """Get the provider from the raw metadata"""
+    #     return None
+
+    # @raises(IndexError)
+    # def get_iso_topic_category(self, dataset_info):
+    #     """Get the ISO topic category from the raw metadata"""
+    #     return None
+
+    # @raises(IndexError)
+    # def get_gcmd_location(self, dataset_info):
+    #     """Get the GCMD location from the raw metadata"""
+    #     return None
+
+    def get_dataset_parameters(self, dataset_info):
+        """Get the dataset's parameters, if any, from the raw metadata
+        Note that if a parameter is not found is pythesint, no error is
+        raised, but a warning is logged
+        """
+        normalized_dataset_parameters = []
+        if 'raw_dataset_parameters' in dataset_info:
+            for raw_parameter_name in dataset_info['raw_dataset_parameters']:
+                candidates = Parameter.filter(raw_parameter_name)
+                if not candidates.exists():
+                    logger.warning("'%s' parameter could not be normalized", raw_parameter_name)
+                    continue
+                else:
+                    if candidates.count() > 1:
+                        logger.warning(
+                            "Found multiple matching parameters for '%s'. Using '%s'",
+                            raw_parameter_name, candidates.first().data['standard_name'])
+                    normalized_dataset_parameters.append(candidates.first())
+                
+        return normalized_dataset_parameters
+
+
+class Stop():
+    """Class used in normalizing queues to signal that processing
+    should stop
+    """
+
+
+class StreamMetadataNormalizer():
+    """"""
+    logger = logging.getLogger(__name__ + '.StreamMetadataNormalizer')
+    QUEUE_SIZE = 500
+    FAILED_INGESTIONS_PATH = os.getenv(
+        'GEOSPAAS_FAILED_INGESTIONS_DIR',
+        Path('/', 'var', 'run', 'geospaas'))
+    MAX_FAILED = 500000  # max number of failed objects per recovery file
+    RECOVERY_SUFFIX = 'failed_ingestions.pickle'
+
+    def __init__(self, normalizer, dataset_infos, max_threads=1):
+        """Creates a managing thread which will in turn spawn
+        normalization threads
+        """
+        self.dataset_infos = dataset_infos
+        self.normalizer = normalizer
+        self.max_threads = max_threads
+
+        self._results = queue.Queue(self.QUEUE_SIZE)
+        self._failed = queue.Queue(self.QUEUE_SIZE)
+
+        self.main_thread = threading.current_thread()
+        self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
+        self.manager_thread.start()
+
+    def __del__(self):
+        """Make sure the managing thread is done
+        """
+        if self.main_thread == threading.current_thread():
+            self.manager_thread.join()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        """Gets the next result from the _results queue"""
+        next_result = self._results.get()
+        if next_result is Stop:
+            raise StopIteration()
+        else:
+            return next_result
+
+    def _pickle_list_elements(self, list_to_pickle, pickle_path):
+        """Pickle all the elements in the list, then empty it"""
+        self.logger.info("Dumping items to %s", pickle_path)
+        with open(pickle_path, 'ab') as pickle_file:
+            for element_to_pickle in list_to_pickle:
+                pickle.dump(element_to_pickle, pickle_file)
+        list_to_pickle.clear()
+
+    def _start_normalizing(self, **kwargs):
+        """Iterate over the DatasetInfo objects obtained from the
+        DatasetInfo iterator and normalize the attributes. Normalizing
+        happens in separate threads to parallelize the I/Os.
+        """
+        # Launch thread which checks the size of the failed ingestions
+        # queue and dumps it to disk when necessary
+        self.logger.info("Starting normalizer thread for %s", self.normalizer.name)
+        failed_queue_thread = threading.Thread(target=self._thread_manage_failed_normalizing)
+        failed_queue_thread.start()
+        try:
+            try:
+                # Launch normalizing threads
+                with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=self.max_threads,
+                        thread_name_prefix=self.__class__.__name__) as executor:
+                    futures = []
+                    for dataset_info in self.dataset_infos:
+                        self.logger.info("Normalizing %s", dataset_info)
+                        futures.append(executor.submit(
+                            self._thread_normalize,
+                            dataset_info,
+                            **kwargs
+                        ))
+            except KeyboardInterrupt:
+                self.logger.info('Normalizing thread received stopping signal')
+                for future in reversed(futures):
+                    future.cancel()
+                self.logger.info(
+                    'Cancelled future normalizing threads')
+            finally:
+                self.logger.debug("Normalizing threads are done")
+                self._results.put(Stop)
+                self.logger.debug('Stopping failed queue watcher thread')
+                self._failed.put(Stop)
+                failed_queue_thread.join()
+
+                # raise exceptions from threads
+                for future in concurrent.futures.as_completed(futures):
+                    exception = future.exception()
+                    if exception:
+                        self.logger.error(
+                            "Exception happened during thread",
+                            exc_info=exception)
+        except Exception as e:
+            self.logger.error(exc_info=e)
+
+    def _thread_normalize(self, dataset_info, **kwargs):
+        """
+        Gets the attributes needed to insert a dataset into the
+        database from its URL, and puts a dictionary containing these
+        attributes in the results queue.
+        If an error occurs while retrieving the attributes, the dataset
+        info and the exception are put in the _failed queue for
+        processing by the dedicated thread.
+        This method is meant to be run in a thread.
+        """
+        self.logger.debug("Getting metadata for '%s'", dataset_info.url)
+        try:
+            result = self.normalizer.normalize(dataset_info, **kwargs)
+        except Exception as error:  # pylint: disable=broad-except
+            self.logger.error("Could not get metadata for '%s'", dataset_info.url, exc_info=True)
+            self._failed.put((dataset_info, error), block=True)
+        else:
+            self._results.put(result)
+
+    def _thread_manage_failed_normalizing(self):
+        """Watches the `_failed` queue and put the incoming failed
+        elements in a list. When the list reaches its maximum size or
+        when None is received, dump the contents of the list to a file.
+        This method is meant to be run in a thread.
+        """
+        try:
+            self.logger.debug("Starting failure management thread")
+            class_name = self.__class__.__name__.lower()
+            date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
+            pickle_path = Path(self.FAILED_INGESTIONS_PATH,
+                            f'{class_name}_{date}_{self.RECOVERY_SUFFIX}')
+
+            os.makedirs(self.FAILED_INGESTIONS_PATH, exist_ok=True)
+
+            failed_ingestions = []
+            while True:
+                element = self._failed.get()
+
+                if element is Stop:
+                    self.logger.debug("Stopping failure management thread")
+                    if failed_ingestions:
+                        self._pickle_list_elements(failed_ingestions, pickle_path)
+                    self._failed.task_done()
+                    break
+
+                failed_ingestions.append(element)
+                if len(failed_ingestions) >= self.MAX_FAILED:
+                    self._pickle_list_elements(failed_ingestions, pickle_path)
+                self._failed.task_done()
+        except Exception as e:
+            self.logger.error(exc_info=e)

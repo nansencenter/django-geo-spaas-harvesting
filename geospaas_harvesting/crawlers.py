@@ -24,7 +24,6 @@ import requests
 import shapely.geometry
 
 import geospaas_harvesting.utils as utils
-import geospaas.catalog.managers as catalog_managers
 from metanorm.handlers import MetadataHandler
 from metanorm.normalizers.geospaas import GeoSPaaSMetadataNormalizer
 
@@ -59,12 +58,11 @@ class Crawler():
     logger = logging.getLogger(__name__ + '.Crawler')
 
     def __init__(self, max_threads=1):
-        self._metadata_handler = MetadataHandler(GeoSPaaSMetadataNormalizer)
         self.max_threads = max_threads
 
     # ------------- crawl ------------
     def __iter__(self):
-        return CrawlerIterator(self, max_threads=self.max_threads)
+        return iter(self.crawl())
 
     def crawl(self):
         """Generator which crawls through a dataset repository and yields
@@ -101,167 +99,6 @@ class Crawler():
             time.sleep(wait_time)
             wait_time *= 2
         raise RuntimeError(f"Max retries reached trying to get {url}") from last_error
-
-    # --------- get metadata ---------
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        """
-        Returns a dictionary of normalized attribute which characterize a Dataset. It should
-        contain the following extra entries: `geospaas_service` and `geospaas_service_name`, which
-        should respectively contain the `service` and `service_name` values necessary to create a
-        DatasetURI object.
-        """
-        raise NotImplementedError()
-
-    @staticmethod
-    def add_url(url, raw_attributes):
-        """Utility method to add the dataset's URL to the raw attributes in case it is not there"""
-        if 'url' not in raw_attributes:
-            raw_attributes['url'] = url
-
-
-class CrawlerIterator():
-    """Iterator for crawlers which returns DatasetInfo objects
-    """
-    logger = logging.getLogger(__name__ + '.CrawlerIterator')
-    QUEUE_SIZE = 500
-    FAILED_INGESTIONS_PATH = os.getenv(
-        'GEOSPAAS_FAILED_INGESTIONS_DIR',
-        os.path.join('/', 'var', 'run', 'geospaas'))
-    MAX_FAILED = 500000  # max number of failed objects per recovery file
-    RECOVERY_SUFFIX = 'failed_ingestions.pickle'
-
-    def __init__(self, crawler, max_threads=1):
-        """Initializes the iterator and creates a managing thread which
-        will in turn spawn normalization threads
-        """
-        self.crawler = crawler
-        self.max_threads = max_threads
-
-        self._results = queue.Queue(self.QUEUE_SIZE)
-        self._failed = queue.Queue(self.QUEUE_SIZE)
-
-        self.main_thread = threading.current_thread()
-        self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
-        self.manager_thread.start()
-
-    def __del__(self):
-        """Make sure the managing thread is done before destroying the
-        iterator
-        """
-        if self.main_thread == threading.current_thread():
-            self.manager_thread.join()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        """Gets the next result from the _results queue"""
-        next_result = self._results.get()
-        if next_result is Stop:
-            raise StopIteration()
-        else:
-            return next_result
-
-    def _pickle_list_elements(self, list_to_pickle, pickle_path):
-        """Pickle all the elements in the list, then empty it"""
-        self.logger.info("Dumping items to %s", pickle_path)
-        with open(pickle_path, 'ab') as pickle_file:
-            for element_to_pickle in list_to_pickle:
-                pickle.dump(element_to_pickle, pickle_file)
-        list_to_pickle.clear()
-
-    def _start_normalizing(self, **kwargs):
-        """Iterate over the DatasetInfo objects obtained from the crawler and
-        normalize the attributes. Normalizing happens in separate threads to
-        parallelize the I/Os.
-        """
-        # Launch thread which checks the size of the failed ingestions
-        # queue and dumps it to disk when necessary
-        failed_queue_thread = threading.Thread(target=self._thread_manage_failed_normalizing)
-        failed_queue_thread.start()
-
-        try:
-            # Launch normalizing threads
-            with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self.max_threads,
-                    thread_name_prefix=self.__class__.__name__) as executor:
-                futures = []
-                for dataset_info in self.crawler.crawl():
-                    futures.append(executor.submit(
-                        self._thread_get_normalized_attributes,
-                        dataset_info,
-                        **kwargs
-                    ))
-        except KeyboardInterrupt:
-            self.logger.info('Normalizing thread received stopping signal')
-            for future in reversed(futures):
-                future.cancel()
-            self.logger.info(
-                'Cancelled future normalizing threads')
-        finally:
-            self.logger.debug("Normalizing threads are done")
-            self._results.put(Stop)
-            self.logger.debug('Stopping failed queue watcher thread')
-            self._failed.put(Stop)
-            failed_queue_thread.join()
-
-            # raise exceptions from threads
-            for future in concurrent.futures.as_completed(futures):
-                exception = future.exception()
-                if exception:
-                    self.logger.error(
-                        "Exception happened during thread",
-                        exc_info=exception)
-
-    def _thread_get_normalized_attributes(self, dataset_info, **kwargs):
-        """
-        Gets the attributes needed to insert a dataset into the
-        database from its URL, and puts a dictionary containing these
-        attributes in the results queue.
-        If an error occurs while retrieving the attributes, the dataset
-        info and the exception are put in the _failed queue for
-        processing by the dedicated thread.
-        This method is meant to be run in a thread.
-        """
-        self.logger.debug("Getting metadata for '%s'", dataset_info.url)
-        try:
-            normalized_attributes = self.crawler.get_normalized_attributes(dataset_info, **kwargs)
-        except Exception as error:  # pylint: disable=broad-except
-            self.logger.error("Could not get metadata for '%s'", dataset_info.url, exc_info=True)
-            self._failed.put((dataset_info, error), block=True)
-        else:
-            dataset_info.metadata = normalized_attributes
-            self._results.put(dataset_info)
-
-    def _thread_manage_failed_normalizing(self):
-        """Watches the `_failed` queue and put the incoming failed
-        elements in a list. When the list reaches its maximum size or
-        when None is received, dump the contents of the list to a file.
-        This method is meant to be run in a thread.
-        """
-        self.logger.debug("Starting failure management thread")
-        class_name = self.__class__.__name__.lower()
-        date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
-        pickle_path = os.path.join(self.FAILED_INGESTIONS_PATH,
-                                   f'{class_name}_{date}_{self.RECOVERY_SUFFIX}')
-
-        os.makedirs(self.FAILED_INGESTIONS_PATH, exist_ok=True)
-
-        failed_ingestions = []
-        while True:
-            element = self._failed.get()
-
-            if element is Stop:
-                self.logger.debug("Stopping failure management thread")
-                if failed_ingestions:
-                    self._pickle_list_elements(failed_ingestions, pickle_path)
-                self._failed.task_done()
-                break
-
-            failed_ingestions.append(element)
-            if len(failed_ingestions) >= self.MAX_FAILED:
-                self._pickle_list_elements(failed_ingestions, pickle_path)
-            self._failed.task_done()
 
 
 class LinkExtractor(HTMLParser):
