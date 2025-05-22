@@ -3,17 +3,13 @@ A set of crawlers used to explore data provider interfaces and get resources URL
 should inherit from the Crawler class and implement the abstract methods defined in Crawler.
 """
 import calendar
-import concurrent.futures
 import ftplib
 import functools
 import io
 import logging
 import os
 import os.path
-import pickle
-import queue
 import re
-import threading
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
@@ -24,8 +20,6 @@ import requests
 import shapely.geometry
 
 import geospaas_harvesting.utils as utils
-from metanorm.handlers import MetadataHandler
-from metanorm.normalizers.geospaas import GeoSPaaSMetadataNormalizer
 
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -43,7 +37,10 @@ class DatasetInfo():
     """
     def __init__(self, url, metadata=None):
         self.url = url
-        self.metadata = metadata
+        if metadata is None:
+            self.metadata = {}
+        else:
+            self.metadata = metadata
 
     def __repr__(self):
         return f"DatasetInfo(url='{self.url}', metadata={self.metadata})"
@@ -67,13 +64,6 @@ class Crawler():
     def crawl(self):
         """Generator which crawls through a dataset repository and yields
         DatasetInfo objects
-        """
-        raise NotImplementedError()
-
-    def set_initial_state(self):
-        """
-        This method should set the crawler's attributes which are used for iterating in their
-        initial state. Child classes must implement this method so that the crawler can be reused
         """
         raise NotImplementedError()
 
@@ -165,7 +155,8 @@ class DirectoryCrawler(Crawler):
         self.include = re.compile(include) if include else None
         self.username = username
         self.password = password
-        self.set_initial_state()
+        self._results = None
+        self._to_process = None
 
     def __eq__(self, other):
         return (
@@ -200,6 +191,7 @@ class DirectoryCrawler(Crawler):
         self._to_process = [self.root_url.path.rstrip('/')]
 
     def crawl(self):
+        self.set_initial_state()
         while True:
             try:
                 # Return all resource URLs from the previously processed folder
@@ -304,7 +296,7 @@ class DirectoryCrawler(Crawler):
         """
         download_url = self.get_download_url(path)
         if download_url is not None:
-            dataset_info = DatasetInfo(download_url)
+            dataset_info = DatasetInfo(download_url, self.get_raw_attributes(download_url))
             if dataset_info not in self._results:
                 self.logger.debug("Adding '%s' to the list of resources.", dataset_info)
                 self._results.append(dataset_info)
@@ -333,9 +325,12 @@ class DirectoryCrawler(Crawler):
             if self.include and self.include.search(path):
                 self._add_url_to_return(path)
 
-    # --------- get metadata ---------
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        raise NotImplementedError()
+    def get_raw_attributes(self, download_url):
+        """Gets raw attributes in the cases where they need to be
+        fetched. For example, the y can sometimes be fetched from
+        a different URL.
+        """
+        return {}
 
 
 class LocalDirectoryCrawler(DirectoryCrawler):
@@ -353,10 +348,6 @@ class LocalDirectoryCrawler(DirectoryCrawler):
 
     def _is_folder(self, path):
         return os.path.isdir(path)
-
-    # --------- get metadata ---------
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        raise NotImplementedError()
 
 
 class HTMLDirectoryCrawler(DirectoryCrawler):
@@ -410,16 +401,6 @@ class HTMLDirectoryCrawler(DirectoryCrawler):
         stripped_folder_path = self._strip_folder_page(folder_path)
         return self._prepend_parent_path(stripped_folder_path, self._get_links(html))
 
-    # --------- get metadata ---------
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        """Gets dataset attributes using http"""
-        raw_attributes = {}
-        self.add_url(dataset_info.url, raw_attributes)
-        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-        normalized_attributes['geospaas_service_name'] = catalog_managers.HTTP_SERVICE_NAME
-        normalized_attributes['geospaas_service'] = catalog_managers.HTTP_SERVICE
-        return normalized_attributes
-
 
 class OpenDAPCrawler(HTMLDirectoryCrawler):
     """
@@ -453,7 +434,7 @@ class OpenDAPCrawler(HTMLDirectoryCrawler):
         namespaces = {'default': self._get_xml_namespace(root)}
         extracted_attributes = {}
         x_path_global = "./default:Attribute[@name='NC_GLOBAL']/default:Attribute"
-        x_path_specific = "./default:Grid/default:Attribute[@name='standard_name']"
+        x_path_specific = "./*/default:Attribute[@name='standard_name']"
         # finding the global metadata
         for attribute in root.findall(x_path_global, namespaces):
             extracted_attributes[attribute.get('name')] = attribute.find(
@@ -462,16 +443,10 @@ class OpenDAPCrawler(HTMLDirectoryCrawler):
         # the online source (specific metadata)
         # The specific ones are stored in 'raw_dataset_parameters' part of
         # the returned dictionary("extracted_attributes")
-        extracted_attributes['raw_dataset_parameters'] = list()
+        extracted_attributes['raw_dataset_parameters'] = set()
         for attribute in root.findall(x_path_specific, namespaces):
-            extracted_attributes['raw_dataset_parameters'].append(
+            extracted_attributes['raw_dataset_parameters'].add(
                 attribute.find("./default:value", namespaces).text)
-        # removing the "latitude" and "longitude" from
-        # the 'raw_dataset_parameters' part of the dictionary
-        if 'latitude' in extracted_attributes['raw_dataset_parameters']:
-            extracted_attributes['raw_dataset_parameters'].remove('latitude')
-        if 'longitude' in extracted_attributes['raw_dataset_parameters']:
-            extracted_attributes['raw_dataset_parameters'].remove('longitude')
         return extracted_attributes
 
     @classmethod
@@ -488,23 +463,15 @@ class OpenDAPCrawler(HTMLDirectoryCrawler):
         else:
             return url + '.ddx'
 
-    def get_normalized_attributes(self, dataset_info, **kwargs):
+    def get_raw_attributes(self, url, **kwargs):
         """Get normalized metadata from the DDX info of the dataset located at
         the provided URL
         """
-        ddx_url = self.get_ddx_url(dataset_info.url)
+        ddx_url = self.get_ddx_url(url)
         # Get the metadata from the dataset as an XML tree
         stream = io.BytesIO(self._http_get(ddx_url, request_parameters={'stream': True}).content)
-        # Get all the global attributes of the Dataset into a dictionary
-        extracted_attributes = self._extract_attributes(ET.parse(stream).getroot())
-        # add the URL to the attributes passed to metanorm
-        self.add_url(dataset_info.url, extracted_attributes)
-        # Get the parameters needed to create a geospaas catalog dataset from the global attributes
-        normalized_attributes = self._metadata_handler.get_parameters(extracted_attributes)
-        normalized_attributes['geospaas_service'] = catalog_managers.OPENDAP_SERVICE
-        normalized_attributes['geospaas_service_name'] = catalog_managers.DAP_SERVICE_NAME
-
-        return normalized_attributes
+        # Add the metadata to the DatasetInfo
+        return self._extract_attributes(ET.parse(stream).getroot())
 
 
 class ThreddsCrawler(OpenDAPCrawler):
@@ -556,18 +523,6 @@ class FTPCrawler(DirectoryCrawler):
 
         super().__init__(root_url, time_range, include, max_threads=1,
                          username=username, password=password)
-
-    def __getstate__(self):
-        """Method used to pickle the crawler"""
-        state = self.__dict__
-        if isinstance(state['ftp'], ftplib.FTP):
-            state['ftp'] = None
-        return state
-
-    def __setstate__(self, state):
-        """Method used to unpickle the crawler"""
-        self.__dict__.update(state)
-        self.connect()
 
     # ------------- crawl ------------
     def set_initial_state(self):
@@ -664,7 +619,6 @@ class HTTPPaginatedAPICrawler(Crawler):
         self.initial_offset = initial_offset or self.MIN_OFFSET
         self.request_parameters = self._build_request_parameters(
             search_terms, time_range, username, password, page_size)
-        self.set_initial_state()
 
     def __eq__(self, other):
         return (
@@ -674,10 +628,6 @@ class HTTPPaginatedAPICrawler(Crawler):
         )
 
     # ------------- crawl ------------
-    def set_initial_state(self):
-        self.page_offset = self.initial_offset
-        self._results = []
-
     @property
     def page_size(self):
         """Getter for the page size"""
@@ -708,7 +658,12 @@ class HTTPPaginatedAPICrawler(Crawler):
             }
         }
 
+    def set_initial_state(self):
+        self.page_offset = self.initial_offset
+        self._results = []
+
     def crawl(self):
+        self.set_initial_state()
         while True:
             try:
                 # Return all resource URLs from the previously processed page
@@ -781,9 +736,6 @@ class ERDDAPTableCrawler(Crawler):
             self.search_terms == other.search_terms and
             self.variables == other.variables
         )
-
-    def set_initial_state(self):
-        """Nothing to do"""
 
     def get_ids(self):
         """Fetch identifiers matching the search terms"""
@@ -911,6 +863,4 @@ class ERDDAPTableCrawler(Crawler):
         raw_attributes['product_metadata'] = self.get_product_metadata()
 
         normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-        normalized_attributes['geospaas_service_name'] = catalog_managers.HTTP_SERVICE_NAME
-        normalized_attributes['geospaas_service'] = catalog_managers.HTTP_SERVICE
         return normalized_attributes
