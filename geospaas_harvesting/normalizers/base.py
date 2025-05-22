@@ -8,6 +8,7 @@ import concurrent.futures
 from datetime import datetime
 from pathlib import Path
 
+import geospaas_harvesting.normalizers.utils as utils
 from geospaas.catalog.models import Dataset, DatasetURI
 from geospaas.vocabularies.models import Parameter
 
@@ -21,6 +22,9 @@ class MetadataNormalizer():
 
     name = None
 
+    def __init__(self):
+        self.logger = logging.getLogger(f"geospaas_harvesting.normalizers.{self.name}")
+
     def normalize(self, dataset_info):
         dataset = Dataset(
             entry_id=self.get_entry_id(dataset_info),
@@ -30,14 +34,11 @@ class MetadataNormalizer():
             entry_title=self.get_entry_title(dataset_info),
             summary=self.get_summary(dataset_info),
         )
-        for keyword in self.get_keywords(dataset_info):
-            dataset.keywords.add(keyword)
-        for parameter in self.get_dataset_parameters(dataset_info):
-            dataset.parameters.add(parameter)
-
         dataset_uri = DatasetURI(uri=dataset_info.url, dataset=dataset)
-
-        return (dataset, dataset_uri)
+        keywords = self.get_keywords(dataset_info)
+        parameters = self.get_dataset_parameters(dataset_info)
+        tags = self.get_tags(dataset_info)
+        return (dataset, dataset_uri, keywords, parameters, tags)
 
     def normalize_stream(self, dataset_infos):
         """"""
@@ -54,7 +55,7 @@ class MetadataNormalizer():
     def get_time_coverage_end(self, dataset_info):
         """Get the end of the time coverage from the raw metadata"""
         raise NotImplementedError
-    
+
     def get_location_geometry(self, dataset_info):
         """Get the location geometry (in WKT or GeoJSON) from the raw
         metadata
@@ -73,48 +74,19 @@ class MetadataNormalizer():
         """Find relevant keywords"""
         return []
 
-    # def get_platform(self, dataset_info):
-    #     """Get the platform from the raw metadata"""
-    #     return None
-
-    # def get_instrument(self, dataset_info):
-    #     """Get the instrument from the raw metadata"""
-    #     return None
-
-    # def get_provider(self, dataset_info):
-    #     """Get the provider from the raw metadata"""
-    #     return None
-
-    # @raises(IndexError)
-    # def get_iso_topic_category(self, dataset_info):
-    #     """Get the ISO topic category from the raw metadata"""
-    #     return None
-
-    # @raises(IndexError)
-    # def get_gcmd_location(self, dataset_info):
-    #     """Get the GCMD location from the raw metadata"""
-    #     return None
+    def get_tags(self, dataset_info):
+        """Find and/or create relevant tags"""
+        return []
 
     def get_dataset_parameters(self, dataset_info):
         """Get the dataset's parameters, if any, from the raw metadata
         Note that if a parameter is not found is pythesint, no error is
         raised, but a warning is logged
         """
-        normalized_dataset_parameters = []
-        if 'raw_dataset_parameters' in dataset_info:
-            for raw_parameter_name in dataset_info['raw_dataset_parameters']:
-                candidates = Parameter.filter(raw_parameter_name)
-                if not candidates.exists():
-                    logger.warning("'%s' parameter could not be normalized", raw_parameter_name)
-                    continue
-                else:
-                    if candidates.count() > 1:
-                        logger.warning(
-                            "Found multiple matching parameters for '%s'. Using '%s'",
-                            raw_parameter_name, candidates.first().data['standard_name'])
-                    normalized_dataset_parameters.append(candidates.first())
-                
-        return normalized_dataset_parameters
+        try:
+            return utils.create_parameter_list(dataset_info.metadata['raw_dataset_parameters'])
+        except KeyError:
+            return []
 
 
 class Stop():
@@ -145,16 +117,18 @@ class StreamMetadataNormalizer():
         self._failed = queue.Queue(self.QUEUE_SIZE)
 
         self.main_thread = threading.current_thread()
-        self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
-        self.manager_thread.start()
+        self.manager_thread = None
 
     def __del__(self):
         """Make sure the managing thread is done
         """
         if self.main_thread == threading.current_thread():
-            self.manager_thread.join()
+            if self.manager_thread is not None:
+                self.manager_thread.join()
 
     def __iter__(self):
+        self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
+        self.manager_thread.start()
         return self
 
     def __next__(self):
@@ -180,45 +154,44 @@ class StreamMetadataNormalizer():
         """
         # Launch thread which checks the size of the failed ingestions
         # queue and dumps it to disk when necessary
-        self.logger.info("Starting normalizer thread for %s", self.normalizer.name)
+        self.logger.debug("Starting normalizer thread for %s", self.normalizer.name)
         failed_queue_thread = threading.Thread(target=self._thread_manage_failed_normalizing)
         failed_queue_thread.start()
         try:
-            try:
-                # Launch normalizing threads
-                with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=self.max_threads,
-                        thread_name_prefix=self.__class__.__name__) as executor:
-                    futures = []
-                    for dataset_info in self.dataset_infos:
-                        self.logger.info("Normalizing %s", dataset_info)
-                        futures.append(executor.submit(
-                            self._thread_normalize,
-                            dataset_info,
-                            **kwargs
-                        ))
-            except KeyboardInterrupt:
-                self.logger.info('Normalizing thread received stopping signal')
-                for future in reversed(futures):
-                    future.cancel()
-                self.logger.info(
-                    'Cancelled future normalizing threads')
-            finally:
-                self.logger.debug("Normalizing threads are done")
-                self._results.put(Stop)
-                self.logger.debug('Stopping failed queue watcher thread')
-                self._failed.put(Stop)
-                failed_queue_thread.join()
+            # Launch normalizing threads
+            with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=self.max_threads,
+                    thread_name_prefix=self.__class__.__name__) as executor:
+                futures = []
+                for dataset_info in self.dataset_infos:
+                    self.logger.debug("Normalizing %s", dataset_info)
+                    futures.append(executor.submit(
+                        self._thread_normalize,
+                        dataset_info,
+                        **kwargs
+                    ))
+        except KeyboardInterrupt:
+            self.logger.info('Normalizing thread received stopping signal')
+            for future in reversed(futures):
+                future.cancel()
+            self.logger.info(
+                'Cancelled future normalizing threads')
+        except Exception as error:
+            self.logger.info('Unexpected error happened during normalizing', exc_info=True)
+        finally:
+            self.logger.debug("Stopping normalizing threads")
+            self._results.put(Stop)
+            self.logger.debug('Stopping failed queue watcher thread')
+            self._failed.put(Stop)
+            failed_queue_thread.join()
 
-                # raise exceptions from threads
-                for future in concurrent.futures.as_completed(futures):
-                    exception = future.exception()
-                    if exception:
-                        self.logger.error(
-                            "Exception happened during thread",
-                            exc_info=exception)
-        except Exception as e:
-            self.logger.error(exc_info=e)
+            # raise exceptions from threads
+            for future in concurrent.futures.as_completed(futures):
+                exception = future.exception()
+                if exception:
+                    self.logger.error(
+                        "Exception happened during thread",
+                        exc_info=exception)
 
     def _thread_normalize(self, dataset_info, **kwargs):
         """
