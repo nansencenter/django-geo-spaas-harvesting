@@ -5,7 +5,6 @@ import logging
 import shapely.errors
 from shapely.geometry import LineString, Point, Polygon
 
-import geospaas.catalog.managers as catalog_managers
 from geospaas_harvesting.crawlers import DatasetInfo, HTTPPaginatedAPICrawler
 from .base import Provider
 from ..arguments import ChoiceArgument, StringArgument, WKTArgument
@@ -31,16 +30,18 @@ class EarthDataCMRProvider(Provider):
             StringArgument('sensor'),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         time_range = (parameters.pop('start_time'), parameters.pop('end_time'))
         location = parameters.pop('location')
         parameters.update(self._make_spatial_parameter(location))
+        username = parameters.pop('username')
+        password = parameters.pop('password')
         return EarthDataCMRCrawler(
             self.search_url,
             search_terms=parameters,
             time_range=time_range,
-            username=self.username,
-            password=self.password,
+            username=username,
+            password=password,
         )
 
     def _make_spatial_parameter(self, geometry):
@@ -135,15 +136,3 @@ class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
             self._results.append(DatasetInfo(url, entry))
 
         return bool(entries)
-
-    # --------- get metadata ---------
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        """Get attributes from an API crawler"""
-        # metanorm expects a 'url' key in the raw attributes
-        self.add_url(dataset_info.url, dataset_info.metadata)
-
-        normalized_attributes = self._metadata_handler.get_parameters(dataset_info.metadata)
-        normalized_attributes['geospaas_service'] = catalog_managers.HTTP_SERVICE
-        normalized_attributes['geospaas_service_name'] = catalog_managers.HTTP_SERVICE_NAME
-
-        return normalized_attributes

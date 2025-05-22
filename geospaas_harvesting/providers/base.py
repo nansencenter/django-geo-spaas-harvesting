@@ -25,7 +25,7 @@ class FilterMixin():
     def make_filters(self, parsed_parameters):  # pylint: disable=unused-argument
         """No filters by default"""
         return []
-    
+
     def _filter(self, dataset_info):
         """Apply all the filters to the DatasetInfo object and returns
         False if any filter returns False
@@ -34,7 +34,7 @@ class FilterMixin():
             if not filter_(dataset_info):
                 return False
         return True
-    
+
     def filter(self, filters, dataset_infos):
         """Apply filters to an iterator of DatasetInfo and yield the
         valid ones
@@ -117,16 +117,16 @@ class Provider(FilterMixin):
         """
         parsed_parameters = self.search_parameters_parser.parse(parameters)
         ingester_params = parsed_parameters.pop('ingester')
-        
+
         crawler = self.make_crawler(parsed_parameters)
         filters = self.make_filters(parsed_parameters)
         normalizer = self.make_normalizer()
 
-        results_iterator = normalizer.normalize_stream(
+        results_iterable = normalizer.normalize_stream(
             self.filter(filters, crawler)
         )
         return SearchResults(
-            results_iterator,
+            results_iterable,
             ingesters.Ingester(**ingester_params),
         )
 
@@ -149,8 +149,8 @@ class SearchResults():
     Provides only basic functionality for now. To be extended when
     integrating the search and harvesting process in the web UI.
     """
-    def __init__(self, results_iterator, ingester=None):
-        self.results_iterator = results_iterator
+    def __init__(self, results_iterable, ingester=None):
+        self.results_iterable = results_iterable
         self.ingester = ingester
         self._cached_results = []
 
@@ -158,10 +158,7 @@ class SearchResults():
     #     return f"SearchResults for crawler: {self.crawler}"
 
     def __iter__(self):
-        return self
-
-    def __next__(self):
-        return next(self.results_iterator)
+        return iter(self.results_iterable)
 
     def save(self, **kwargs):
         """Save the datasets matching the search to the database"""

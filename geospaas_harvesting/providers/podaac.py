@@ -17,7 +17,7 @@ class PODAACProvider(TimeFilterMixin, Provider):
             StringArgument('include', default=r'\.nc$'),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         return OpenDAPCrawler(
             '/'.join((self.url, parameters['directory'])),
             time_range=(parameters['start_time'], parameters['end_time']),

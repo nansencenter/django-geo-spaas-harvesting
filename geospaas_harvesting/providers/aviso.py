@@ -17,12 +17,12 @@ class AVISOProvider(TimeFilterMixin, Provider):
             StringArgument('include'),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         return ThreddsCrawler(
             '/'.join((self.url, parameters['directory'].lstrip('/'))),
             time_range=(parameters['start_time'], parameters['end_time']),
             include=parameters.get('include'),
             max_threads=30,
-            username=self.username,
-            password=self.password,
+            username=parameters['username'],
+            password=parameters['password'],
         )

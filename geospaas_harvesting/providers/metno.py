@@ -17,7 +17,7 @@ class METNOProvider(TimeFilterMixin, Provider):
             StringArgument('include'),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         return ThreddsCrawler(
             '/'.join((self.url, parameters['directory'].lstrip('/'))),
             time_range=(parameters['start_time'], parameters['end_time']),

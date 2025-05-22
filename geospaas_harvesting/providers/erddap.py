@@ -23,7 +23,7 @@ class ERDDAPTableProvider(Provider):
         self.variables = kwargs['variables']
         self.search_parameters_parser.add_arguments([ListArgument('search_terms', required=False)])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         time_range = (parameters.pop('start_time', None), parameters.pop('end_time'), None)
         location = parameters.pop('location', None)
         search_terms = parameters.pop('search_terms', [])

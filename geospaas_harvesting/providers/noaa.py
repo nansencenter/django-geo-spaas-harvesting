@@ -23,7 +23,7 @@ class NOAAProvider(TimeFilterMixin, Provider):
             StringArgument('include', default=r'\.nc(\.gz)?$'),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         url = self.url.format(server=parameters['server'])
         return FTPCrawler(
             urljoin(url, parameters['directory']),

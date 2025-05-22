@@ -5,7 +5,6 @@ from urllib.parse import urljoin
 
 from shapely.geometry.polygon import Polygon
 
-import geospaas.catalog.managers as catalog_managers
 import geospaas_harvesting.utils as utils
 from geospaas_harvesting.crawlers import DatasetInfo, HTTPPaginatedAPICrawler
 from .base import Provider
@@ -39,21 +38,24 @@ class RestoProvider(Provider):
             StringArgument('status', default='all'),
             StringArgument('dataset', default='ESA-DATASET'),
             StringArgument('productIdentifier', required=False),
+
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         collection_url = self.search_url.format(collection=parameters.pop('collection'))
         location = parameters.pop('location', None)  # shapely geometry or None
         if location is not None:
             parameters['geometry'] = location.wkt
         time_range = (parameters.pop('start_time'), parameters.pop('end_time'))
+        username = parameters.pop('username')
+        password = parameters.pop('password')
 
         return RestoCrawler(
             collection_url,
             search_terms=parameters,
             time_range=time_range,
-            username=self.username,
-            password=self.password,
+            username=username,
+            password=password,
         )
 
     @property

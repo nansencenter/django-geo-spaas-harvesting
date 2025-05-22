@@ -21,11 +21,11 @@ class GPortalProvider(TimeFilterMixin, Provider):
             StringArgument('include', default=r'\.h5$'),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         return FTPCrawler(
             urljoin(self.url, parameters['directory']),
             time_range=(parameters['start_time'], parameters['end_time']),
-            username=self.username,
-            password=self.password,
+            username=parameters['username'],
+            password=parameters['password'],
             include=parameters['include'],
         )

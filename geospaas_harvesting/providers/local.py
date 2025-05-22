@@ -12,7 +12,6 @@ import shapely.wkt
 from dateutil.tz import tzutc
 from shapely.geometry import MultiPoint
 
-import geospaas.catalog.managers as catalog_managers
 import pythesint as pti
 from geospaas.utils.utils import nansat_filename
 from metanorm.utils import get_cf_or_wkv_standard_name
@@ -35,7 +34,7 @@ class NansatProvider(TimeFilterMixin, Provider):
             StringArgument('include', default='.'),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         return NansatCrawler(
             parameters['directory'],
             time_range=(parameters['start_time'], parameters['end_time']),
@@ -58,7 +57,7 @@ class NetCDFProvider(TimeFilterMixin, Provider):
             StringArgument('include', default=r'\.nc$'),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         return NetCDFCrawler(
             parameters['directory'],
             time_range=(parameters['start_time'], parameters['end_time']),
@@ -80,13 +79,7 @@ class NansatCrawler(LocalDirectoryCrawler):
         n_points = int(kwargs.get('n_points', 10))
         nansat_options = kwargs.get('nansat_options', {})
         url_scheme = urlparse(dataset_info.url).scheme
-        if not 'http' in url_scheme and not 'ftp' in url_scheme:
-            normalized_attributes['geospaas_service_name'] = catalog_managers.FILE_SERVICE_NAME
-            normalized_attributes['geospaas_service'] = catalog_managers.LOCAL_FILE_SERVICE
-        elif 'http' in url_scheme and not 'ftp' in url_scheme:
-            normalized_attributes['geospaas_service_name'] = catalog_managers.DAP_SERVICE_NAME
-            normalized_attributes['geospaas_service'] = catalog_managers.OPENDAP_SERVICE
-        elif 'ftp' in url_scheme:
+        if 'ftp' in url_scheme:
             raise ValueError(
                 f"Can't ingest '{dataset_info.url}': nansat can't open remote ftp files")
 
@@ -192,12 +185,12 @@ class NetCDFCrawler(LocalDirectoryCrawler):
         geometry = MultiPoint(points).convex_hull
         return geometry.wkt
 
-    def _get_raw_attributes(self, dataset_path):
+    def get_raw_attributes(self, dataset_path):
         """Get the raw metadata from the NetCDF file"""
         dataset = netCDF4.Dataset(dataset_path)
         raw_attributes = dataset.__dict__
-        self.add_url(dataset_path, raw_attributes)
         raw_attributes['raw_dataset_parameters'] = self._get_parameter_names(dataset)
+        raw_attributes['location_geometry'] = self._get_geometry_wkt(dataset)
         return raw_attributes
 
     def _get_parameter_names(self, dataset):
@@ -207,20 +200,3 @@ class NetCDFCrawler(LocalDirectoryCrawler):
             for variable in dataset.variables.values()
             if hasattr(variable, 'standard_name')
         ]
-
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        raw_attributes = self._get_raw_attributes(dataset_info.url)
-        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-
-        if not normalized_attributes.get('location_geometry'):
-            normalized_attributes['location_geometry'] = self._get_geometry_wkt(
-                netCDF4.Dataset(dataset_info.url))
-
-        if dataset_info.url.startswith('http'):
-            normalized_attributes['geospaas_service'] = catalog_managers.HTTP_SERVICE
-            normalized_attributes['geospaas_service_name'] = catalog_managers.HTTP_SERVICE_NAME
-        else:
-            normalized_attributes['geospaas_service'] = catalog_managers.LOCAL_FILE_SERVICE
-            normalized_attributes['geospaas_service_name'] = catalog_managers.FILE_SERVICE_NAME
-
-        return normalized_attributes
