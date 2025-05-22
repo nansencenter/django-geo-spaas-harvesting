@@ -39,7 +39,7 @@ class Ingester():
         """Writes a dataset to the database based on its attributes and
         URL. The input should be a DatasetInfo object.
         """
-        dataset, dataset_uri = to_ingest
+        dataset, dataset_uri, keywords, parameters, tags = to_ingest
 
         dataset_status = dataset_uri_status = OperationStatus.NOOP
 
@@ -50,14 +50,22 @@ class Ingester():
                 dataset.save()
                 dataset_status = OperationStatus.CREATED
             else:
+                dataset.id = existing_dataset.id
                 if self.update:
-                    dataset.id = existing_dataset.id
                     dataset.save()
                     dataset_status = OperationStatus.UPDATED
 
             if not DatasetURI.objects.filter(uri=dataset_uri.uri, dataset=dataset).exists():
                 dataset_uri.save()
                 dataset_uri_status = OperationStatus.CREATED
+
+            # add many-to-many relationships
+            for keyword in keywords:
+                dataset.keywords.add(keyword)
+            for parameter in parameters:
+                dataset.parameters.add(parameter)
+            for tag in tags:
+                dataset.tags.add(tag)
 
         return (dataset_uri.uri, dataset.entry_id, dataset_status, dataset_uri_status)
 
