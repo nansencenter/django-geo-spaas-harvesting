@@ -12,8 +12,8 @@ import copernicusmarine
 import pythesint
 from copernicusmarine.catalogue_parser.catalogue_parser import MARINE_DATA_STORE_STAC_BASE_URL
 
-import geospaas_harvesting.providers.metadata_utils as providers_utils
-from geospaas.catalog.managers import HTTP_SERVICE, HTTP_SERVICE_NAME
+import geospaas_harvesting.normalizers.utils as providers_utils
+
 from .base import Provider, TimeFilterMixin
 from ..arguments import  ChoiceArgument, PathArgument, StringArgument, ListArgument
 from ..crawlers import Crawler, DatasetInfo, FTPCrawler
@@ -31,13 +31,13 @@ class CMEMSProvider(Provider):
             ListArgument('dataset_ids', default=None),
         ])
 
-    def _make_crawler(self, parameters):
+    def make_crawler(self, parameters):
         return CMEMSCrawler(
             cmems_product_id=parameters['product_id'],
             cmems_dataset_ids=parameters['dataset_ids'],
             time_range=(parameters['start_time'], parameters['end_time']),
-            username=self.username,
-            password=self.password,
+            username=parameters['username'],
+            password=parameters['password'],
         )
 
 
