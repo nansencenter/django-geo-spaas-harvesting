@@ -1,6 +1,7 @@
 """Code for searching EarthData CMR (https://www.earthdata.nasa.gov/)"""
 import json
 import logging
+import math
 
 import shapely.errors
 from shapely.geometry import LineString, Point, Polygon
@@ -22,7 +23,8 @@ class EarthDataCMRProvider(Provider):
         super().__init__(*args, **kwargs)
         self.search_url = 'https://cmr.earthdata.nasa.gov/search/granules.umm_json'
         self.search_parameters_parser.add_arguments([
-            EarthDataSpatialArgument('location', required=False, geometry_types=(LineString, Point, Polygon)),
+            WKTArgument('location', required=False, geometry_types=(LineString, Point, Polygon)),
+            StringArgument('bounding_box', required=False),
             StringArgument('short_name', required=True, description='Short name of the collection'),
             ChoiceArgument('downloadable', valid_options=['true', 'false'], default='true'),
             StringArgument('platform'),
@@ -32,8 +34,6 @@ class EarthDataCMRProvider(Provider):
 
     def make_crawler(self, parameters):
         time_range = (parameters.pop('start_time'), parameters.pop('end_time'))
-        location = parameters.pop('location')
-        parameters.update(self._make_spatial_parameter(location))
         username = parameters.pop('username')
         password = parameters.pop('password')
         return EarthDataCMRCrawler(
@@ -43,51 +43,6 @@ class EarthDataCMRProvider(Provider):
             username=username,
             password=password,
         )
-
-    def _make_spatial_parameter(self, geometry):
-        if isinstance(geometry, Polygon):
-            # the API takes a sequence of points to define a polygon:
-            # lon0,lat0,lon1,lat1,lon2,lat2,...,lon0,lat0
-            points = zip(*geometry.exterior.coords.xy)
-            result = {'polygon': ','.join([f"{lon},{lat}" for lon, lat in points])}
-        elif isinstance(geometry, LineString):
-            points = zip(*geometry.xy)
-            result = {'line': ','.join([f"{lon},{lat}" for lon, lat in points])}
-        elif isinstance(geometry, Point):
-            result = {'point': f"{geometry.xy[0][0]},{geometry.xy[1][0]}"}
-        elif isinstance(geometry, str):
-            name, value = geometry.split('=')
-            result = {name: value}
-        else:
-            raise ValueError(f"Unsupported geometry type {type(geometry)}")
-        return result
-
-
-class EarthDataSpatialArgument(WKTArgument):
-    """Argument that provides the specific spatial format required by
-    queries to the CMR API.
-    See https://cmr.earthdata.nasa.gov/search/site/docs/search/api.html#g-spatial
-    for valid parameters.
-    """
-    def parse(self, value):
-        valid_prefixes = ('polygon', 'bounding_box', 'point', 'line', 'circle')
-        geos_logger = logging.getLogger('shapely.geos')
-        result = None
-        try:
-            geos_logger.disabled = True
-            result = super().parse(value)
-            geos_logger.disabled = False
-        except (shapely.errors.ShapelyError, ValueError) as error:
-            if isinstance(value, str):
-                for prefix in valid_prefixes:
-                    if value.startswith(f"{prefix}=") or value.startswith(f"{prefix}[]="):
-                        result = value
-                        break
-            if result is None:
-                raise ValueError(
-                    "location should be a geometry or a valid CMR spatial parameter"
-                ) from error
-        return result
 
 
 class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
@@ -100,6 +55,10 @@ class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
     # ------------- crawl ------------
     def _build_request_parameters(self, search_terms=None, time_range=(None, None),
                                   username=None, password=None, page_size=100):
+        if 'location' in search_terms:
+            geometry = search_terms.pop('location')
+            search_terms.update(self._make_spatial_parameter(geometry))
+
         request_parameters = super()._build_request_parameters(
             search_terms, time_range, username, password, page_size)
 
@@ -115,6 +74,39 @@ class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
                 for date in time_range)
 
         return request_parameters
+
+    def _exclude_edges(self, raw_points):
+        """Slightly move points on the edges inward for compatibility with the
+        Earthdata CMR interface
+        """
+        points = []
+        for lon, lat in raw_points:
+            abs_lon = abs(lon)
+            abs_lat = abs(lat)
+            if abs_lon == 180:
+                lon = math.copysign(abs_lon - .01, lon)
+            if abs_lat == 90:
+                lat = math.copysign(abs_lat - .01, lat)
+            points.append((lon, lat))
+        return points
+
+    def _make_spatial_parameter(self, geometry):
+        if isinstance(geometry, Polygon):
+            # the API takes a sequence of points to define a polygon:
+            # lon0,lat0,lon1,lat1,lon2,lat2,...,lon0,lat0
+            points= self._exclude_edges(zip(*geometry.exterior.coords.xy))
+            result = {'polygon[]': ','.join([f"{lon},{lat}" for lon, lat in points])}
+        elif isinstance(geometry, LineString):
+            points = self._exclude_edges(zip(*geometry.xy))
+            result = {'line[]': ','.join([f"{lon},{lat}" for lon, lat in points])}
+        elif isinstance(geometry, Point):
+            result = {'point': f"{geometry.xy[0][0]},{geometry.xy[1][0]}"}
+        elif isinstance(geometry, str):
+            name, value = geometry.split('=')
+            result = {name: value}
+        else:
+            raise ValueError(f"Unsupported geometry type {type(geometry)}")
+        return result
 
     def _find_download_url(self, entry):
         """Return the first URL whose type is 'GET DATA'"""
