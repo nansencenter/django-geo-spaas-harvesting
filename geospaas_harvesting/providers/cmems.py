@@ -15,7 +15,13 @@ from copernicusmarine.catalogue_parser.catalogue_parser import MARINE_DATA_STORE
 import geospaas_harvesting.normalizers.utils as providers_utils
 
 from .base import Provider, TimeFilterMixin
-from ..arguments import  ChoiceArgument, PathArgument, StringArgument, ListArgument
+from ..arguments import (ArgumentParser,
+                         ChoiceArgument,
+                         DatetimeArgument,
+                         PathArgument,
+                         StringArgument,
+                         ListArgument,
+                         SequenceArgument,)
 from ..crawlers import Crawler, DatasetInfo, FTPCrawler
 
 
@@ -45,16 +51,26 @@ class CMEMSCrawler(Crawler):
     """Crawler which accesses CMEMS products through the
     copernicusmarine toolbox
     """
+    argument_parser = ArgumentParser([
+        *Crawler.argument_parser.arguments,
+        StringArgument('cmems_product_id', required=True),
+        SequenceArgument('cmems_dataset_ids', contents_type=StringArgument, required=True),
+        SequenceArgument('time_range',
+                         contents_type=DatetimeArgument,
+                         length=2,
+                         default=(None, None)),
+        StringArgument('username', default=None),
+        StringArgument('password', default=None),
+    ])
     S3_BASE_URL = '://'.join(urlparse(MARINE_DATA_STORE_STAC_BASE_URL)[0:2])
 
-    def __init__(self, cmems_product_id, cmems_dataset_ids, time_range=(None, None),
-                 username=None, password=None, max_threads=1):
-        super().__init__(max_threads)
-        self.cmems_product_id = cmems_product_id
-        self.cmems_dataset_ids = cmems_dataset_ids
-        self.time_range = time_range
-        self.username = username
-        self.password = password
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cmems_product_id = kwargs['cmems_product_id']
+        self.cmems_dataset_ids = kwargs['cmems_dataset_ids']
+        self.time_range = kwargs['time_range']
+        self.username = kwargs['username']
+        self.password = kwargs['password']
         # initialized in self.set_initial_state()
         self._product_info = None
         self._tmpdir = None

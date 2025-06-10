@@ -19,6 +19,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 import shapely.geometry
 
+import geospaas_harvesting.arguments as arguments
 import geospaas_harvesting.utils as utils
 
 
@@ -53,9 +54,16 @@ class Crawler():
     """Base Crawler class"""
 
     logger = logging.getLogger(__name__ + '.Crawler')
+    argument_parser = arguments.ArgumentParser([
+        arguments.IntegerArgument('max_threads', default=1),
+    ])
 
-    def __init__(self, max_threads=1):
-        self.max_threads = max_threads
+    def __init__(self, **kwargs):
+        self.max_threads = kwargs.get('max_threads', 1)
+
+    @classmethod
+    def from_config(cls, config: dict):
+        return cls(**cls.argument_parser.parse(config))
 
     # ------------- crawl ------------
     def __iter__(self):
@@ -127,6 +135,18 @@ class LinkExtractor(HTMLParser):
 
 class DirectoryCrawler(Crawler):
     """Parent class for crawlers used on repositories which expose a directory-like structure"""
+    argument_parser = arguments.ArgumentParser([
+        *Crawler.argument_parser.arguments,
+        arguments.StringArgument('root_url', required=True),
+        arguments.SequenceArgument('time_range',
+                                   contents_type=arguments.DatetimeArgument,
+                                   length=2,
+                                   default=(None, None)),
+        arguments.StringArgument('include', default=None),
+        arguments.StringArgument('username', default=None),
+        arguments.StringArgument('password', default=None),
+    ])
+
     EXCLUDE = None
 
     YEAR_PATTERN = r'y?(?P<year>\d{4})'
@@ -140,8 +160,7 @@ class DirectoryCrawler(Crawler):
         f'^.*/{YEAR_PATTERN}/?{MONTH_PATTERN}/?{DAY_OF_MONTH_PATTERN}(/.*)?$')
     DAY_OF_YEAR_MATCHER = re.compile(f'^.*/{YEAR_PATTERN}/{DAY_OF_YEAR_PATTERN}(/.*)?$')
 
-    def __init__(self, root_url, time_range=(None, None), include=None,
-                 username=None, password=None, max_threads=1):
+    def __init__(self, **kwargs):
         """
         `root_url` is the URL of the data repository to explore.
         `time_range` is a 2-tuple of datetime.datetime objects defining the time range
@@ -149,12 +168,13 @@ class DirectoryCrawler(Crawler):
         `include` is a regular expression string used to filter the crawler's output.
         Only URLs matching it are returned.
         """
-        super().__init__(max_threads)
-        self.root_url = urlparse(root_url)
-        self.time_range = time_range
+        super().__init__(**kwargs)
+        self.root_url = urlparse(kwargs['root_url'])
+        self.time_range = kwargs['time_range']
+        include = kwargs.get('include')
         self.include = re.compile(include) if include else None
-        self.username = username
-        self.password = password
+        self.username = kwargs['username']
+        self.password = kwargs['password']
         self._results = None
         self._to_process = None
 
@@ -606,19 +626,33 @@ class FTPCrawler(DirectoryCrawler):
 class HTTPPaginatedAPICrawler(Crawler):
     """Base class for crawlers used on repositories exposing a paginated API over HTTP"""
 
+    argument_parser = arguments.ArgumentParser([
+        *Crawler.argument_parser.arguments,
+        arguments.StringArgument('url', required=True),
+        arguments.DictArgument('search_terms', default=None),
+        arguments.SequenceArgument('time_range',
+                                   contents_type=arguments.DatetimeArgument,
+                                   length=2,
+                                   default=(None, None)),
+        arguments.StringArgument('username', default=None),
+        arguments.StringArgument('password', default=None),
+        arguments.IntegerArgument('page_size', default=100),
+        arguments.IntegerArgument('initial_offset', default=None),
+    ])
+
     PAGE_OFFSET_NAME = ''
     PAGE_SIZE_NAME = ''
     MIN_OFFSET = 0
 
-    def __init__(self, url, search_terms=None, time_range=(None, None),
-                 username=None, password=None,
-                 page_size=100, initial_offset=None, max_threads=1):
-        super().__init__(max_threads)
-        self.url = url
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.url = kwargs['url']
         self._results = None
-        self.initial_offset = initial_offset or self.MIN_OFFSET
+        self.initial_offset = kwargs['initial_offset'] or self.MIN_OFFSET
         self.request_parameters = self._build_request_parameters(
-            search_terms, time_range, username, password, page_size)
+            kwargs['search_terms'], kwargs['time_range'],
+            kwargs['username'], kwargs['password'],
+            kwargs['page_size'])
 
     def __eq__(self, other):
         return (
@@ -698,30 +732,41 @@ class HTTPPaginatedAPICrawler(Crawler):
 class ERDDAPTableCrawler(Crawler):
     """Crawler for ERDDAP tabledap APIs"""
 
+    argument_parser = arguments.ArgumentParser([
+        *Crawler.argument_parser.arguments,
+        arguments.StringArgument('url', required=True),
+        arguments.StringArgument('id_attrs', required=True),
+        arguments.StringArgument('entry_id_prefix', default=''),
+        arguments.StringArgument('longitude_attr', default='longitude'),
+        arguments.StringArgument('latitude_attr', default='latitude'),
+        arguments.StringArgument('time_attr', default='time'),
+        arguments.StringArgument('position_qc_attr', default=''),
+        arguments.StringArgument('time_qc_attr', default=''),
+        arguments.SequenceArgument('valid_qc_codes',
+                                   contents_type=arguments.IntegerArgument,
+                                   default=None),
+        arguments.DictArgument('search_terms', default=None),
+        arguments.SequenceArgument('variables', default=None),
+    ])
     logger = logging.getLogger(__name__ + '.ERDDAPTableCrawler')
 
-    def __init__(self, url,
-                 id_attrs,
-                 entry_id_prefix='',
-                 longitude_attr='longitude', latitude_attr='latitude', time_attr='time',
-                 position_qc_attr='', time_qc_attr='', valid_qc_codes=None,
-                 search_terms=None, variables=None,
-                 max_threads=1):
-        super().__init__(max_threads)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        url = kwargs['url']
         if url.rstrip('/').endswith('.json'):
             self.url = url
         else:
             raise ValueError("The URL should end with .json")
-        self.id_attrs = id_attrs
-        self.entry_id_prefix = entry_id_prefix
-        self.longitude_attr = longitude_attr
-        self.latitude_attr = latitude_attr
-        self.time_attr = time_attr
-        self.position_qc_attr = position_qc_attr
-        self.time_qc_attr = time_qc_attr
-        self.valid_qc_codes = valid_qc_codes
-        self.search_terms = search_terms if search_terms is not None else []
-        self.variables = variables if variables else []
+        self.id_attrs = kwargs['id_attrs']
+        self.entry_id_prefix = kwargs['entry_id_prefix']
+        self.longitude_attr = kwargs['longitude_attr']
+        self.latitude_attr = kwargs['latitude_attr']
+        self.time_attr = kwargs['time_attr']
+        self.position_qc_attr = kwargs['position_qc_attr']
+        self.time_qc_attr = kwargs['time_qc_attr']
+        self.valid_qc_codes = kwargs['valid_qc_codes']
+        self.search_terms = kwargs['search_terms'] if kwargs['search_terms'] is not None else []
+        self.variables = kwargs['variables'] if kwargs['variables'] else []
 
     def __eq__(self, other):
         return (
