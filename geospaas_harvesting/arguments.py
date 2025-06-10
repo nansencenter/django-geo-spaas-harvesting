@@ -2,6 +2,7 @@
 """
 import re
 from datetime import timezone
+from typing import Sequence
 
 import dateutil.parser
 import shapely.wkt
@@ -242,14 +243,31 @@ class IntegerArgument(Argument):
         return value
 
 
-class ListArgument(Argument):
+class SequenceArgument(Argument):
+    """The argument can be any sequence"""
+    type = 'sequence'
+
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+        self.contents_type = kwargs.get('contents_type', AnyArgument) # should be an argument class
+        self.length = kwargs.get('length', None)
+
+    def parse(self, value):
+        if not isinstance(value, Sequence):
+            raise ValueError(f"{self.name} should be a sequence")
+        if self.length is not None and len(value) != self.length:
+            raise ValueError(f"{self.name} should have {self.length} elements")
+        return [self.contents_type(f'{self.name} element').parse(elt) for elt in value]
+
+
+class ListArgument(SequenceArgument):
     """Check that the value is a list"""
     type = 'list'
 
     def parse(self, value):
         if not isinstance(value, list):
             raise ValueError(f"{self.name} should be a list")
-        return value
+        return super().parse(value)
 
 
 class PathArgument(ChoiceArgument):
@@ -301,7 +319,7 @@ class StringArgument(Argument):
         if not isinstance(value, str):
             raise ValueError(f"{self.name} should be a string")
         if self.regex is not None and not re.match(self.regex, value):
-            raise ValueError(f"{value} does not match the validation pattern {self.regex}")
+            raise ValueError(f"Value does not match the validation pattern {self.regex}")
         return value
 
 
