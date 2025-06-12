@@ -99,7 +99,6 @@ class RestoAPIMetadataNormalizer(MetadataNormalizer):
             lookup = get_lookup(dataset_info)
             if lookup is not None:
                 lookups.append(lookup)
-        self.logger.info(lookups)
         return utils.find_keywords(lookups)
 
     @utils.raises(KeyError)
