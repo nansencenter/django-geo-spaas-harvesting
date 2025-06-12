@@ -16,7 +16,7 @@ class ArgumentParser():
     """Class capable of validating if a dictionary of parameters
     matches a list of argument definitions
     """
-    def __init__(self, arguments, strict=True):
+    def __init__(self, arguments, name='root', strict=True):
         """Set the list of valid arguments.
         If `strict` is True, only the defined arguments must be present
         in the parameters being validated. Otherwise, extra parameters
@@ -24,6 +24,7 @@ class ArgumentParser():
         """
         self.arguments = {}
         self.add_arguments(arguments)
+        self.name = name
         self.strict = strict
 
     def __str__(self):
@@ -34,8 +35,8 @@ class ArgumentParser():
     def add_arguments(self, arguments):
         """Adds or updates Arguments in the valid arguments"""
         for arg in arguments:
-            if not isinstance(arg, Argument):
-                raise ValueError(f"{arg} should be an Argument object")
+            if not (isinstance(arg, Argument) or isinstance(arg, ArgumentParser)):
+                raise ValueError(f"{arg} should be an Argument or ArgumentParser object")
             self.arguments[arg.name] = arg
 
     def parse(self, parameters):
@@ -49,7 +50,6 @@ class ArgumentParser():
 
         # Loop through the argument definitions and check that the
         # parameters match the definitions.
-        # If an argument has children, they will be checked too
         while recursion_stack and len(recursion_stack) <= max_stack_size:
             # if the name of the argument is found in the parameters,
             # the value is parsed and adde to the final results.
@@ -57,10 +57,6 @@ class ArgumentParser():
             if argument.name in parameters:
                 parsed_parameters[argument.name] = argument.parse(
                     parameters.pop(argument.name))
-                # add the child arguments to the stack so that they are
-                # processed
-                for child in argument.children:
-                    recursion_stack.append(child)
             elif argument.required:
                 raise ValueError(f"Argument {argument.name} not provided")
             else:
@@ -76,8 +72,6 @@ class ArgumentParser():
 class Argument():
     """Base class for arguments. Each argument has at least a name and
     a 'required' attribute.
-    In case there are arguments depending on another one, they can be
-    listed as children. In that case, their 'parent' attribute is set
     """
     type = 'unknown'
 
@@ -86,8 +80,6 @@ class Argument():
         self.required = kwargs.get('required', False)
         self.default = kwargs.get('default', NoDefault)
         self.description = kwargs.get('description', '')
-        self.parent = None
-        self.children = []
 
     def __eq__(self, other):
         return (
@@ -105,15 +97,6 @@ class Argument():
             f"default={self.default}" if self.default is not NoDefault else '',
             f"description={self.description}" if self.description else '',
         )))
-
-    def _set_parent(self, parent):
-        """Define the parent of the current argument"""
-        self.parent = parent
-
-    def add_child(self, child):
-        """Add a child argument"""
-        child._set_parent(self)
-        self.children.append(child)
 
     def parse(self, value):
         """Return a properly formatted value for the argument.
