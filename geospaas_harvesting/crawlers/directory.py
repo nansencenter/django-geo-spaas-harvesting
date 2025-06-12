@@ -1,102 +1,33 @@
-"""
-A set of crawlers used to explore data provider interfaces and get resources URLs. Each crawler
-should inherit from the Crawler class and implement the abstract methods defined in Crawler.
-"""
 import calendar
 import ftplib
 import functools
 import io
+import itertools
+import json
 import logging
 import os
-import os.path
 import re
-import time
+import uuid
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
+from datetime import datetime, timedelta, timezone
 
-import requests
-import shapely.geometry
+import dateutil.parser
+import netCDF4
+import numpy as np
+import shapely.wkt
+import pythesint as pti
+from dateutil.tz import tzutc
+from metanorm.utils import get_cf_or_wkv_standard_name
+from nansat import Nansat
+from geospaas.utils.utils import nansat_filename
+from shapely.geometry import MultiPoint
 
 import geospaas_harvesting.arguments as arguments
-import geospaas_harvesting.utils as utils
+from .base import Crawler, DatasetInfo
 
 
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-
-
-class Stop():
-    """Class used in normalizing queues to signal that processing
-    should stop
-    """
-
-
-class DatasetInfo():
-    """Class used to store dataset information coming from crawled repositories
-    url is a string, metadata is a dict
-    """
-    def __init__(self, url, metadata=None):
-        self.url = url
-        if metadata is None:
-            self.metadata = {}
-        else:
-            self.metadata = metadata
-
-    def __repr__(self):
-        return f"DatasetInfo(url='{self.url}', metadata={self.metadata})"
-
-    def __eq__(self, other):
-        return self.url == other.url and self.metadata == other.metadata
-
-
-class Crawler():
-    """Base Crawler class"""
-
-    logger = logging.getLogger(__name__ + '.Crawler')
-    argument_parser = arguments.ArgumentParser([
-        arguments.IntegerArgument('max_threads', default=1),
-    ])
-
-    def __init__(self, **kwargs):
-        self.max_threads = kwargs.get('max_threads', 1)
-
-    @classmethod
-    def from_config(cls, config: dict):
-        return cls(**cls.argument_parser.parse(config))
-
-    # ------------- crawl ------------
-    def __iter__(self):
-        return iter(self.crawl())
-
-    def crawl(self):
-        """Generator which crawls through a dataset repository and yields
-        DatasetInfo objects
-        """
-        raise NotImplementedError()
-
-    def _http_get(self, url, request_parameters=None, max_tries=5, wait_time=5):
-        """Sends an HTTP GET request, retry in case of failure"""
-        self.logger.debug("Getting page: '%s'", url)
-
-        last_error = None
-        for try_index in range(max_tries):
-            try:
-                response = utils.http_request('GET', url, **request_parameters or {})
-                response.raise_for_status()
-                return response
-            except (requests.ConnectionError, requests.HTTPError, requests.Timeout) as error:
-                # retry only for connection errors and HTTP errors 5**
-                if (isinstance(error, requests.HTTPError) and
-                        (error.response.status_code < 500 or error.response.status_code > 599)):
-                    raise
-                else:
-                    last_error = error
-                    self.logger.warning('Error while sending request to %s, %d retries left',
-                                        url, max_tries - try_index - 1, exc_info=True)
-            time.sleep(wait_time)
-            wait_time *= 2
-        raise RuntimeError(f"Max retries reached trying to get {url}") from last_error
 
 
 class LinkExtractor(HTMLParser):
@@ -135,16 +66,11 @@ class LinkExtractor(HTMLParser):
 
 class DirectoryCrawler(Crawler):
     """Parent class for crawlers used on repositories which expose a directory-like structure"""
+    name = None
     argument_parser = arguments.ArgumentParser([
-        *Crawler.argument_parser.arguments,
+        *Crawler.argument_parser.arguments.values(),
         arguments.StringArgument('root_url', required=True),
-        arguments.SequenceArgument('time_range',
-                                   contents_type=arguments.DatetimeArgument,
-                                   length=2,
-                                   default=(None, None)),
         arguments.StringArgument('include', default=None),
-        arguments.StringArgument('username', default=None),
-        arguments.StringArgument('password', default=None),
     ])
 
     EXCLUDE = None
@@ -353,26 +279,9 @@ class DirectoryCrawler(Crawler):
         return {}
 
 
-class LocalDirectoryCrawler(DirectoryCrawler):
-    """Crawl through the contents of a local folder"""
-
-    logger = logging.getLogger(__name__ + '.LocalDirectoryCrawler')
-
-    # ------------- crawl ------------
-    def _list_folder_contents(self, folder_path):
-        if self._is_folder(folder_path):
-            return [os.path.join(folder_path, file_path) for file_path in os.listdir(folder_path)]
-        else:
-            # if the given path points to a file, just return it
-            return [folder_path]
-
-    def _is_folder(self, path):
-        return os.path.isdir(path)
-
-
 class HTMLDirectoryCrawler(DirectoryCrawler):
     """Implementation of DirectoryCrawler for repositories exposed as HTML pages."""
-
+    name = 'html_directory'
     logger = logging.getLogger(__name__ + '.HTMLDirectoryCrawler')
 
     FOLDERS_SUFFIXES = ('/',)
@@ -426,6 +335,7 @@ class OpenDAPCrawler(HTMLDirectoryCrawler):
     """
     Crawler for harvesting the data of OpenDAP
     """
+    name = 'opendap'
     logger = logging.getLogger(__name__ + '.OpenDAPCrawler')
     FOLDERS_SUFFIXES = ('/contents.html',)
     EXCLUDE = re.compile(r'\?')
@@ -498,6 +408,7 @@ class ThreddsCrawler(OpenDAPCrawler):
     """
     Crawler for harvesting the data which are provided by Thredds
     """
+    name = 'thredds'
     logger = logging.getLogger(__name__ + '.ThreddsCrawler')
     FOLDERS_SUFFIXES = ('/catalog.html',)
     FILES_SUFFIXES = ('.nc',)
@@ -528,6 +439,7 @@ class FTPCrawler(DirectoryCrawler):
     Crawler which returns the search results of an FTP, given the URL and search
     terms
     """
+    name = 'ftp'
     logger = logging.getLogger(__name__ + '.FTPCrawler')
 
     def __init__(self, root_url, time_range=(None, None), include=None,
@@ -623,289 +535,153 @@ class FTPCrawler(DirectoryCrawler):
         return normalized_attributes
 
 
-class HTTPPaginatedAPICrawler(Crawler):
-    """Base class for crawlers used on repositories exposing a paginated API over HTTP"""
-
-    argument_parser = arguments.ArgumentParser([
-        *Crawler.argument_parser.arguments,
-        arguments.StringArgument('url', required=True),
-        arguments.DictArgument('search_terms', default=None),
-        arguments.SequenceArgument('time_range',
-                                   contents_type=arguments.DatetimeArgument,
-                                   length=2,
-                                   default=(None, None)),
-        arguments.StringArgument('username', default=None),
-        arguments.StringArgument('password', default=None),
-        arguments.IntegerArgument('page_size', default=100),
-        arguments.IntegerArgument('initial_offset', default=None),
-    ])
-
-    PAGE_OFFSET_NAME = ''
-    PAGE_SIZE_NAME = ''
-    MIN_OFFSET = 0
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.url = kwargs['url']
-        self._results = None
-        self.initial_offset = kwargs['initial_offset'] or self.MIN_OFFSET
-        self.request_parameters = self._build_request_parameters(
-            kwargs['search_terms'], kwargs['time_range'],
-            kwargs['username'], kwargs['password'],
-            kwargs['page_size'])
-
-    def __eq__(self, other):
-        return (
-            self.url == other.url and
-            self.initial_offset == other.initial_offset and
-            self.request_parameters == other.request_parameters
-        )
+class LocalDirectoryCrawler(DirectoryCrawler):
+    """Crawl through the contents of a local folder"""
+    name = 'local'
+    logger = logging.getLogger(__name__ + '.LocalDirectoryCrawler')
 
     # ------------- crawl ------------
-    @property
-    def page_size(self):
-        """Getter for the page size"""
-        return self.request_parameters['params'][self.PAGE_SIZE_NAME]
+    def _list_folder_contents(self, folder_path):
+        if self._is_folder(folder_path):
+            return [os.path.join(folder_path, file_path) for file_path in os.listdir(folder_path)]
+        else:
+            # if the given path points to a file, just return it
+            return [folder_path]
 
-    @property
-    def page_offset(self):
-        """Getter for the page offset"""
-        return self.request_parameters['params'][self.PAGE_OFFSET_NAME]
+    def _is_folder(self, path):
+        return os.path.isdir(path)
 
-    @page_offset.setter
-    def page_offset(self, offset):
-        """Setter for the page offset"""
-        self.request_parameters['params'][self.PAGE_OFFSET_NAME] = offset
 
-    def increment_offset(self):
-        self.page_offset += 1
-
-    def _build_request_parameters(self, search_terms=None, time_range=(None, None),
-                                  username=None, password=None, page_size=100):
-        """Build a dict containing the parameters used to query the API.
-        This dict will be unpacked to provide the arguments to `requests.get()`.
-        """
-        return {
-            'params': {
-                self.PAGE_OFFSET_NAME: self.initial_offset,
-                self.PAGE_SIZE_NAME: page_size,
-            }
-        }
-
-    def set_initial_state(self):
-        self.page_offset = self.initial_offset
-        self._results = []
-
-    def crawl(self):
-        self.set_initial_state()
-        while True:
-            try:
-                # Return all resource URLs from the previously processed page
-                yield self._results.pop()
-            except IndexError:
-                # If no more URLs from the previously processed page are available,
-                # process the next one
-                if not self._get_datasets_info(self._get_next_page()):
-                    self.logger.debug("No more entries found at '%s' matching '%s'",
-                                    self.url, self.request_parameters['params'])
-                    break
-
-    def _get_next_page(self):
-        """Get the next page of search results"""
-        self.logger.debug("Looking for resources at '%s', matching '%s'",
-                         self.url, self.request_parameters['params'])
-        current_page = self._http_get(self.url, self.request_parameters).text
-        self.increment_offset()
-        return current_page
-
-    def _get_datasets_info(self, page):
-        """Get datasets information from the current page and add it
-        to self._results. It should be a DatasetInfo object.
-        Returns True if information was found, False otherwise"""
-        raise NotImplementedError()
+class NansatCrawler(LocalDirectoryCrawler):
+    """Crawler for local files, using Nansat to get metadata"""
+    name = 'nansat'
+    logger = logging.getLogger(__name__ + '.NansatCrawler')
 
     # --------- get metadata ---------
     def get_normalized_attributes(self, dataset_info, **kwargs):
-        raise NotImplementedError()
+        """Gets dataset attributes using nansat"""
+        normalized_attributes = {}
+        n_points = int(kwargs.get('n_points', 10))
+        nansat_options = kwargs.get('nansat_options', {})
+        url_scheme = urlparse(dataset_info.url).scheme
+        if 'ftp' in url_scheme:
+            raise ValueError(
+                f"Can't ingest '{dataset_info.url}': nansat can't open remote ftp files")
 
+        # Open file with Nansat
+        nansat_object = Nansat(nansat_filename(dataset_info.url),
+                               log_level=self.logger.getEffectiveLevel(),
+                               mapper='mapper_sentinel1_l1',
+                               **nansat_options)
 
-class ERDDAPTableCrawler(Crawler):
-    """Crawler for ERDDAP tabledap APIs"""
+        # get metadata from Nansat and get objects from vocabularies
+        n_metadata = nansat_object.get_metadata()
 
-    argument_parser = arguments.ArgumentParser([
-        *Crawler.argument_parser.arguments,
-        arguments.StringArgument('url', required=True),
-        arguments.StringArgument('id_attrs', required=True),
-        arguments.StringArgument('entry_id_prefix', default=''),
-        arguments.StringArgument('longitude_attr', default='longitude'),
-        arguments.StringArgument('latitude_attr', default='latitude'),
-        arguments.StringArgument('time_attr', default='time'),
-        arguments.StringArgument('position_qc_attr', default=''),
-        arguments.StringArgument('time_qc_attr', default=''),
-        arguments.SequenceArgument('valid_qc_codes',
-                                   contents_type=arguments.IntegerArgument,
-                                   default=None),
-        arguments.DictArgument('search_terms', default=None),
-        arguments.SequenceArgument('variables', default=None),
-    ])
-    logger = logging.getLogger(__name__ + '.ERDDAPTableCrawler')
+        # set compulsory metadata (source)
+        normalized_attributes['entry_title'] = n_metadata.get('entry_title', 'NONE')
+        normalized_attributes['summary'] = n_metadata.get('summary', 'NONE')
+        normalized_attributes['time_coverage_start'] = dateutil.parser.parse(
+            n_metadata['time_coverage_start']).replace(tzinfo=tzutc())
+        normalized_attributes['time_coverage_end'] = dateutil.parser.parse(
+            n_metadata['time_coverage_end']).replace(tzinfo=tzutc())
+        normalized_attributes['platform'] = json.loads(n_metadata['platform'])
+        normalized_attributes['instrument'] = json.loads(n_metadata['instrument'])
+        normalized_attributes['specs'] = n_metadata.get('specs', '')
+        normalized_attributes['entry_id'] = n_metadata.get('entry_id', 'NERSC_' + str(uuid.uuid4()))
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        url = kwargs['url']
-        if url.rstrip('/').endswith('.json'):
-            self.url = url
-        else:
-            raise ValueError("The URL should end with .json")
-        self.id_attrs = kwargs['id_attrs']
-        self.entry_id_prefix = kwargs['entry_id_prefix']
-        self.longitude_attr = kwargs['longitude_attr']
-        self.latitude_attr = kwargs['latitude_attr']
-        self.time_attr = kwargs['time_attr']
-        self.position_qc_attr = kwargs['position_qc_attr']
-        self.time_qc_attr = kwargs['time_qc_attr']
-        self.valid_qc_codes = kwargs['valid_qc_codes']
-        self.search_terms = kwargs['search_terms'] if kwargs['search_terms'] is not None else []
-        self.variables = kwargs['variables'] if kwargs['variables'] else []
+        # set optional ForeignKey metadata from Nansat or from defaults
+        normalized_attributes['gcmd_location'] = n_metadata.get(
+            'gcmd_location', pti.get_gcmd_location('SEA SURFACE'))
+        normalized_attributes['provider'] = pti.get_gcmd_provider(
+            n_metadata.get('provider', 'NERSC'))
+        normalized_attributes['iso_topic_category'] = n_metadata.get(
+            'ISO_topic_category', pti.get_iso19115_topic_category('Oceans'))
 
-    def __eq__(self, other):
-        return (
-            self.url == other.url and
-            self.id_attrs == other.id_attrs and
-            self.longitude_attr == other.longitude_attr and
-            self.latitude_attr == other.latitude_attr and
-            self.time_attr == other.time_attr and
-            self.position_qc_attr == other.position_qc_attr and
-            self.time_qc_attr == other.time_qc_attr and
-            self.valid_qc_codes == other.valid_qc_codes and
-            self.search_terms == other.search_terms and
-            self.variables == other.variables
-        )
+        # Find coverage to set number of points in the geolocation
+        if nansat_object.vrt.dataset.GetGCPs():
+            nansat_object.reproject_gcps()
+        normalized_attributes['location_geometry'] = shapely.wkt.loads(
+            nansat_object.get_border_wkt(n_points=n_points))
 
-    def get_ids(self):
-        """Fetch identifiers matching the search terms"""
-        url = f"{self.url}?{','.join(self.id_attrs)}&distinct()"
-        kwargs = {}
-        url = '&'.join([url] + self.search_terms)
-        try:
-            response = self._http_get(url, max_tries=1, **kwargs)
-        except requests.HTTPError as error:
-            self.logger.error("Could not list dataset identifiers at %s: %s",
-                              url, error.response.content, exc_info=True)
-            raise
-        for row in response.json()['table']['rows']:
-            yield row[:len(self.id_attrs)]
-
-    def _make_condition_parameters(self, parameters):
-        """Prepare the parameters to filter a query using the id
-        attributes. Necessary because the API requires different
-        formats depending on the type of parameter
-        """
-        params = {}
-        for key, value in parameters.items():
-            if isinstance(value, str):
-                params[key] = f'"{value}"'
+        json_dumped_dataset_parameters = n_metadata.get('dataset_parameters', None)
+        if json_dumped_dataset_parameters:
+            json_loads_result = json.loads(json_dumped_dataset_parameters)
+            if isinstance(json_loads_result, list):
+                normalized_attributes['dataset_parameters'] = [
+                    get_cf_or_wkv_standard_name(dataset_param)
+                    for dataset_param in json_loads_result
+                ]
             else:
-                params[key] = value
-        return params
+                raise TypeError(
+                    f"Can't ingest '{dataset_info.url}': the 'dataset_parameters' section of the "
+                    "metadata returned by nansat is not a JSON list")
+        else:
+            normalized_attributes['dataset_parameters'] = []
 
-    def crawl(self):
-        attributes = [self.time_attr, self.longitude_attr, self.latitude_attr]
-        for qc_attr in (self.time_qc_attr, self.position_qc_attr):
-            if qc_attr:
-                attributes.append(qc_attr)
-        attributes.extend(self.variables)
-        for id_values in self.get_ids():
-            id_attrs = dict(zip(self.id_attrs, id_values))
-            id_condition = '&'.join(
-                f"{id_attr}={id_value}"
-                for id_attr, id_value in self._make_condition_parameters(id_attrs).items()
-            )
-            yield DatasetInfo(
-                f'{self.url}?{",".join(attributes)}&{id_condition}',
-                {'id_attributes': id_attrs})
+        return normalized_attributes
 
-    def _check_qc(self, qc_value):
-        """Return True if the QC value indicates valid data or the
-        valid codes are unknown
-        """
-        return not self.valid_qc_codes or qc_value in self.valid_qc_codes
 
-    def _make_coverage_url(self):
-        """"""
-        qc_attributes = ','.join(c for c in (self.time_qc_attr, self.position_qc_attr) if c)
-        if qc_attributes:
-            qc_attributes = f",{qc_attributes}"
-        return (f'{self.url}?{self.time_attr},{self.longitude_attr},{self.latitude_attr}' +
-                qc_attributes +
-                f'&distinct()&orderBy("{self.time_attr}")')
+class NetCDFCrawler(LocalDirectoryCrawler):
+    """Crawler for local NetCDF files"""
+    name = 'local_netcdf'
+    logger = logging.getLogger(__name__ + '.NetCDFCrawler')
 
-    def get_coverage(self, id_attributes):
-        """Get the temporal and spatial coverage for a specific dataset
-        """
-        try:
-            response = self._http_get(self._make_coverage_url(), request_parameters={
-                'params': self._make_condition_parameters(id_attributes)
-            })
-        except requests.HTTPError as error:
-            self.logger.error("Could not get coverage for dataset %s: %s",
-                              id_attributes, error.response.content)
-            raise
-        rows = response.json()['table']['rows']
+    def __init__(self, *args, **kwargs):
+        self.longitude_attribute = kwargs.pop('longitude_attribute')
+        self.latitude_attribute = kwargs.pop('latitude_attribute')
+        super().__init__(*args, **kwargs)
 
-        # build the trajectory and get the first time with valid QC
-        # (the query results are sorted by time)
-        time_coverage_start = None
-        trajectory = []
-        for row in rows:
-            if time_coverage_start is None and self._check_qc(row[3]):
-                time_coverage_start = row[0]
-            point = (row[1], row[2])
-            if point not in trajectory and self._check_qc(row[4]):
-                trajectory.append(point)
+    # --------- get metadata ---------
+    def _get_geometry_wkt(self, dataset):
+        longitudes = dataset.variables[self.longitude_attribute][:]
+        latitudes = dataset.variables[self.latitude_attribute][:]
 
-        # get the last time with valid QC
-        time_coverage_end = None
-        for row in rows[::-1]:
-            if self._check_qc(row[3]):
-                time_coverage_end = row[0]
+        lonlat_dependent_data = False
+        for nc_variable_name, nc_variable_value in dataset.variables.items():
+            if (nc_variable_name not in dataset.dimensions
+                    and self.longitude_attribute in nc_variable_value.dimensions
+                    and self.latitude_attribute in nc_variable_value.dimensions):
+                lonlat_dependent_data = True
                 break
 
-        if time_coverage_start is None or time_coverage_end is None or not trajectory:
-            raise RuntimeError(f"Could not determine coverage for dataset {id_attributes}")
-
-        return ((time_coverage_start, time_coverage_end), trajectory)
-
-    def _make_product_metadata_url(self):
-        """Generate the product metadata URL from the base data URL"""
-        match = re.match(r'^(https?://.*)/tabledap/(.*)\.json$', self.url)
-        if match:
-            return f"{match.group(1)}/info/{match.group(2)}/index.json"
+        # If at least a variable is dependent on latitude and
+        # longitude, the longitude and latitude arrays are combined to
+        # find all the data points
+        if lonlat_dependent_data:
+            valid_lon = longitudes.compressed() if np.ma.isMaskedArray(longitudes) else longitudes
+            valid_lat = latitudes.compressed() if np.ma.isMaskedArray(latitudes) else latitudes
+            points = list(itertools.product(valid_lon, valid_lat))
+        # If the longitude and latitude variables have the same shape,
+        # we assume that they contain the coordinates for each data
+        # point
+        elif longitudes.shape == latitudes.shape:
+            masks = []
+            for l in (longitudes, latitudes):
+                if np.ma.isMaskedArray(l):
+                    masks.append(l.mask)
+                else:
+                    masks.append(np.full(l.shape, False))
+            combined_mask = np.logical_or(*masks)
+            points = np.array(np.nditer((longitudes[~combined_mask],
+                                         latitudes[~combined_mask]),
+                                        flags=['buffered']))
         else:
-            raise RuntimeError(f"Unable to get product metadata URL from {self.url}")
+            raise ValueError("Could not determine the spatial coverage")
+        geometry = MultiPoint(points).convex_hull
+        return geometry.wkt
 
-    def get_product_metadata(self):
-        """Get the product's metadata"""
-        url = self._make_product_metadata_url()
-        try:
-            response = self._http_get(url)
-        except requests.HTTPError:
-            self.logger.info("Could not get product metadata from %s", url)
-            raise
-        return response.json()
+    def get_raw_attributes(self, dataset_path):
+        """Get the raw metadata from the NetCDF file"""
+        dataset = netCDF4.Dataset(dataset_path)
+        raw_attributes = dataset.__dict__
+        raw_attributes['raw_dataset_parameters'] = self._get_parameter_names(dataset)
+        raw_attributes['location_geometry'] = self._get_geometry_wkt(dataset)
+        return raw_attributes
 
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        """Use metanorm to normalize a DatasetInfo's raw attributes"""
-        raw_attributes = dataset_info.metadata
-        self.add_url(dataset_info.url, raw_attributes)
-        coverage = self.get_coverage(dataset_info.metadata['id_attributes'])
-        raw_attributes['entry_id'] = (
-            self.entry_id_prefix +
-            '_'.join(map(str, dataset_info.metadata['id_attributes'].values()))
-        )
-        raw_attributes['temporal_coverage'] = coverage[0]
-        raw_attributes['trajectory'] = shapely.geometry.MultiPoint(coverage[1]).wkt
-        raw_attributes['product_metadata'] = self.get_product_metadata()
-
-        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-        return normalized_attributes
+    def _get_parameter_names(self, dataset):
+        """Get the names of the dataset's variables"""
+        return [
+            variable.standard_name
+            for variable in dataset.variables.values()
+            if hasattr(variable, 'standard_name')
+        ]
