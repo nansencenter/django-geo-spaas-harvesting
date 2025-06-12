@@ -28,8 +28,6 @@ import geospaas_harvesting.arguments as arguments
 from .base import Crawler, DatasetInfo
 
 
-
-
 class LinkExtractor(HTMLParser):
     """
     HTML parser which extracts links from an HTML page
@@ -69,7 +67,7 @@ class DirectoryCrawler(Crawler):
     name = None
     argument_parser = arguments.ArgumentParser([
         *Crawler.argument_parser.arguments.values(),
-        arguments.StringArgument('root_url', required=True),
+        arguments.StringArgument('url', required=True),
         arguments.StringArgument('include', default=None),
     ])
 
@@ -95,7 +93,7 @@ class DirectoryCrawler(Crawler):
         Only URLs matching it are returned.
         """
         super().__init__(**kwargs)
-        self.root_url = urlparse(kwargs['root_url'])
+        self.root_url = urlparse(kwargs['url'])
         self.time_range = kwargs['time_range']
         include = kwargs.get('include')
         self.include = re.compile(include) if include else None
