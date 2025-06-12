@@ -1,11 +1,42 @@
 """Utilities module for geospaas_harvesting"""
+import importlib
 import os
+import pkgutil
+import sys
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
 import requests
 import yaml
 
+
+def get_all_subclasses(base_class):
+    """Recursively get all subclasses of `base_class`.
+    Returns a set to ensure uniqueness
+    """
+    subclasses = set()
+    for subclass in base_class.__subclasses__():
+        subclasses.add(subclass)
+        subclasses = subclasses.union(get_all_subclasses(subclass))
+    return subclasses
+
+
+def export_subclasses(package__all__, package_name, package_dir, base_class):
+    """Append `base_class` and all of its subclasses declared in
+    modules in `package_dir` to `all`. This is meant to be used in
+    __init__.py files to make normalizer classes easily importable.
+    """
+    package__all__.append(base_class.__name__)
+
+    # Import the modules in the package
+    for (_, name, _) in pkgutil.iter_modules([package_dir]):
+        importlib.import_module('.' + name, package_name)
+
+    # Make the base_class subclasses available
+    # in the 'package' namespace
+    for cls in get_all_subclasses(base_class):
+        setattr(sys.modules[package_name], cls.__name__, cls)
+        package__all__.append(cls.__name__)
 
 class TrustDomainSession(requests.Session):
     """Session class which allows keeping authentication headers in

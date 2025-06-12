@@ -1,14 +1,9 @@
 """Utility functions for metadata normalizing"""
 
-import importlib
 import functools
-import pkgutil
 import re
-import sys
-from collections import OrderedDict
 from datetime import datetime, timedelta
 
-import pythesint as pti
 import shapely.geometry
 import shapely.ops
 import shapely.wkt
@@ -17,37 +12,6 @@ from dateutil.tz import tzutc
 from geospaas.vocabularies.models import Keyword, Parameter
 
 from .errors import MetadataNormalizationError
-
-
-######################## Class manipulation utilities ########################
-
-def get_all_subclasses(base_class):
-    """Recursively get all subclasses of `base_class`.
-    Returns a set to ensure uniqueness
-    """
-    subclasses = set()
-    for subclass in base_class.__subclasses__():
-        subclasses.add(subclass)
-        subclasses = subclasses.union(get_all_subclasses(subclass))
-    return subclasses
-
-
-def export_subclasses(package__all__, package_name, package_dir, base_class):
-    """Append `base_class` and all of its subclasses declared in
-    modules in `package_dir` to `all`. This is meant to be used in
-    __init__.py files to make normalizer classes easily importable.
-    """
-    package__all__.append(base_class.__name__)
-
-    # Import the modules in the package
-    for (_, name, _) in pkgutil.iter_modules([package_dir]):
-        importlib.import_module('.' + name, package_name)
-
-    # Make the base_class subclasses available
-    # in the 'package' namespace
-    for cls in get_all_subclasses(base_class):
-        setattr(sys.modules[package_name], cls.__name__, cls)
-        package__all__.append(cls.__name__)
 
 
 ######################## Pythesint utilities ########################
