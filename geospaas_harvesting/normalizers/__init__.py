@@ -8,10 +8,8 @@ import importlib
 from pathlib import Path
 
 from .base import MetadataNormalizer
-from .utils import export_subclasses, get_all_subclasses
+from ..utils import get_all_subclasses
 
-# __all__ = []
-# export_subclasses(__all__, __package__, os.path.dirname(__file__), MetadataNormalizer)
 
 for (_, name, _) in pkgutil.iter_modules([Path(__file__).parent]):
         importlib.import_module('.' + name, __package__)
