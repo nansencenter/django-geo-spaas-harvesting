@@ -428,19 +428,17 @@ class FTPCrawler(DirectoryCrawler):
     name = 'ftp'
     logger = logging.getLogger(__name__ + '.FTPCrawler')
 
-    def __init__(self, root_url, time_range=(None, None), include=None,
-                 username=None, password=None, max_threads=1):
-        if not root_url.startswith('ftp://'):
+    def __init__(self, **kwargs):
+        if not kwargs['url'].startswith('ftp://'):
             raise ValueError("The root url must start with 'ftp://'")
 
-        if username is None:
+        if kwargs['username'] is None:
             username = 'anonymous'
-        if password is None:
+        if kwargs['password'] is None:
             password = 'anonymous'
         self.ftp = None
 
-        super().__init__(root_url, time_range, include, max_threads=1,
-                         username=username, password=password)
+        super().__init__(**kwargs)
 
     # ------------- crawl ------------
     def set_initial_state(self):
