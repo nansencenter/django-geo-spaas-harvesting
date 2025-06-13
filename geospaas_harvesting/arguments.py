@@ -325,7 +325,7 @@ class WKTArgument(Argument):
     def parse(self, value):
         geometry = shapely.wkt.loads(value)
         geometry_type = type(geometry)
-        if self.geometry_types is None or geometry_type in self.geometry_types:
+        if not self.geometry_types or geometry_type in self.geometry_types:
             return geometry
         else:
             raise ValueError(f"{geometry_type} is not supported for argument {self.name}")
