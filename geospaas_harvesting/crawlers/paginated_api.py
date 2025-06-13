@@ -81,16 +81,11 @@ class HTTPPaginatedAPICrawler(Crawler):
     def crawl(self):
         self.set_initial_state()
         while True:
-            try:
-                # Return all resource URLs from the previously processed page
-                yield self._results.pop()
-            except IndexError:
-                # If no more URLs from the previously processed page are available,
-                # process the next one
-                if not self._get_datasets_info(self._get_next_page()):
-                    self.logger.debug("No more entries found at '%s' matching '%s'",
-                                      self.url, self.request_parameters['params'])
-                    break
+            entries = self._get_entries(self._get_next_page())
+            if not entries:
+                break
+            for dataset_info in self._get_datasets_info(entries):
+                yield dataset_info
 
     def _get_next_page(self):
         """Get the next page of search results"""
@@ -100,10 +95,16 @@ class HTTPPaginatedAPICrawler(Crawler):
         self.increment_offset()
         return current_page
 
+    def _get_entries(self, page):
+        """Get entries about datasets from the pages returned by the
+        API
+        """
+        raise NotImplementedError()
+
     def _get_datasets_info(self, page):
-        """Get datasets information from the current page and add it
-        to self._results. It should be a DatasetInfo object.
-        Returns True if information was found, False otherwise"""
+        """Get datasets information from raw entries and yield
+        DatasetInfo objects.
+        """
         raise NotImplementedError()
 
     # --------- get metadata ---------
@@ -194,18 +195,16 @@ class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
                 return url['URL']
         return urls[0]['URL']
 
-    def _get_datasets_info(self, page):
+    def _get_entries(self, page):
+        return json.loads(page)['items']
+
+    def _get_datasets_info(self, entries):
         """Get dataset attributes from the current page and
         adds them to self._results.
         Returns True if attributes were found, False otherwise"""
-        entries = json.loads(page)['items']
-
         for entry in entries:
             url = self._find_download_url(entry)
-            self.logger.debug("Adding '%s' to the list of resources.", url)
-            self._results.append(DatasetInfo(url, entry))
-
-        return bool(entries)
+            yield DatasetInfo(url, entry)
 
 
 class RestoCrawler(HTTPPaginatedAPICrawler):
@@ -260,17 +259,15 @@ class RestoCrawler(HTTPPaginatedAPICrawler):
 
         return request_parameters
 
-    def _get_datasets_info(self, page):
+    def _get_entries(self, page):
+        return json.loads(page)['features']
+
+    def _get_datasets_info(self, entries):
         """Get dataset attributes from the current page and
         adds them to self._results.
         Returns True if attributes were found, False otherwise"""
-        entries = json.loads(page)['features']
-
         for entry in entries:
             metadata = entry['properties']
             metadata['geometry'] = json.dumps(entry['geometry'])
             url = metadata['services']['download']['url']
-            self.logger.debug("Adding '%s' to the list of resources.", url)
-            self._results.append(DatasetInfo(url, metadata))
-
-        return bool(entries)
+            yield DatasetInfo(url, metadata)
