@@ -86,7 +86,7 @@ class DirectoryCrawler(Crawler):
 
     def __init__(self, **kwargs):
         """
-        `root_url` is the URL of the data repository to explore.
+        `url` is the URL of the data repository to explore.
         `time_range` is a 2-tuple of datetime.datetime objects defining the time range
         of the datasets returned by the crawler.
         `include` is a regular expression string used to filter the crawler's output.
