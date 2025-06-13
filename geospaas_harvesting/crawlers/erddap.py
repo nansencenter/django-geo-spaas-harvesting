@@ -11,22 +11,24 @@ from .base import Crawler, DatasetInfo
 
 class ERDDAPTableCrawler(Crawler):
     """Crawler for ERDDAP tabledap APIs"""
-    name = 'erddap'
+    name = 'tabledap'
     argument_parser = arguments.ArgumentParser([
         *Crawler.argument_parser.arguments.values(),
         arguments.StringArgument('url', required=True),
-        arguments.StringArgument('id_attrs', required=True),
+        arguments.SequenceArgument(
+            'id_attrs', required=True, contents_type=arguments.StringArgument),
         arguments.StringArgument('entry_id_prefix', default=''),
         arguments.StringArgument('longitude_attr', default='longitude'),
         arguments.StringArgument('latitude_attr', default='latitude'),
         arguments.StringArgument('time_attr', default='time'),
         arguments.StringArgument('position_qc_attr', default=''),
         arguments.StringArgument('time_qc_attr', default=''),
-        arguments.SequenceArgument('valid_qc_codes',
-                                   contents_type=arguments.IntegerArgument,
-                                   default=None),
+        arguments.SequenceArgument(
+            'valid_qc_codes', contents_type=arguments.StringArgument, default=None),
         arguments.DictArgument('search_terms', default=None),
-        arguments.SequenceArgument('variables', default=None),
+        arguments.WKTArgument('location', default=None, ),
+        arguments.SequenceArgument(
+            'variables', default=None, contents_type=arguments.StringArgument),
     ])
     logger = logging.getLogger(__name__ + '.ERDDAPTableCrawler')
 
@@ -46,6 +48,8 @@ class ERDDAPTableCrawler(Crawler):
         self.time_qc_attr = kwargs['time_qc_attr']
         self.valid_qc_codes = kwargs['valid_qc_codes']
         self.search_terms = kwargs['search_terms'] if kwargs['search_terms'] is not None else []
+        self.search_terms.extend(self._make_spatial_condition(kwargs['location']))
+        self.search_terms.extend(self._make_temporal_condition(kwargs['time_range']))
         self.variables = kwargs['variables'] if kwargs['variables'] else []
 
     def __eq__(self, other):
@@ -89,6 +93,31 @@ class ERDDAPTableCrawler(Crawler):
                 params[key] = value
         return params
 
+    def _make_spatial_condition(self, location):
+        """Make a tabledap spatial condition from a shapely geometry"""
+        result = []
+        if location:
+            min_lon, min_lat, max_lon, max_lat = location.bounds
+            result = [
+                f"{self.longitude_attr}>={min_lon}",
+                f"{self.longitude_attr}<={max_lon}",
+                f"{self.latitude_attr}>={min_lat}",
+                f"{self.latitude_attr}<={max_lat}",
+            ]
+        return result
+
+    def _make_temporal_condition(self, time_range):
+        """Make a tabledap spatial condition from a couple of datetime
+        objects
+        """
+        result = []
+        time_format = '%Y-%m-%dT%H:%M:%SZ'
+        if time_range[0]:
+            result.append(f"{self.time_attr}>={time_range[0].strftime(time_format)}")
+        if time_range[1]:
+            result.append(f"{self.time_attr}<={time_range[1].strftime(time_format)}")
+        return result
+
     def crawl(self):
         attributes = [self.time_attr, self.longitude_attr, self.latitude_attr]
         for qc_attr in (self.time_qc_attr, self.position_qc_attr):
@@ -101,9 +130,21 @@ class ERDDAPTableCrawler(Crawler):
                 f"{id_attr}={id_value}"
                 for id_attr, id_value in self._make_condition_parameters(id_attrs).items()
             )
+            coverage = self.get_coverage(id_attrs)
             yield DatasetInfo(
                 f'{self.url}?{",".join(attributes)}&{id_condition}',
-                {'id_attributes': id_attrs})
+                {
+                    'entry_id': self._make_entry_id(id_values),
+                    'temporal_coverage': coverage[0],
+                    'trajectory': shapely.geometry.MultiPoint(coverage[1]).wkt,
+                    'product_metadata': self.get_product_metadata(),
+                })
+
+    def _make_entry_id(self, id_values):
+        """Create an entry_id from the prefix and values of the
+        identifying attributes
+        """
+        return self.entry_id_prefix + '_'.join(map(str, id_values))
 
     def _check_qc(self, qc_value):
         """Return True if the QC value indicates valid data or the
@@ -173,19 +214,3 @@ class ERDDAPTableCrawler(Crawler):
             self.logger.info("Could not get product metadata from %s", url)
             raise
         return response.json()
-
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        """Use metanorm to normalize a DatasetInfo's raw attributes"""
-        raw_attributes = dataset_info.metadata
-        self.add_url(dataset_info.url, raw_attributes)
-        coverage = self.get_coverage(dataset_info.metadata['id_attributes'])
-        raw_attributes['entry_id'] = (
-            self.entry_id_prefix +
-            '_'.join(map(str, dataset_info.metadata['id_attributes'].values()))
-        )
-        raw_attributes['temporal_coverage'] = coverage[0]
-        raw_attributes['trajectory'] = shapely.geometry.MultiPoint(coverage[1]).wkt
-        raw_attributes['product_metadata'] = self.get_product_metadata()
-
-        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-        return normalized_attributes
