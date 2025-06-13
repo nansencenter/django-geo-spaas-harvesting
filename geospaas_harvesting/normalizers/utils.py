@@ -296,9 +296,9 @@ def find_keywords(lookups):
     `search_terms` is a list of Django lookups in the form of
     dictionaries
     """
-    keywords = set()
+    keywords = []
     for lookup in lookups:
-            candidates = Keyword.objects.filter(**lookup)
-            if candidates.exists():
-                keywords.add(candidates.first())
+        candidates = Keyword.objects.filter(**lookup)
+        if candidates.exists() and candidates.first() not in keywords:
+            keywords.append(candidates.first())
     return keywords
