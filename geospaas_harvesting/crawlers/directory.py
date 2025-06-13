@@ -136,17 +136,9 @@ class DirectoryCrawler(Crawler):
 
     def crawl(self):
         self.set_initial_state()
-        while True:
-            try:
-                # Return all resource URLs from the previously processed folder
-                yield self._results.pop()
-            except IndexError:
-                # If no more URLs from the previously processed folder are available,
-                # process the next one
-                try:
-                    self._process_folder(self._to_process.pop())
-                except IndexError:
-                    break
+        while self._to_process:
+            for dataset_info in self._process_folder(self._to_process.pop()):
+                yield dataset_info
 
     @classmethod
     def _folder_coverage(cls, folder_path, time_zone=timezone.utc):
@@ -233,17 +225,11 @@ class DirectoryCrawler(Crawler):
         """
         return urljoin(self.base_url, path)
 
-    def _add_url_to_return(self, path):
-        """
-        Add a URL to the list of URLs returned by the crawler after
-        checking that it fits inside the crawler's time range.
-        """
+    def _make_dataset_info(self, path):
+        """Create a DatasetInfo from a path"""
         download_url = self.get_download_url(path)
         if download_url is not None:
-            dataset_info = DatasetInfo(download_url, self.get_raw_attributes(download_url))
-            if dataset_info not in self._results:
-                self.logger.debug("Adding '%s' to the list of resources.", dataset_info)
-                self._results.append(dataset_info)
+            return DatasetInfo(download_url, self.get_raw_attributes(download_url))
 
     def _add_folder_to_process(self, path):
         """Add a folder to the list of folder which will be explored later"""
@@ -267,7 +253,9 @@ class DirectoryCrawler(Crawler):
                 self._add_folder_to_process(path)
             # select paths which are matched based on input config file
             if self.include and self.include.search(path):
-                self._add_url_to_return(path)
+                dataset_info = self._make_dataset_info(path)
+                if dataset_info is not None:
+                    yield dataset_info
 
     def get_raw_attributes(self, download_url):
         """Gets raw attributes in the cases where they need to be
