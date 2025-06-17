@@ -151,7 +151,7 @@ class Provider(FilterMixin):
                 **parameters
             })
         except KeyError:
-            raise ValueError(f"Unknown crawler {self.normalizer_name}")
+            raise ValueError(f"Unknown crawler {self.crawler_name}")
 
     def make_normalizer(self):
         """Get MetadataNormalizer class from index and instantiate it
