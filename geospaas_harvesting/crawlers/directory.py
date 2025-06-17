@@ -542,67 +542,31 @@ class NansatCrawler(LocalDirectoryCrawler):
     logger = logging.getLogger(__name__ + '.NansatCrawler')
 
     # --------- get metadata ---------
-    def get_normalized_attributes(self, dataset_info, **kwargs):
+    def get_raw_attributes(self, dataset_path, **kwargs):
         """Gets dataset attributes using nansat"""
-        normalized_attributes = {}
+        raw_attributes = {}
         n_points = int(kwargs.get('n_points', 10))
         nansat_options = kwargs.get('nansat_options', {})
-        url_scheme = urlparse(dataset_info.url).scheme
+        url_scheme = urlparse(dataset_path).scheme
         if 'ftp' in url_scheme:
             raise ValueError(
-                f"Can't ingest '{dataset_info.url}': nansat can't open remote ftp files")
+                f"Can't ingest '{dataset_path}': nansat can't open remote ftp files")
 
         # Open file with Nansat
-        nansat_object = Nansat(nansat_filename(dataset_info.url),
+        nansat_object = Nansat(nansat_filename(dataset_path),
                                log_level=self.logger.getEffectiveLevel(),
-                               mapper='mapper_sentinel1_l1',
                                **nansat_options)
 
         # get metadata from Nansat and get objects from vocabularies
-        n_metadata = nansat_object.get_metadata()
-
-        # set compulsory metadata (source)
-        normalized_attributes['entry_title'] = n_metadata.get('entry_title', 'NONE')
-        normalized_attributes['summary'] = n_metadata.get('summary', 'NONE')
-        normalized_attributes['time_coverage_start'] = dateutil.parser.parse(
-            n_metadata['time_coverage_start']).replace(tzinfo=tzutc())
-        normalized_attributes['time_coverage_end'] = dateutil.parser.parse(
-            n_metadata['time_coverage_end']).replace(tzinfo=tzutc())
-        normalized_attributes['platform'] = json.loads(n_metadata['platform'])
-        normalized_attributes['instrument'] = json.loads(n_metadata['instrument'])
-        normalized_attributes['specs'] = n_metadata.get('specs', '')
-        normalized_attributes['entry_id'] = n_metadata.get('entry_id', 'NERSC_' + str(uuid.uuid4()))
-
-        # set optional ForeignKey metadata from Nansat or from defaults
-        normalized_attributes['gcmd_location'] = n_metadata.get(
-            'gcmd_location', pti.get_gcmd_location('SEA SURFACE'))
-        normalized_attributes['provider'] = pti.get_gcmd_provider(
-            n_metadata.get('provider', 'NERSC'))
-        normalized_attributes['iso_topic_category'] = n_metadata.get(
-            'ISO_topic_category', pti.get_iso19115_topic_category('Oceans'))
+        raw_attributes = nansat_object.get_metadata()
 
         # Find coverage to set number of points in the geolocation
         if nansat_object.vrt.dataset.GetGCPs():
             nansat_object.reproject_gcps()
-        normalized_attributes['location_geometry'] = shapely.wkt.loads(
+        raw_attributes['location_geometry'] = shapely.wkt.loads(
             nansat_object.get_border_wkt(n_points=n_points))
 
-        json_dumped_dataset_parameters = n_metadata.get('dataset_parameters', None)
-        if json_dumped_dataset_parameters:
-            json_loads_result = json.loads(json_dumped_dataset_parameters)
-            if isinstance(json_loads_result, list):
-                normalized_attributes['dataset_parameters'] = [
-                    get_cf_or_wkv_standard_name(dataset_param)
-                    for dataset_param in json_loads_result
-                ]
-            else:
-                raise TypeError(
-                    f"Can't ingest '{dataset_info.url}': the 'dataset_parameters' section of the "
-                    "metadata returned by nansat is not a JSON list")
-        else:
-            normalized_attributes['dataset_parameters'] = []
-
-        return normalized_attributes
+        return raw_attributes
 
 
 class NetCDFCrawler(LocalDirectoryCrawler):
