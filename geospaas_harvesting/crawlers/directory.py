@@ -607,7 +607,13 @@ class NansatCrawler(LocalDirectoryCrawler):
 
 class NetCDFCrawler(LocalDirectoryCrawler):
     """Crawler for local NetCDF files"""
-    name = 'local_netcdf'
+    name = 'netcdf'
+    argument_parser = arguments.ArgumentParser([
+        *LocalDirectoryCrawler.argument_parser.arguments.values(),
+        arguments.StringArgument('longitude_attribute', default='LONGITUDE'),
+        arguments.StringArgument('latitude_attribute', default='LATITUDE'),
+    ])
+
     logger = logging.getLogger(__name__ + '.NetCDFCrawler')
 
     def __init__(self, *args, **kwargs):
