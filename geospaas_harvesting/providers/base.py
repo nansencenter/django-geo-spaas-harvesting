@@ -14,72 +14,7 @@ from ..arguments import ArgumentParser, DatetimeArgument, DictArgument, StringAr
 logger = logging.getLogger(__name__)
 
 
-class FilterMixin():
-    """Base class for filter mixins. These are used to easily add
-    filtering capabilities to providers.
-    This filtering is applied to the output of the crawler, after
-    the normalization step. So it is far less costly to narrow the
-    search down at the crawler level whenever possible rather than
-    using these filters (for example when the provider exposes an API
-    with search capabilities).
-    """
-
-    def make_filters(self, parsed_parameters):  # pylint: disable=unused-argument
-        """No filters by default"""
-        return []
-
-    def _filter(self, dataset_info):
-        """Apply all the filters to the DatasetInfo object and returns
-        False if any filter returns False
-        """
-        for filter_ in self.filters:
-            if not filter_(dataset_info):
-                return False
-        return True
-
-    def filter(self, filters, dataset_infos):
-        """Apply filters to an iterator of DatasetInfo and yield the
-        valid ones
-        """
-        for dataset_info in dataset_infos:
-            valid = True
-            for filter_ in filters:
-                if not filter_(dataset_info):
-                    valid = False
-            if valid:
-                yield dataset_info
-
-
-class TimeFilterMixin(FilterMixin):
-    """Adaptation for directory crawlers. Since the precision of
-    time filtering is at the folder level, we need to filter more
-    finely.
-    """
-
-    def _time_coverage_end_gt(self, dataset_info):
-        """Compares a DatasetInfo's time coverage to the stored value"""
-        return dataset_info.metadata['time_coverage_end'] > self._mixin_start_time
-
-    def _time_coverage_start_lte(self, dataset_info):
-        """Compares a DatasetInfo's time coverage to the stored value"""
-        return dataset_info.metadata['time_coverage_start'] <= self._mixin_end_time
-
-    def make_filters(self, parsed_parameters):
-        """Check that the search parameters' time range and the
-        dataset's time range intersect.
-        """
-        filters = []
-        self._mixin_start_time = parsed_parameters.get('start_time')
-        if self._mixin_start_time is not None:
-            filters.append(self._time_coverage_end_gt)
-        self._mixin_end_time = parsed_parameters.get('end_time')
-        if self._mixin_end_time is not None:
-            filters.append(self._time_coverage_start_lte)
-        return filters
-
-
-# class Provider(models.Model, FilterMixin):
-class Provider(FilterMixin):
+class Provider(models.Model):
     """Base class for Providers. Child classes should add their
     specific parameters to the 'search_parameters' attribute in the
     form of Argument objects.
@@ -101,7 +36,7 @@ class Provider(FilterMixin):
         abstract = True
 
     def __init__(self, *args, **kwargs):
-        # super(models.Model).__init__(*args, **kwargs)
+        super(models.Model).__init__(*args, **kwargs)
         self.search_parameters_parser = ArgumentParser([
             DictArgument('crawler', default={}),
             DictArgument('ingester', default={}),
