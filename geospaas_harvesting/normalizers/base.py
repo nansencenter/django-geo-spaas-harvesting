@@ -22,18 +22,25 @@ class MetadataNormalizer():
 
     name = None
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.logger = logging.getLogger(f"geospaas_harvesting.normalizers.{self.name}")
 
     def normalize(self, dataset_info):
-        dataset = Dataset(
-            entry_id=self.get_entry_id(dataset_info),
-            time_coverage_start=self.get_time_coverage_start(dataset_info),
-            time_coverage_end=self.get_time_coverage_end(dataset_info),
-            location=self.get_location_geometry(dataset_info),
-            entry_title=self.get_entry_title(dataset_info),
-            summary=self.get_summary(dataset_info),
-        )
+        dataset_kwargs = {
+            'time_coverage_start': self.get_time_coverage_start(dataset_info),
+            'time_coverage_end': self.get_time_coverage_end(dataset_info),
+            'location': self.get_location_geometry(dataset_info),
+            'entry_title': self.get_entry_title(dataset_info),
+            'summary': self.get_summary(dataset_info),
+        }
+        # entry_id should not be in the arguments if a value could not
+        # be found because it would interfere with generating a default
+        # value
+        entry_id = self.get_entry_id(dataset_info)
+        if entry_id:
+            dataset_kwargs['entry_id'] = entry_id
+
+        dataset = Dataset(**dataset_kwargs)
         dataset_uri = DatasetURI(uri=dataset_info.url, dataset=dataset)
         keywords = self.get_keywords(dataset_info)
         parameters = self.get_dataset_parameters(dataset_info)
