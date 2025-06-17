@@ -65,6 +65,7 @@ class Ingester():
             for parameter in parameters:
                 dataset.parameters.add(parameter)
             for tag in tags:
+                tag.save()
                 dataset.tags.add(tag)
 
         return (dataset_uri.uri, dataset.entry_id, dataset_status, dataset_uri_status)
