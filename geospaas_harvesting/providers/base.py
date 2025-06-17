@@ -91,7 +91,8 @@ class Provider(FilterMixin):
 
     @staticmethod
     def validate_config(value):
-        if not (isinstance(value, dict) and set(('crawler', 'ingester')).issubset(value.keys())):
+        valid_keys = set(('crawler', 'ingester', 'normalizer'))
+        if not (isinstance(value, dict) and valid_keys.issubset(value.keys())):
             raise ValidationError
 
     config = models.JSONField(validators=[validate_config])
@@ -157,7 +158,7 @@ class Provider(FilterMixin):
         """Get MetadataNormalizer class from index and instantiate it
         """
         try:
-            return self.normalizer_class()
+            return self.normalizer_class(**self.config.get('normalizer', {}))
         except KeyError:
             raise ValueError(f"Unknown normalizer {self.normalizer_name}")
 
