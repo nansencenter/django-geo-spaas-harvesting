@@ -5,26 +5,10 @@ import pkgutil
 
 import geospaas_harvesting
 from .arguments import ArgumentParser, BooleanArgument, DictArgument, ListArgument
-from .providers.base import Provider
+from .providers import Provider
 from .utils import read_yaml_file
 
 
-def import_provider_modules():
-    """Import provider classes from core modules and plugins"""
-    imported = []
-    for base_module in [geospaas_harvesting, *geospaas_harvesting.discovered_plugins.values()]:
-        for _, name, ispkg in pkgutil.iter_modules(base_module.__path__):
-            if name == 'providers':
-                providers = importlib.import_module(f"{base_module.__name__}.{name}")
-                imported.append(providers)
-                if ispkg:
-                    for _, provider_name, _ in pkgutil.iter_modules(providers.__path__):
-                        imported.append(
-                            importlib.import_module(f"{providers.__name__}.{provider_name}"))
-    return imported
-
-
-import_provider_modules()
 logger = logging.getLogger(__name__)
 
 
@@ -66,37 +50,27 @@ class ProvidersArgument(DictArgument):
             'password': 'pass123'
     }
     """
-    provider_classes = Provider.__subclasses__()
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
-
-    def _find_provider(self, provider_type):
-        """Try to find a provider matching the `provider_type` in the
-        Provider subclasses
-        """
-        for provider_class in self.provider_classes:
-            if provider_class.type == provider_type:
-                return provider_class
-        raise NoProviderFoundError(f"No provider found of type {provider_type}")
 
     def parse(self, value):
         """Go through the list of provider settings and create the
         providers
         """
-        _providers = {}
+        _providers = []
         providers_dict = super().parse(value)
         for provider_name, provider_settings in providers_dict.items():
-            try:
-                _providers[provider_name] = (
-                    self._find_provider(provider_settings['type'])(
-                        name=provider_name,
-                        **provider_settings,
-                    ))
-            except KeyError as error:
-                logger.error('Missing setting for provider: %s', error.args[0])
-            except NoProviderFoundError as error:
-                logger.error(error.args[0])
+            _providers.append(Provider(
+                name=provider_name,
+                crawler_name=provider_settings['crawler']['name'],
+                normalizer_name=provider_settings.get('normalizer', {}).get('name', 'raw'),
+                config={
+                    'crawler': provider_settings['crawler'].get('config'),
+                    'normalizer': provider_settings.get('normalizer', {}).get('config'),
+                    'ingester': provider_settings.get('ingester', {}).get('config'),
+                }
+            ))
         return _providers
 
 class ProvidersConfiguration(Configuration):
@@ -107,7 +81,7 @@ class ProvidersConfiguration(Configuration):
             BooleanArgument('update_vocabularies', default=True),
             BooleanArgument('update_pythesint', default=True),
             DictArgument('pythesint_versions', default=None),
-            ProvidersArgument('providers', required=True)
+            ProvidersArgument('default_providers', required=True)
         ])
 
 
@@ -115,23 +89,11 @@ class SearchConfiguration(Configuration):
     """Configuration manager used to parse search parameters"""
 
     def __init__(self):
-        self.providers = None
         common_argument_parser = Provider().search_parameters_parser
         self.config_arguments_parser = ArgumentParser([
-            DictArgument(
-                'common', argument_parser=common_argument_parser),
+            DictArgument('common', argument_parser=common_argument_parser),
             ListArgument('searches')
         ])
-
-    def with_providers(self, providers):
-        """Adds a dict of providers to the current object.
-        Needs to be called before the create_provider_searches() method
-        """
-        if isinstance(providers, dict):
-            self.providers = providers
-        else:
-            raise ValueError("Need a dictionary")
-        return self
 
     def create_provider_searches(self):
         """Creates a SearchResults object for each of the provider
@@ -142,5 +104,5 @@ class SearchConfiguration(Configuration):
             provider_name = provider_search.pop('provider_name')
             search_terms = self.common.copy()  # pylint: disable=no-member
             search_terms.update(provider_search)
-            searches.append(self.providers[provider_name].search(**search_terms))
+            searches.append(Provider.objects.get(name=provider_name).search(**search_terms))
         return searches
