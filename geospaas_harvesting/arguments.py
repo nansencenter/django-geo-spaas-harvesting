@@ -61,7 +61,11 @@ class ArgumentParser():
                 raise ValueError(f"Argument {argument.name} not provided")
             else:
                 if argument.default is not NoDefault:
-                    parsed_parameters[argument.name] = argument.default
+                    if isinstance(argument.default, type):
+                        default = argument.default()
+                    else:
+                        default = argument.default
+                    parsed_parameters[argument.name] = default
 
         if self.strict and parameters:
             raise ValueError(f"Unknown argument(s) {parameters}")
