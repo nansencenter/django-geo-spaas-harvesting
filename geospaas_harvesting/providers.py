@@ -8,11 +8,16 @@ from shapely.geometry.polygon import Polygon
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.normalizers as normalizers
-from ..arguments import ArgumentParser, DatetimeArgument, DictArgument, StringArgument, WKTArgument
+from .arguments import ArgumentParser, DatetimeArgument, DictArgument, StringArgument, WKTArgument
 
 
 logger = logging.getLogger(__name__)
 
+
+def validate_provider_config(value):
+    valid_keys = set(('crawler', 'ingester', 'normalizer'))
+    if not (isinstance(value, dict) and valid_keys.issubset(value.keys())):
+        raise ValidationError
 
 class Provider(models.Model):
     """Base class for Providers. Child classes should add their
@@ -20,26 +25,20 @@ class Provider(models.Model):
     form of Argument objects.
     They should also implement the make_crawler() method.
     """
-    name = models.CharField(max_length=100)
-    normalizer_name = models.CharField(max_length=100)
-    crawler_name = models.CharField(max_length=100)
-
-    @staticmethod
-    def validate_config(value):
-        valid_keys = set(('crawler', 'ingester', 'normalizer'))
-        if not (isinstance(value, dict) and valid_keys.issubset(value.keys())):
-            raise ValidationError
-
-    config = models.JSONField(validators=[validate_config])
+    name = models.CharField(max_length=100, unique=True, null=False, blank=False)
+    normalizer_name = models.CharField(max_length=100, null=False, blank=False)
+    crawler_name = models.CharField(max_length=100, null=False, blank=False)
+    config = models.JSONField(validators=[validate_provider_config])
 
     class Meta:
-        abstract = True
+        app_label = 'geospaas_harvesting'
 
     def __init__(self, *args, **kwargs):
-        super(models.Model).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.search_parameters_parser = ArgumentParser([
-            DictArgument('crawler', default={}),
-            DictArgument('ingester', default={}),
+            DictArgument('crawler', default=dict),
+            DictArgument('ingester', default=dict),
+            DictArgument('normalizer', default=dict),
         ])
 
     def __repr__(self):
