@@ -1,1 +1,1 @@
-from .providers.base import Provider
+from .providers import Provider
