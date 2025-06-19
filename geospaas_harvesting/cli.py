@@ -11,6 +11,7 @@ from pathlib import Path
 
 import django
 import django.conf
+import django.core.exceptions
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 if not django.conf.settings.configured:
@@ -18,6 +19,7 @@ if not django.conf.settings.configured:
 
 from geospaas.catalog.models import Parameter
 from .config import ProvidersConfiguration, SearchConfiguration
+from .providers import Provider
 from .recovery import retry_ingest
 
 
@@ -75,23 +77,35 @@ def save_results(searches_results):
             raise
 
 
-def print_providers(cli_arguments):
+def handle_providers(cli_arguments, config):
     """Print each provider's description, notably the possible search
     arguments
     """
-    print('Available providers:')
-    for provider in ProvidersConfiguration.from_file(cli_arguments.config_path).providers.values():
-        print(provider)
+    if cli_arguments.make:
+        print("Creating default providers")
+        for provider in config.default_providers:
+            try:
+                existing_provider = Provider.objects.get(name=provider.name)
+            except Provider.DoesNotExist:
+                print(f"Creating provider {provider}")
+                provider.save()
+            else:
+                if provider != existing_provider:
+                    print(f"Updating provider {existing_provider} to {provider}")
+                    provider.id = existing_provider.id
+                    provider.save()
+    if cli_arguments.list:
+        print('Available providers:')
+        for provider in Provider.objects.all():
+            print(provider)
 
 
-def harvest(cli_arguments):
+def harvest(cli_arguments, config):
     """Reads the configuration files and harvests the searched data.
     If errors occur during the ingestion process (like the provider
     website being temporarily unavailable), it is retried at the end.
     """
-    config = ProvidersConfiguration.from_file(cli_arguments.config_path)
-    search_config = SearchConfiguration.from_file(cli_arguments.search_path) \
-                                       .with_providers(config.providers)
+    search_config = SearchConfiguration.from_file(cli_arguments.search_path)
     searches_results = search_config.create_provider_searches()
 
     refresh_vocabularies(config)
@@ -112,8 +126,10 @@ def make_arg_parser():
 
     subparsers = arg_parser.add_subparsers()
 
-    list_subparser = subparsers.add_parser('list', help='List available providers')
-    list_subparser.set_defaults(func=print_providers)
+    providers_subparser = subparsers.add_parser('providers', help='Provider functions')
+    providers_subparser.set_defaults(func=handle_providers)
+    providers_subparser.add_argument('-m', '--make', action='store_true')
+    providers_subparser.add_argument('-l', '--list', action='store_true')
 
     harvest_parser = subparsers.add_parser('harvest',
                                            help='Harvest data directly into the database')
@@ -131,7 +147,8 @@ def main():
     """
     arg_parser = make_arg_parser()
     cli_arguments = arg_parser.parse_args()
-    cli_arguments.func(cli_arguments)
+    config = ProvidersConfiguration.from_file(cli_arguments.config_path)
+    cli_arguments.func(cli_arguments, config)
 
 
 if __name__ == '__main__':  # pragma: no cover
