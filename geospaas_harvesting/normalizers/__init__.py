@@ -7,7 +7,7 @@ import pkgutil
 import importlib
 from pathlib import Path
 
-from .base import MetadataNormalizer
+from .base import MetadataNormalizer, StreamMetadataNormalizer
 from ..utils import get_all_subclasses
 
 

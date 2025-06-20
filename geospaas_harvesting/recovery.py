@@ -15,6 +15,7 @@ if not django.conf.settings.configured:
 
 import geospaas_harvesting.crawlers as crawlers  # pylint: disable=wrong-import-position
 import geospaas_harvesting.ingesters as ingesters  # pylint: disable=wrong-import-position
+import geospaas_harvesting.normalizers as normalizers
 
 
 logger = logging.getLogger('geospaas_harvesting.recovery')
@@ -57,8 +58,8 @@ def retry_ingest():
     ingestion fails again. In that case, the new files are retried
     after waiting for a while. Maximum 5 tries.
     """
-    base_path = Path(crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH)
-    glob_pattern = f'*{crawlers.CrawlerIterator.RECOVERY_SUFFIX}'
+    base_path = Path(normalizers.StreamMetadataNormalizer.FAILED_INGESTIONS_PATH)
+    glob_pattern = f'*{normalizers.StreamMetadataNormalizer.RECOVERY_SUFFIX}'
     wait_time = 60  # seconds
     recovery_attempted = False
 
