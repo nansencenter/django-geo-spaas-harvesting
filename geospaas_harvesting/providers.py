@@ -33,14 +33,6 @@ class Provider(models.Model):
     class Meta:
         app_label = 'geospaas_harvesting'
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.search_parameters_parser = ArgumentParser([
-            DictArgument('crawler', default=dict),
-            DictArgument('ingester', default=dict),
-            DictArgument('normalizer', default=dict),
-        ])
-
     def __repr__(self):
         return f"{self.__class__.__name__}(name={self.name})"
 
