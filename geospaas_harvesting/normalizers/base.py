@@ -1,10 +1,10 @@
 """Module containing the base class for GeoSPaaS normalizers"""
+import concurrent.futures
 import logging
 import os
+import pickle
 import queue
 import threading
-import pickle
-import concurrent.futures
 from datetime import datetime
 from pathlib import Path
 
@@ -120,10 +120,10 @@ class StreamMetadataNormalizer():
         self.normalizer = normalizer
         self.max_threads = max_threads
 
-        self._results = queue.Queue(self.QUEUE_SIZE)
-        self._failed = queue.Queue(self.QUEUE_SIZE)
+        self._results = None
+        self._failed = None
 
-        self.main_thread = threading.current_thread()
+        self.main_thread = None
         self.manager_thread = None
 
     def __del__(self):
@@ -134,6 +134,9 @@ class StreamMetadataNormalizer():
                 self.manager_thread.join()
 
     def __iter__(self):
+        self._results = queue.Queue(self.QUEUE_SIZE)
+        self._failed = queue.Queue(self.QUEUE_SIZE)
+        self.main_thread = threading.current_thread()
         self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
         self.manager_thread.start()
         return self
