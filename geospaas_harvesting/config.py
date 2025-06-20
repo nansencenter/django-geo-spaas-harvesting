@@ -66,9 +66,9 @@ class ProvidersArgument(DictArgument):
                 crawler_name=provider_settings['crawler']['name'],
                 normalizer_name=provider_settings.get('normalizer', {}).get('name', 'raw'),
                 config={
-                    'crawler': provider_settings['crawler'].get('config'),
-                    'normalizer': provider_settings.get('normalizer', {}).get('config'),
-                    'ingester': provider_settings.get('ingester', {}).get('config'),
+                    'crawler': provider_settings['crawler'].get('config', {}),
+                    'normalizer': provider_settings.get('normalizer', {}).get('config', {}),
+                    'ingester': provider_settings.get('ingester', {}).get('config', {}),
                 }
             ))
         return _providers
@@ -89,9 +89,8 @@ class SearchConfiguration(Configuration):
     """Configuration manager used to parse search parameters"""
 
     def __init__(self):
-        common_argument_parser = Provider().search_parameters_parser
         self.config_arguments_parser = ArgumentParser([
-            DictArgument('common', argument_parser=common_argument_parser),
+            DictArgument('common'),
             ListArgument('searches')
         ])
 
@@ -100,9 +99,9 @@ class SearchConfiguration(Configuration):
         specific searches
         """
         searches = []
-        for provider_search in self.searches:  # pylint: disable=no-member
-            provider_name = provider_search.pop('provider_name')
+        for search in self.searches:  # pylint: disable=no-member
+            provider_name = search.pop('provider_name')
             search_terms = self.common.copy()  # pylint: disable=no-member
-            search_terms.update(provider_search)
+            search_terms.update(search)
             searches.append(Provider.objects.get(name=provider_name).search(**search_terms))
         return searches
