@@ -36,9 +36,7 @@ class RawMetadataNormalizer(MetadataNormalizer):
             return None
 
     def get_tags(self, dataset_info):
-        return [
-            Tag(data={
-                'type': 'raw_metadata',
-                'data': dataset_info.metadata,
-            })
-        ]
+        tags = []
+        for key, value in dataset_info.metadata.items():
+            tags.append(Tag(name=key, value=str(value)))
+        return tags
