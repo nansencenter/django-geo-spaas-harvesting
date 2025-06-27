@@ -12,11 +12,48 @@ class NoDefault:
     """Special class used when no default value is specified"""
 
 
-class ArgumentParser():
+class Argument():
+    """Base class for arguments. Each argument has at least a name and
+    a 'required' attribute.
+    """
+    type = 'unknown'
+
+    def __init__(self, name, **kwargs):
+        self.name = name
+        self.required = kwargs.get('required', False)
+        self.default = kwargs.get('default', NoDefault)
+        self.description = kwargs.get('description', '')
+
+    def __eq__(self, other):
+        return (
+            self.name == other.name and
+            self.required == other.required and
+            self.default == other.default and
+            self.description == other.description
+        )
+
+    def __str__(self):
+        return ', '.join(filter(None, (
+            f"{self.name}",
+            f"type={self.type}",
+            'required' if self.required else 'not required',
+            f"default={self.default}" if self.default is not NoDefault else '',
+            f"description={self.description}" if self.description else '',
+        )))
+
+    def parse(self, value):
+        """Return a properly formatted value for the argument.
+        If the input is not correct, should raise an exception
+        """
+        raise NotImplementedError()
+
+
+class ArgumentParser(Argument):
     """Class capable of validating if a dictionary of parameters
     matches a list of argument definitions
     """
-    def __init__(self, arguments, name='root', strict=True):
+
+    def __init__(self, arguments, name='root', strict=True, **kwargs):
         """Set the list of valid arguments.
         If `strict` is True, only the defined arguments must be present
         in the parameters being validated. Otherwise, extra parameters
@@ -24,8 +61,8 @@ class ArgumentParser():
         """
         self.arguments = {}
         self.add_arguments(arguments)
-        self.name = name
         self.strict = strict
+        super().__init__(name, **kwargs)
 
     def __str__(self):
         result = ['available arguments:']
@@ -71,42 +108,6 @@ class ArgumentParser():
             raise ValueError(f"Unknown argument(s) {parameters}")
 
         return parsed_parameters
-
-
-class Argument():
-    """Base class for arguments. Each argument has at least a name and
-    a 'required' attribute.
-    """
-    type = 'unknown'
-
-    def __init__(self, name, **kwargs):
-        self.name = name
-        self.required = kwargs.get('required', False)
-        self.default = kwargs.get('default', NoDefault)
-        self.description = kwargs.get('description', '')
-
-    def __eq__(self, other):
-        return (
-            self.name == other.name and
-            self.required == other.required and
-            self.default == other.default and
-            self.description == other.description
-        )
-
-    def __str__(self):
-        return ', '.join(filter(None, (
-            f"{self.name}",
-            f"type={self.type}",
-            'required' if self.required else 'not required',
-            f"default={self.default}" if self.default is not NoDefault else '',
-            f"description={self.description}" if self.description else '',
-        )))
-
-    def parse(self, value):
-        """Return a properly formatted value for the argument.
-        If the input is not correct, should raise an exception
-        """
-        raise NotImplementedError()
 
 
 class AnyArgument(Argument):
