@@ -37,9 +37,11 @@ class RestoAPIMetadataNormalizer(MetadataNormalizer):
         ])
         summary_fields[utils.SUMMARY_FIELDS['description']] = description
 
-        if 'processingLevel' in dataset_info.metadata:
-            processing_level = dataset_info.metadata['processingLevel'].replace('LEVEL', '')
+        try:
+            processing_level = dataset_info.metadata.get('processingLevel').replace('LEVEL', '')
             summary_fields[utils.SUMMARY_FIELDS['processing_level']] = processing_level
+        except AttributeError:
+            pass
 
         return utils.dict_to_string(summary_fields)
 
