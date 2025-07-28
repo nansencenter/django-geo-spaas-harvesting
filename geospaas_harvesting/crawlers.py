@@ -559,6 +559,8 @@ class HTMLDirectoryCrawler(DirectoryCrawler):
         if not parent_path.endswith('/'):
             parent_path += '/'
         for path in paths:
+            if urlparse(path).scheme != '':
+                continue
             if path.startswith(parent_path):
                 result.append(path)
             else:

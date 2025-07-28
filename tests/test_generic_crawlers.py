@@ -713,7 +713,7 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         Should prepend all the paths with the parent_path, except if they already start with it
         """
         parent_path = '/foo'
-        paths = ['/foo/bar', 'baz']
+        paths = ['/foo/bar', 'baz', 'https://external/site']
         self.assertEqual(
             crawlers.HTMLDirectoryCrawler._prepend_parent_path(parent_path, paths),
             ['/foo/bar', '/foo/baz']
