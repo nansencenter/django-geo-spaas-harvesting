@@ -11,7 +11,7 @@ class AVISOProvider(TimeFilterMixin, Provider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.url = 'https://tds.aviso.altimetry.fr/thredds'
+        self.url = 'https://tds-odatis.aviso.altimetry.fr/thredds'
         self.search_parameters_parser.add_arguments([
             StringArgument('directory', required=True),
             StringArgument('include'),
