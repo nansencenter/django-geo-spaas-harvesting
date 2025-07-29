@@ -23,7 +23,7 @@ class AVISOProviderTestCase(unittest.TestCase):
         self.assertEqual(
             provider._make_crawler(parameters),
             crawlers.ThreddsCrawler(
-                'https://tds.aviso.altimetry.fr/thredds/foo',
+                'https://tds-odatis.aviso.altimetry.fr/thredds/foo',
                 include='.*',
                 time_range=(datetime(2023, 1, 1, tzinfo=timezone.utc),
                             datetime(2023, 1, 2, tzinfo=timezone.utc)),
