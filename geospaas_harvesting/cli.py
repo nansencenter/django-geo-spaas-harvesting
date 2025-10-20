@@ -128,8 +128,9 @@ def make_arg_parser():
 
     providers_subparser = subparsers.add_parser('providers', help='Provider functions')
     providers_subparser.set_defaults(func=handle_providers)
-    providers_subparser.add_argument('-m', '--make', action='store_true')
-    providers_subparser.add_argument('-l', '--list', action='store_true')
+    providers_subparser.add_argument('-m', '--make-defaults', action='store_true',
+                                     help='Create default providers')
+    providers_subparser.add_argument('-l', '--list', action='store_true', help='List providers')
 
     harvest_parser = subparsers.add_parser('harvest',
                                            help='Harvest data directly into the database')
