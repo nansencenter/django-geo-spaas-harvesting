@@ -10,18 +10,12 @@ default_providers:
   thredds:
     crawler:
       name: 'thredds'
-      config:
-        max_threads: 30
   opendap:
     crawler:
       name: 'podaac'
-      config:
-        max_threads: 30
   http:
     crawler:
       name: 'html_directory'
-      config:
-        max_threads: 30
   nansat:
     crawler:
       name: 'nansat'

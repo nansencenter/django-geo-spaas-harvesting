@@ -231,7 +231,7 @@ class RestoCrawler(HTTPPaginatedAPICrawler):
 
     # ------------- crawl ------------
     def _build_request_parameters(self, search_terms=None, time_range=(None, None), location=None,
-                                  username=None, password=None, page_size=100, max_threads=1,):
+                                  username=None, password=None, page_size=100):
         """Build a dict containing the parameters used to query
         the Creodias EO finder API.
         search_terms should be a dictionary containing the search

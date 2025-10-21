@@ -46,11 +46,7 @@ class Crawler():
             default=(None, None)),
         arguments.StringArgument('username', default=None),
         arguments.StringArgument('password', default=None),
-        arguments.IntegerArgument('max_threads', default=1),
     ])
-
-    def __init__(self, **kwargs):
-        self.max_threads = kwargs.get('max_threads', 1)
 
     @classmethod
     def from_config(cls, config: dict):
