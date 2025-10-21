@@ -17,8 +17,8 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 if not django.conf.settings.configured:
     django.setup()  # pragma: no cover
 
+import geospaas_harvesting.config as config
 from geospaas.catalog.models import Parameter
-from .config import ProvidersConfiguration, SearchConfiguration
 from .providers import Provider
 from .recovery import retry_ingest
 
@@ -31,23 +31,28 @@ default_configuration_path = package_dir / 'config.yml'
 default_search_path = Path() / 'search.yml'
 
 
+class CreateDefaultProviders():
+    """Flag used to signal that the default providers should be created
+    """
+
+
 def init_worker():
     """Initialization function for child processes. Defines signals handling."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def refresh_vocabularies(config):
+def refresh_vocabularies(general_config):
     """Update the Vocabulary objects in the database if the
     `update_vocabularies` settings is True.
     If the `update_pythesint` setting is also True,
     the local pythesint data is also updated.
     """
-    if config.update_vocabularies:
+    if general_config.update_vocabularies:
         logger.info('Updating vocabularies...')
         django.core.management.call_command(
             'update_vocabularies',
-            force=config.update_pythesint,
-            versions=config.pythesint_versions)
+            force=general_config.update_pythesint,
+            versions=general_config.pythesint_versions)
         logger.info('Finished updating vocabularies')
     # safety check in order to prevent harvesting process with an empty
     # list of parameters
@@ -77,13 +82,23 @@ def save_results(searches_results):
             raise
 
 
-def handle_providers(cli_arguments, config):
-    """Print each provider's description, notably the possible search
-    arguments
-    """
-    if cli_arguments.make:
-        print("Creating default providers")
-        for provider in config.default_providers:
+def parse_providers_config(providers_config_path):
+    """Parse a file for provider configurations"""
+    providers_config = config.ProvidersConfiguration.from_file(providers_config_path)
+    return providers_config.providers
+
+
+def handle_providers(cli_arguments, general_config):
+    """List/update/delete providers"""
+    if cli_arguments.providers_path:
+        if cli_arguments.providers_path is CreateDefaultProviders:
+            providers = general_config.default_providers
+            message = "Updating default providers"
+        else:
+            providers = parse_providers_config(cli_arguments.providers_path)
+            message = f"Updating providers from {cli_arguments.providers_path}"
+        print(message)
+        for provider in providers:
             try:
                 existing_provider = Provider.objects.get(name=provider.name)
             except Provider.DoesNotExist:
@@ -94,21 +109,25 @@ def handle_providers(cli_arguments, config):
                     print(f"Updating provider {existing_provider} to {provider}")
                     provider.id = existing_provider.id
                     provider.save()
-    if cli_arguments.list:
+    elif cli_arguments.delete:
+        to_delete = Provider.objects.filter(name__in=cli_arguments.delete)
+        print(f'Deleting {list(to_delete)}')
+        to_delete.all().delete()
+    elif cli_arguments.list:
         print('Available providers:')
         for provider in Provider.objects.all():
             print(provider)
 
 
-def harvest(cli_arguments, config):
+def harvest(cli_arguments, general_config):
     """Reads the configuration files and harvests the searched data.
     If errors occur during the ingestion process (like the provider
     website being temporarily unavailable), it is retried at the end.
     """
-    search_config = SearchConfiguration.from_file(cli_arguments.search_path)
+    search_config = config.SearchConfiguration.from_file(cli_arguments.search_path)
     searches_results = search_config.create_provider_searches()
 
-    refresh_vocabularies(config)
+    refresh_vocabularies(general_config)
     save_results(searches_results)
 
     # Retry to ingest datasets for which the ingestion failed
@@ -128,9 +147,17 @@ def make_arg_parser():
 
     providers_subparser = subparsers.add_parser('providers', help='Provider functions')
     providers_subparser.set_defaults(func=handle_providers)
-    providers_subparser.add_argument('-m', '--make-defaults', action='store_true',
-                                     help='Create default providers')
-    providers_subparser.add_argument('-l', '--list', action='store_true', help='List providers')
+    action_group = providers_subparser.add_mutually_exclusive_group()
+    action_group.add_argument('-p', '--create-providers',
+                              dest='providers_path',
+                              default=None,
+                              const=CreateDefaultProviders,
+                              nargs="?",
+                              help='Create/update providers from YAML file. '
+                                   'If no file is provided, create the default providers')
+    action_group.add_argument('-d', '--delete', action='extend', nargs='+', type=str,
+                              help='Delete providers')
+    action_group.add_argument('-l', '--list', action='store_true', help='List providers')
 
     harvest_parser = subparsers.add_parser('harvest',
                                            help='Harvest data directly into the database')
@@ -148,8 +175,8 @@ def main():
     """
     arg_parser = make_arg_parser()
     cli_arguments = arg_parser.parse_args()
-    config = ProvidersConfiguration.from_file(cli_arguments.config_path)
-    cli_arguments.func(cli_arguments, config)
+    general_config = config.GeneralConfiguration.from_file(cli_arguments.config_path)
+    cli_arguments.func(cli_arguments, general_config)
 
 
 if __name__ == '__main__':  # pragma: no cover

@@ -73,9 +73,8 @@ class ProvidersArgument(DictArgument):
             ))
         return _providers
 
-class ProvidersConfiguration(Configuration):
-    """Configuration manager for providers"""
-
+class GeneralConfiguration(Configuration):
+    """Configuration manager for general harvesting settings"""
     def __init__(self):
         self.config_arguments_parser = ArgumentParser([
             BooleanArgument('update_vocabularies', default=True),
@@ -85,9 +84,16 @@ class ProvidersConfiguration(Configuration):
         ])
 
 
+class ProvidersConfiguration(Configuration):
+    """Configuration manager for providers"""
+    def __init__(self):
+        self.config_arguments_parser = ArgumentParser([
+            ProvidersArgument('providers', required=True)
+        ])
+
+
 class SearchConfiguration(Configuration):
     """Configuration manager used to parse search parameters"""
-
     def __init__(self):
         self.config_arguments_parser = ArgumentParser([
             DictArgument('common'),
