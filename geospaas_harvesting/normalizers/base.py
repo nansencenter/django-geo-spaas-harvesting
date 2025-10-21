@@ -47,9 +47,10 @@ class MetadataNormalizer():
         tags = self.get_tags(dataset_info)
         return (dataset, dataset_uri, keywords, parameters, tags)
 
-    def normalize_stream(self, dataset_infos):
-        """"""
-        return StreamMetadataNormalizer(self, dataset_infos)
+    def normalize_stream(self, dataset_infos, max_threads=1):
+        """Normalize an iterable of DatasetInfo objects.
+        """
+        return StreamMetadataNormalizer(self, dataset_infos, max_threads=max_threads)
 
     def get_entry_id(self, dataset_info):
         """Get the entry ID from the raw metadata"""
