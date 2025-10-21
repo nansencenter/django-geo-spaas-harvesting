@@ -58,11 +58,11 @@ class Provider(models.Model):
     def normalizer_class(self):
         return normalizers.index[self.normalizer_name]
 
-    def search(self, **parameters):
+    def search(self, **search_parameters):
         """Returns a Search object which can be used to explore the
         search results returned by the crawler
         """
-        crawler = self.make_crawler(parameters)
+        crawler = self.make_crawler(search_parameters)
         normalizer = self.make_normalizer()
 
         return SearchResults(
@@ -70,12 +70,13 @@ class Provider(models.Model):
             ingesters.Ingester(**self.config.get('ingester', {})),
         )
 
-    def make_crawler(self, parameters):
-        """Create a crawler from the search parameters"""
+    def make_crawler(self, search_parameters):
+        """Create a crawler from the search parameters and the stored configuration
+        """
         try:
             return self.crawler_class.from_config({
                 **self.config.get('crawler', {}),
-                **parameters
+                **search_parameters
             })
         except KeyError:
             raise ValueError(f"Unknown crawler {self.crawler_name}")
