@@ -24,19 +24,19 @@ default_providers:
   netcdf_lon_lat:
     crawler:
       name: 'netcdf'
-      config:
+      defaults:
         longitude_attribute: 'lon'
         latitude_attribute: 'lat'
   netcdf_l:
     crawler:
       name: 'netcdf'
-      config:
+      defaults:
         longitude_attribute: 'longitude'
         latitude_attribute: 'latitude'
   netcdf_L:
     crawler:
       name: 'netcdf'
-      config:
+      defaults:
         longitude_attribute: 'LONGITUDE'
         latitude_attribute: 'LATITUDE'
 
@@ -45,7 +45,7 @@ default_providers:
     # ftp://anon-ftp.ceda.ac.uk/neodc/esacci/sst/data/CDR_v2/Climatology/L4/v2.1
     crawler:
       name: 'ftp'
-      config:
+      defaults:
         include: '\.nc$'
     normalizer:
       name: 'ceda'
@@ -53,7 +53,7 @@ default_providers:
     # ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3
     crawler:
       name: 'ftp'
-      config:
+      defaults:
         include: '\.h5$'
     normalizer:
       name: 'gportal_gcom'
@@ -61,7 +61,7 @@ default_providers:
     # https://thredds.met.no/thredds
     crawler:
       name: 'thredds'
-      config:
+      defaults:
         include: '\.nc$'
     normalizer:
       name: 'osisaf'
@@ -69,7 +69,7 @@ default_providers:
     # https://tds-odatis.aviso.altimetry.fr/thredds
     crawler:
       name: 'thredds'
-      config:
+      defaults:
         include: '\.nc$'
     normalizer:
       name: 'aviso'
@@ -78,7 +78,7 @@ default_providers:
     # ftp://ftpprd.ncep.noaa.gov
     crawler:
       name: 'ftp'
-      config:
+      defaults:
         include: '\.nc(\.gz)?$'
     normalizer:
       name: 'noaa_hycom'
@@ -87,14 +87,14 @@ default_providers:
     # ftp://ftpprd.ncep.noaa.gov
     crawler:
       name: 'ftp'
-      config:
+      defaults:
         include: '\.nc(\.gz)?$'
     normalizer:
       name: 'noaa_rtofs'
   cpom:
     crawler:
       name: 'netcdf'
-      config:
+      defaults:
         longitude_attribute: 'lon'
         latitude_attribute: 'lat'
     normalizer:
@@ -107,14 +107,14 @@ default_providers:
   creodias:
     crawler:
       name: 'resto'
-      config:
+      defaults:
         url: 'https://datahub.creodias.eu'
     normalizer:
       name: 'resto'
   copernicus_data_space:
     crawler:
       name: 'resto'
-      config:
+      defaults:
         url: 'https://catalogue.dataspace.copernicus.eu'
     normalizer:
       name: 'resto'
@@ -128,7 +128,7 @@ default_providers:
       name: 'tabledap'
     crawler:
       name: 'tabledap'
-      config:
+      defaults:
         url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json'
         entry_id_prefix: 'argo_profile_'
         id_attrs: ['platform_number', 'cycle_number']
@@ -161,7 +161,7 @@ default_providers:
       name: 'tabledap'
     crawler:
       name: 'tabledap'
-      config:
+      defaults:
         url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json'
         entry_id_prefix: 'argo_trajectory_'
         id_attrs: ['platform_number']
@@ -178,7 +178,7 @@ default_providers:
       name: 'tabledap'
     crawler:
       name: 'tabledap'
-      config:
+      defaults:
         url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats-synthetic-BGC.json'
         entry_id_prefix: 'bioargo_profile_'
         id_attrs: ['platform_number', 'cycle_number']
@@ -209,7 +209,7 @@ default_providers:
       name: 'tabledap'
     crawler:
       name: 'tabledap'
-      config:
+      defaults:
         url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats-synthetic-BGC.json'
         entry_id_prefix: 'bioargo_trajectory_'
         id_attrs: ['platform_number']

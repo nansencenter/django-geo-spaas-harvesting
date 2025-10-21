@@ -66,7 +66,7 @@ class ProvidersArgument(DictArgument):
                 crawler_name=provider_settings['crawler']['name'],
                 normalizer_name=provider_settings.get('normalizer', {}).get('name', 'raw'),
                 config={
-                    'crawler': provider_settings['crawler'].get('config', {}),
+                    'crawler': provider_settings['crawler'].get('defaults', {}),
                     'normalizer': provider_settings.get('normalizer', {}).get('config', {}),
                     'ingester': provider_settings.get('ingester', {}).get('config', {}),
                 }
