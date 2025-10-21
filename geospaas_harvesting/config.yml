@@ -42,53 +42,61 @@ default_providers:
 
   # specific providers
   ceda:
-    # ftp://anon-ftp.ceda.ac.uk/neodc/esacci/sst/data/CDR_v2/Climatology/L4/v2.1
     crawler:
       name: 'ftp'
       defaults:
+        url: 'ftp://anon-ftp.ceda.ac.uk/neodc/esacci/sst/data/CDR_v2/Climatology/L4/v2.1'
         include: '\.nc$'
+        username: 'anonymous'
+        password: ''
     normalizer:
       name: 'ceda'
   gportal:
-    # ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3
     crawler:
       name: 'ftp'
       defaults:
+        url: 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3'
         include: '\.h5$'
+        username: !ENV JAXA_USERNAME
+        password: !ENV JAXA_PASSWORD
     normalizer:
       name: 'gportal_gcom'
   metno_osisaf:
-    # https://thredds.met.no/thredds
     crawler:
       name: 'thredds'
       defaults:
+        url: 'https://thredds.met.no/thredds'
         include: '\.nc$'
     normalizer:
       name: 'osisaf'
   aviso:
-    # https://tds-odatis.aviso.altimetry.fr/thredds
     crawler:
       name: 'thredds'
       defaults:
+        url: 'https://tds-odatis.aviso.altimetry.fr/thredds'
         include: '\.nc$'
+        username: !ENV AVISO_USERNAME
+        password: !ENV AVISO_PASSWORD
     normalizer:
       name: 'aviso'
   noaa_hycom:
-    # ftp://ftp.opc.ncep.noaa.gov
-    # ftp://ftpprd.ncep.noaa.gov
     crawler:
       name: 'ftp'
       defaults:
+        url: 'ftp://ftp.opc.ncep.noaa.gov/grids/operational/GLOBALHYCOM/Navy'
         include: '\.nc(\.gz)?$'
+        username: !ENV JAXA_USERNAME
+        password: !ENV JAXA_PASSWORD
     normalizer:
       name: 'noaa_hycom'
   noaa_rtofs:
-    # ftp://ftp.opc.ncep.noaa.gov
-    # ftp://ftpprd.ncep.noaa.gov
     crawler:
       name: 'ftp'
       defaults:
+        url: 'ftp://ftpprd.ncep.noaa.gov/pub/data/nccf/com/rtofs/prod'
         include: '\.nc(\.gz)?$'
+        username: !ENV JAXA_USERNAME
+        password: !ENV JAXA_PASSWORD
     normalizer:
       name: 'noaa_rtofs'
   cpom:
@@ -102,6 +110,9 @@ default_providers:
   cmems:
     crawler:
       name: 'cmems'
+      defaults:
+        username: !ENV CMEMS_USERNAME
+        password: !ENV CMEMS_PASSWORD
     normalizer:
       name: 'cmems'
   creodias:
