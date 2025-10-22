@@ -27,7 +27,6 @@ class HTTPPaginatedAPICrawler(Crawler):
     MIN_OFFSET = 0
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
         self.url = kwargs['url']
         self._results = None
         self.initial_offset = kwargs['initial_offset'] or self.MIN_OFFSET

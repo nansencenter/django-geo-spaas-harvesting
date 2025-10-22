@@ -33,7 +33,6 @@ class ERDDAPTableCrawler(Crawler):
     logger = logging.getLogger(__name__ + '.ERDDAPTableCrawler')
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
         url = kwargs['url']
         if url.rstrip('/').endswith('.json'):
             self.url = url

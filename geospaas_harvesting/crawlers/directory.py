@@ -92,7 +92,6 @@ class DirectoryCrawler(Crawler):
         `include` is a regular expression string used to filter the crawler's output.
         Only URLs matching it are returned.
         """
-        super().__init__(**kwargs)
         self.root_url = urlparse(kwargs['url'])
         self.time_range = kwargs['time_range']
         include = kwargs.get('include')

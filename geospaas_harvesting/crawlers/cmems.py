@@ -25,7 +25,6 @@ class CMEMSCrawler(Crawler):
     S3_BASE_URL = '://'.join(urlparse(MARINE_DATA_STORE_STAC_BASE_URL)[0:2])
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
         self.cmems_product_id = kwargs['cmems_product_id']
         self.cmems_dataset_ids = kwargs['cmems_dataset_ids']
         self.time_range = kwargs['time_range']
