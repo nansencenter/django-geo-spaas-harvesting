@@ -10,9 +10,15 @@ default_providers:
   thredds:
     crawler:
       name: 'thredds'
+    normalizer:
+      config:
+        max_threads: 30
   opendap:
     crawler:
-      name: 'podaac'
+      name: 'opendap'
+    normalizer:
+      config:
+        max_threads: 30
   http:
     crawler:
       name: 'html_directory'
@@ -69,6 +75,8 @@ default_providers:
         include: '\.nc$'
     normalizer:
       name: 'osisaf'
+      config:
+        max_threads: 30
   aviso:
     crawler:
       name: 'thredds'
@@ -79,6 +87,8 @@ default_providers:
         password: !ENV AVISO_PASSWORD
     normalizer:
       name: 'aviso'
+      config:
+        max_threads: 30
   noaa_hycom:
     crawler:
       name: 'ftp'

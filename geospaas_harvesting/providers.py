@@ -56,17 +56,20 @@ class Provider(models.Model):
 
     @property
     def normalizer_class(self):
-        return normalizers.index[self.normalizer_name]
+        try:
+            return normalizers.index[self.normalizer_name]
+        except KeyError:
+            raise ValueError(f"Unknown normalizer {self.normalizer_name}")
 
     def search(self, **search_parameters):
         """Returns a Search object which can be used to explore the
         search results returned by the crawler
         """
         crawler = self.make_crawler(search_parameters)
-        normalizer = self.make_normalizer()
+        normalizer, max_threads = self.make_normalizer()
 
         return SearchResults(
-            normalizer.normalize_stream(crawler),
+            normalizer.normalize_stream(crawler, max_threads),
             ingesters.Ingester(**self.config.get('ingester', {})),
         )
 
@@ -82,12 +85,12 @@ class Provider(models.Model):
             raise ValueError(f"Unknown crawler {self.crawler_name}")
 
     def make_normalizer(self):
-        """Get MetadataNormalizer class from index and instantiate it
+        """Get MetadataNormalizer class from index and instantiate it.
+        Also retrieve the max_threads parameter from configuration
         """
-        try:
-            return self.normalizer_class(**self.config.get('normalizer', {}))
-        except KeyError:
-            raise ValueError(f"Unknown normalizer {self.normalizer_name}")
+        normalizer_config = self.config.get('normalizer', {})
+        max_threads = normalizer_config.pop('max_threads', 1)
+        return (self.normalizer_class(**normalizer_config), max_threads)
 
 
 class SearchResults():
