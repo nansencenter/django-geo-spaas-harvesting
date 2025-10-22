@@ -165,11 +165,13 @@ class StreamMetadataNormalizer():
         """
         # Launch thread which checks the size of the failed ingestions
         # queue and dumps it to disk when necessary
-        self.logger.debug("Starting normalizer thread for %s", self.normalizer.name)
+        self.logger.debug("Starting normalizing failure management thread for %s",
+                          self.normalizer.name)
         failed_queue_thread = threading.Thread(target=self._thread_manage_failed_normalizing)
         failed_queue_thread.start()
+        self.logger.debug("Starting normalizer threads for %s (max %s)",
+                          self.normalizer.name, self.max_threads)
         try:
-            # Launch normalizing threads
             with concurrent.futures.ThreadPoolExecutor(
                     max_workers=self.max_threads,
                     thread_name_prefix=self.__class__.__name__) as executor:
@@ -230,7 +232,7 @@ class StreamMetadataNormalizer():
         This method is meant to be run in a thread.
         """
         try:
-            self.logger.debug("Starting failure management thread")
+            self.logger.debug("Failure management thread started")
             class_name = self.__class__.__name__.lower()
             date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
             pickle_path = Path(self.FAILED_INGESTIONS_PATH,
