@@ -64,6 +64,12 @@ def http_request(http_method, *args, **kwargs):
     makes it possible to follow redirections inside the same domain.
     """
     auth = kwargs.pop('auth', None)
+
+    # TODO: temporary fix until implementation of proper config management
+    ca_bundle_path = os.getenv('GEOSPAAS_HARVESTING_CA_BUNDLE')
+    if ca_bundle_path:
+        kwargs['verify'] = ca_bundle_path
+
     if auth:
         with TrustDomainSession() as session:
             session.auth = auth
