@@ -67,6 +67,15 @@ default_providers:
         password: !ENV JAXA_PASSWORD
     normalizer:
       name: 'gportal_gcom'
+  metno:
+    crawler:
+      name: 'thredds'
+      defaults:
+        url: 'https://thredds.met.no/thredds'
+        include: '\.nc$'
+    normalizer:
+      config:
+        max_threads: 30
   metno_osisaf:
     crawler:
       name: 'thredds'
