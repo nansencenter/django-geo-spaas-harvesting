@@ -15,14 +15,14 @@ class CMEMSCrawler(Crawler):
     name = 'cmems'
     argument_parser = arguments.ArgumentParser([
         *Crawler.argument_parser.arguments.values(),
-        arguments.StringArgument('cmems_product_id', required=True),
-        arguments.SequenceArgument('cmems_dataset_ids',
+        arguments.StringArgument('product_id', required=True),
+        arguments.SequenceArgument('dataset_ids',
                                    contents_type=arguments.StringArgument, required=True),
     ])
 
     def __init__(self, **kwargs):
-        self.cmems_product_id = kwargs['cmems_product_id']
-        self.cmems_dataset_ids = kwargs['cmems_dataset_ids']
+        self.product_id = kwargs['product_id']
+        self.dataset_ids = kwargs['dataset_ids']
         self.time_range = kwargs['time_range']
         self.username = kwargs['username']
         self.password = kwargs['password']
@@ -32,8 +32,8 @@ class CMEMSCrawler(Crawler):
 
     def __eq__(self, other):
         return (
-            self.cmems_product_id == other.cmems_product_id and
-            self.cmems_dataset_ids == other.cmems_dataset_ids and
+            self.product_id == other.product_id and
+            self.dataset_ids == other.dataset_ids and
             self.time_range == other.time_range and
             self.username == other.username and
             self.password == other.password)
@@ -102,11 +102,11 @@ class CMEMSCrawler(Crawler):
         try:
             self._product_info = copernicusmarine.describe(
                 show_all_versions=False,
-                product_id=self.cmems_product_id,
+                product_id=self.product_id,
                 disable_progress_bar=True,
             ).products[0]
         except IndexError as error:
-            raise RuntimeError(f"No product found with ID: {self.cmems_product_id}") from error
+            raise RuntimeError(f"No product found with ID: {self.product_id}") from error
 
     def crawl(self):
         """Generator which crawls through a dataset repository and yields
@@ -117,7 +117,7 @@ class CMEMSCrawler(Crawler):
             dataset_id = cmems_dataset.dataset_id
             dataset_variables = (cmems_dataset.versions[0].parts[0]
                                  .get_service_by_service_name('original-files').variables)
-            if self.cmems_dataset_ids is None or dataset_id in self.cmems_dataset_ids:
+            if self.dataset_ids is None or dataset_id in self.dataset_ids:
                 response = copernicusmarine.get(
                     dataset_id=dataset_id,
                     dry_run=True,
