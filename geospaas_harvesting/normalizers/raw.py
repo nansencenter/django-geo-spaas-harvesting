@@ -38,5 +38,10 @@ class RawMetadataNormalizer(MetadataNormalizer):
     def get_tags(self, dataset_info):
         tags = []
         for key, value in dataset_info.metadata.items():
-            tags.append(Tag(name=key, value=str(value)))
+            value = str(value)
+            try:
+                tag = Tag.objects.get(name=key, value=value)
+            except Tag.DoesNotExist:
+                tag = Tag(name=key, value=value)
+            tags.append(tag)
         return tags
