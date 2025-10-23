@@ -86,13 +86,13 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
         ),
         # generic 1 day coverage
         (
-            re.compile(rf'(^|[-_.:]){utils.YEARMONTHDAY_REGEX}(\d{{6}})?([-_.:T]|$)'),
+            re.compile(rf'(^|[-_.:/]){utils.YEARMONTHDAY_REGEX}(\d{{6}})?([-_.:T]|$)'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(days=1))
         ),
         # generic 1 month coverage
         (
-            re.compile(rf'(^|[-_.:]){utils.YEARMONTH_REGEX}([-_.:T]|$)'),
+            re.compile(rf'(^|[-_.:/]){utils.YEARMONTH_REGEX}([-_.:T]|$)'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(months=1))
         ),
@@ -107,10 +107,10 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
     def get_summary(self, dataset_info):
         """Build a summary from metadata fields"""
         return utils.dict_to_string({
-            utils.SUMMARY_FIELDS['description']: dataset_info.metadata['product_info']['description'],
+            utils.SUMMARY_FIELDS['description']: dataset_info.metadata['product_info'].description,
             utils.SUMMARY_FIELDS['processing_level']: (
-                dataset_info.metadata['product_info']['processing_level']),
-            utils.SUMMARY_FIELDS['product']: dataset_info.metadata['product_info']['product_id'],
+                dataset_info.metadata['product_info'].processing_level),
+            utils.SUMMARY_FIELDS['product']: dataset_info.metadata['product_info'].product_id,
             'Dataset ID': dataset_info.metadata['cmems_dataset_name'],
         })
 
@@ -127,7 +127,7 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
 
         search_strings = (
             dataset_info.metadata['cmems_dataset_name'],
-            *dataset_info.metadata['product_info']['sources'],
+            *dataset_info.metadata['product_info'].sources,
         )
         platform = None
         platforms = utils.find_keywords({'kind': 'gcmd_platform', 'data__icontains': s}
@@ -150,15 +150,15 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
 
     def get_location_geometry(self, dataset_info):
         """Get the spatial coverage of the dataset"""
-        bbox = dataset_info.metadata['variables'][0]['bbox']
+        bbox = dataset_info.metadata['variables'][0].bbox
         return utils.wkt_polygon_from_wgs84_limits(bbox[3], bbox[1], bbox[2], bbox[0])
 
     def get_dataset_parameters(self, dataset_info):
         """Get a list of normalized dataset variables"""
         search_names = []
         for variable in dataset_info.metadata['variables']:
-            standard_name = variable.get('standard_name')
-            short_name = variable.get('short_name')
+            standard_name = variable.standard_name
+            short_name = variable.short_name
             if standard_name:
                 search_names.append(standard_name)
             elif short_name:
