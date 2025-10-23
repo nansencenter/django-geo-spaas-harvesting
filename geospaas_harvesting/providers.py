@@ -34,7 +34,7 @@ class Provider(models.Model):
         app_label = 'geospaas_harvesting'
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(name={self.name})"
+        return f"{self.__class__.__name__}(name='{self.name}', normalizer_name='{self.normalizer_name}, crawler_name={self.crawler_name}, config={self.config}')"
 
     def __str__(self):
         return (f"Provider: {self.name} ("
@@ -69,6 +69,7 @@ class Provider(models.Model):
         normalizer, max_threads = self.make_normalizer()
 
         return SearchResults(
+            repr(self),
             normalizer.normalize_stream(crawler, max_threads),
             ingesters.Ingester(**self.config.get('ingester', {})),
         )
@@ -99,13 +100,14 @@ class SearchResults():
     Provides only basic functionality for now. To be extended when
     integrating the search and harvesting process in the web UI.
     """
-    def __init__(self, results_iterable, ingester=None):
+    def __init__(self, provider_info, results_iterable, ingester=None):
+        self.provider_info = provider_info
         self.results_iterable = results_iterable
         self.ingester = ingester
         self._cached_results = []
 
-    # def __repr__(self):
-    #     return f"SearchResults for crawler: {self.crawler}"
+    def __str__(self):
+        return f"SearchResults for {self.provider_info}"
 
     def __iter__(self):
         return iter(self.results_iterable)
