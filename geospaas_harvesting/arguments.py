@@ -6,6 +6,7 @@ from typing import Sequence
 
 import dateutil.parser
 import shapely.wkt
+from shapely.errors import GEOSException
 
 
 class NoDefault:
@@ -334,3 +335,16 @@ class WKTArgument(Argument):
             return geometry
         else:
             raise ValueError(f"{geometry_type} is not supported for argument {self.name}")
+
+
+class WKTOrStringArgument(WKTArgument):
+    """Creates a shapely geometry if possible. Otherwise, if the
+    argument is a string, pass it through
+    """
+    type = 'WKT or arbitrary string'
+
+    def parse(self, value):
+        try:
+            return super().parse(value)
+        except GEOSException as error:
+            return str(value)

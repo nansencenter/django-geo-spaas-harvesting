@@ -151,6 +151,8 @@ default_providers:
   earthdata_cmr:
     crawler:
       name: 'earthdata_cmr'
+      defaults:
+        url: 'https://cmr.earthdata.nasa.gov/search/granules.umm_json'
     normalizer:
       name: 'earthdata_cmr'
   argo_profile:

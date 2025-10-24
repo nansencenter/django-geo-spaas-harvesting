@@ -116,6 +116,8 @@ class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
     name = 'earthdata_cmr'
     argument_parser = arguments.ArgumentParser([
         *HTTPPaginatedAPICrawler.argument_parser.arguments.values(),
+        arguments.WKTOrStringArgument(
+            'location', geometry_types=[Polygon, LineString, Point], default=None),
         arguments.ArgumentParser(name='search_terms', arguments=[
             arguments.StringArgument('bounding_box', required=False),
             arguments.StringArgument(
