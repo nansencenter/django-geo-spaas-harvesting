@@ -34,7 +34,9 @@ class Provider(models.Model):
         app_label = 'geospaas_harvesting'
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(name='{self.name}', normalizer_name='{self.normalizer_name}, crawler_name={self.crawler_name}, config={self.config}')"
+        return (f"{self.__class__.__name__}(name='{self.name}', "
+                f"normalizer_name='{self.normalizer_name}', crawler_name='{self.crawler_name}', "
+                f"config={self.config})")
 
     def __str__(self):
         return (f"Provider: {self.name} ("
