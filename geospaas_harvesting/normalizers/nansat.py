@@ -14,6 +14,7 @@ class NansatMetadataNormalizer(MetadataNormalizer):
 
     def get_entry_id(self, dataset_info):
         entry_id = dataset_info.metadata.get('entry_id')
+        filename_match = None
         if not entry_id:
             filename_match = utils.NC_H5_FILENAME_MATCHER.search(dataset_info.url)
         if filename_match:
