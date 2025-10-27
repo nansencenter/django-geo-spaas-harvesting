@@ -36,7 +36,16 @@ class Provider(models.Model):
     def __repr__(self):
         return (f"{self.__class__.__name__}(name='{self.name}', "
                 f"normalizer_name='{self.normalizer_name}', crawler_name='{self.crawler_name}', "
-                f"config={self.config})")
+                f"config={self.get_config_repr()})")
+
+    def get_config_repr(self):
+        """Returns a representation of the provider's configuration
+        with masked passwords
+        """
+        config = self.config.copy()
+        if config.get('crawler', {}).get('password') is not None:
+            config['crawler']['password'] = '*****'
+        return repr(config)
 
     def __str__(self):
         return (f"Provider: {self.name} ("
