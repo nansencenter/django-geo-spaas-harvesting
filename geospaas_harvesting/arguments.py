@@ -78,7 +78,7 @@ class ArgumentParser(Argument):
                 raise ValueError(f"{arg} should be an Argument or ArgumentParser object")
             self.arguments[arg.name] = arg
 
-    def parse(self, parameters):
+    def parse(self, parameters, allow_missing=False):
         """Makes sure the right arguments are passed and parses them.
         `parameters` should be a dictionary of parameters to be
         validated.
@@ -96,7 +96,7 @@ class ArgumentParser(Argument):
             if argument.name in parameters:
                 parsed_parameters[argument.name] = argument.parse(
                     parameters.pop(argument.name))
-            elif argument.required:
+            elif not allow_missing and argument.required:
                 raise ValueError(f"Argument {argument.name} not provided")
             else:
                 if argument.default is not NoDefault:
