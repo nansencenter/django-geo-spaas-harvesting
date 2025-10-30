@@ -9,6 +9,7 @@ import geospaas_harvesting.arguments as arguments
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.normalizers as normalizers
+import geospaas_harvesting.utils as utils
 
 
 logger = logging.getLogger(__name__)
@@ -53,8 +54,7 @@ class Provider(models.Model):
         with masked passwords
         """
         config = self.config.copy()
-        if config.get('crawler', {}).get('password') is not None:
-            config['crawler']['password'] = '*****'
+        config['crawler'] = utils.mask_secrets(config['crawler'])
         return repr(config)
 
     def __str__(self):
@@ -91,34 +91,37 @@ class Provider(models.Model):
         except KeyError:
             raise ValueError(f"Unknown normalizer {self.normalizer_name}")
 
-    def get_config_section(self, key):
-        """Returns a config section without the 'name' attribute"""
+    def get_config_section(self, key, override_parameters=None):
+        """Returns a config section without the 'name' attribute.
+        Overrides values with `override_parameters` if provided
+        """
         config_ = self.config.get(key, {}).copy()
         config_.pop('name', None)
+        if override_parameters and key in override_parameters:
+            config_.update(override_parameters[key])
         return config_
 
     def search(self, **search_parameters):
         """Returns a Search object which can be used to explore the
         search results returned by the crawler
         """
-        crawler = self._make_component(self.crawler_class.from_kwargs, 'crawler', search_parameters)
-        normalizer = self._make_component(self.normalizer_class, 'normalizer', search_parameters)
-        ingester = self._make_component(ingesters.Ingester, 'ingester', search_parameters)
+        crawler_config = self.get_config_section('crawler', override_parameters=search_parameters)
+        crawler_config_str = utils.mask_secrets(crawler_config)
+        normalizer_config = self.get_config_section(
+            'normalizer', override_parameters=search_parameters)
+        ingester_config = self.get_config_section('ingester', override_parameters=search_parameters)
+
+        crawler = self.crawler_class.from_config(crawler_config)
+        normalizer = self.normalizer_class(**normalizer_config)
+        ingester = ingesters.Ingester(**ingester_config)
         max_threads = self.config['max_normalizer_threads']
 
         return SearchResults(
-            repr(self),
+            (f"crawler: {crawler} {crawler_config_str}, "
+             f"normalizer: {normalizer} {normalizer_config}, "
+             f"ingester: {ingester_config}"),
             normalizer.normalize_stream(crawler, max_threads),
             ingester)
-
-    def _make_component(self, class_, config_key, search_parameters):
-        """Instantiate a component from a class given search parameters
-        which override the default configuration
-        """
-        return class_(**{
-            **self.get_config_section(config_key),
-            **search_parameters.get(config_key, {})
-        })
 
 
 class SearchResults():
@@ -127,14 +130,14 @@ class SearchResults():
     Provides only basic functionality for now. To be extended when
     integrating the search and harvesting process in the web UI.
     """
-    def __init__(self, provider_info, results_iterable, ingester=None):
-        self.provider_info = provider_info
+    def __init__(self, search_info, results_iterable, ingester=None):
+        self.search_info = search_info
         self.results_iterable = results_iterable
         self.ingester = ingester
         self._cached_results = []
 
     def __str__(self):
-        return f"SearchResults for {self.provider_info}"
+        return f"SearchResults for {self.search_info}"
 
     def __iter__(self):
         return iter(self.results_iterable)

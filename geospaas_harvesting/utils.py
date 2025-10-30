@@ -114,3 +114,14 @@ def parse_xml_get_ns(file):
             if root is None:
                 root = elem
     return ET.ElementTree(root), namespaces
+
+
+def mask_secrets(dictionary, secret_keys=('password',)):
+    """Returns a copy of the dictionary, replacing the values of secret
+    keys with '******'
+    """
+    masked = dictionary.copy()
+    for key in secret_keys:
+        if key in dictionary:
+            masked[key] = '******'
+    return masked
