@@ -1,5 +1,6 @@
 """This module defines classes used to parse and validate arguments.
 """
+import copy
 import re
 from datetime import timezone
 from typing import Sequence
@@ -102,7 +103,9 @@ class ArgumentParser(Argument):
                     if isinstance(argument.default, type):
                         default = argument.default()
                     else:
-                        default = argument.default
+                        # copy prevents all instances from sharing the
+                        # same default object when the default is mutable
+                        default = copy.deepcopy(argument.default)
                     parsed_parameters[argument.name] = default
 
         if self.strict and parameters:
