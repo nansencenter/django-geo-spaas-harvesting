@@ -93,8 +93,8 @@ class SearchConfiguration(Configuration):
     """Configuration manager used to parse search parameters"""
     def __init__(self):
         self.config_arguments_parser = ArgumentParser([
-            DictArgument('common'),
-            ListArgument('searches')
+            DictArgument('common', default=dict),
+            ListArgument('searches', default=list)
         ])
 
     def create_provider_searches(self):
