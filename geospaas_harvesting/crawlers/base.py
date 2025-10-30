@@ -48,6 +48,9 @@ class Crawler():
         arguments.StringArgument('password', default=None),
     ])
 
+    def __str__(self):
+        return self.name
+
     @classmethod
     def from_config(cls, config: dict):
         """Instantiate a crawler from a configuration dictionary"""

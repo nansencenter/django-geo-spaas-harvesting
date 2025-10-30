@@ -25,6 +25,9 @@ class MetadataNormalizer():
     def __init__(self, **kwargs):
         self.logger = logging.getLogger(f"geospaas_harvesting.normalizers.{self.name}")
 
+    def __str__(self):
+        return self.name
+
     def normalize(self, dataset_info):
         """Takes a DatasetInfo object and returns the necessary
         arguments to instantiate a Dataset, DatasetURI and the
