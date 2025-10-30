@@ -53,6 +53,11 @@ class Crawler():
         """Instantiate a crawler from a configuration dictionary"""
         return cls(**cls.argument_parser.parse(config))
 
+    @classmethod
+    def from_kwargs(cls, **kwargs):
+        """Instantiate a crawler from a configuration dictionary"""
+        return cls(**cls.argument_parser.parse(kwargs))
+
     # ------------- crawl ------------
     def __iter__(self):
         return iter(self.crawl())
