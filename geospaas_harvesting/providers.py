@@ -5,37 +5,47 @@ import django.db.models as models
 from django.core.exceptions import ValidationError
 from shapely.geometry.polygon import Polygon
 
+import geospaas_harvesting.arguments as arguments
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.normalizers as normalizers
-from .arguments import ArgumentParser, DatetimeArgument, DictArgument, StringArgument, WKTArgument
 
 
 logger = logging.getLogger(__name__)
 
 
-def validate_provider_config(value):
-    valid_keys = set(('crawler', 'ingester', 'normalizer'))
-    if not (isinstance(value, dict) and valid_keys.issubset(value.keys())):
-        raise ValidationError
-
 class Provider(models.Model):
-    """Base class for Providers. Child classes should add their
-    specific parameters to the 'search_parameters' attribute in the
-    form of Argument objects.
-    They should also implement the make_crawler() method.
+    """TODO
     """
     name = models.CharField(max_length=100, unique=True, null=False, blank=False)
-    normalizer_name = models.CharField(max_length=100, null=False, blank=False)
-    crawler_name = models.CharField(max_length=100, null=False, blank=False)
-    config = models.JSONField(validators=[validate_provider_config])
+    config = models.JSONField(null=False)
 
     class Meta:
         app_label = 'geospaas_harvesting'
 
+    config_parser = arguments.ArgumentParser([
+        arguments.DictArgument('crawler', required=True),
+        arguments.DictArgument('normalizer', default={'name': 'raw'}),
+        arguments.DictArgument('ingester', default=dict),
+        arguments.IntegerArgument('max_normalizer_threads', default=1),
+    ])
+
+    @classmethod
+    def from_config(cls, name, config):
+        """Instantiate a provider from a config dictionary"""
+        parsed_config = cls.config_parser.parse(config)
+
+        # check that the crawler configuration is valid
+        crawler_config = parsed_config['crawler'].copy()
+        crawler_name = crawler_config.pop('name')
+        crawlers.index[crawler_name].argument_parser.parse(crawler_config, allow_missing=True)
+
+        return cls(name=name, config=parsed_config)
+
     def __repr__(self):
         return (f"{self.__class__.__name__}(name='{self.name}', "
-                f"normalizer_name='{self.normalizer_name}', crawler_name='{self.crawler_name}', "
+                f"normalizer_name='{self.normalizer_name}', "
+                f"crawler_name='{self.crawler_name}', "
                 f"config={self.get_config_repr()})")
 
     def get_config_repr(self):
@@ -57,13 +67,22 @@ class Provider(models.Model):
         return (
             type(self) is type(other) and
             self.name == other.name and
-            self.normalizer_name == other.normalizer_name and
-            self.crawler_name == other.crawler_name and
             self.config == other.config)
 
     @property
+    def crawler_name(self):
+        return self.config['crawler']['name']
+
+    @property
+    def normalizer_name(self):
+        return self.config['normalizer']['name']
+
+    @property
     def crawler_class(self):
-        return crawlers.index[self.crawler_name]
+        try:
+            return crawlers.index[self.crawler_name]
+        except KeyError:
+            raise ValueError(f"Unknown crawler {self.crawler_name}")
 
     @property
     def normalizer_class(self):
@@ -72,37 +91,34 @@ class Provider(models.Model):
         except KeyError:
             raise ValueError(f"Unknown normalizer {self.normalizer_name}")
 
+    def get_config_section(self, key):
+        """Returns a config section without the 'name' attribute"""
+        config_ = self.config.get(key, {}).copy()
+        config_.pop('name', None)
+        return config_
+
     def search(self, **search_parameters):
         """Returns a Search object which can be used to explore the
         search results returned by the crawler
         """
-        crawler = self.make_crawler(search_parameters)
-        normalizer, max_threads = self.make_normalizer()
+        crawler = self._make_component(self.crawler_class.from_kwargs, 'crawler', search_parameters)
+        normalizer = self._make_component(self.normalizer_class, 'normalizer', search_parameters)
+        ingester = self._make_component(ingesters.Ingester, 'ingester', search_parameters)
+        max_threads = self.config['max_normalizer_threads']
 
         return SearchResults(
             repr(self),
             normalizer.normalize_stream(crawler, max_threads),
-            ingesters.Ingester(**self.config.get('ingester', {})),
-        )
+            ingester)
 
-    def make_crawler(self, search_parameters):
-        """Create a crawler from the search parameters and the stored configuration
+    def _make_component(self, class_, config_key, search_parameters):
+        """Instantiate a component from a class given search parameters
+        which override the default configuration
         """
-        try:
-            return self.crawler_class.from_config({
-                **self.config.get('crawler', {}),
-                **search_parameters
-            })
-        except KeyError:
-            raise ValueError(f"Unknown crawler {self.crawler_name}")
-
-    def make_normalizer(self):
-        """Get MetadataNormalizer class from index and instantiate it.
-        Also retrieve the max_threads parameter from configuration
-        """
-        normalizer_config = self.config.get('normalizer', {})
-        max_threads = normalizer_config.pop('max_threads', 1)
-        return (self.normalizer_class(**normalizer_config), max_threads)
+        return class_(**{
+            **self.get_config_section(config_key),
+            **search_parameters.get(config_key, {})
+        })
 
 
 class SearchResults():
