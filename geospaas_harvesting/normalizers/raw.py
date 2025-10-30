@@ -20,13 +20,11 @@ class RawMetadataNormalizer(MetadataNormalizer):
         entry_id = self.get_entry_id(dataset_info)
         if entry_id:
             dataset_kwargs['entry_id'] = entry_id
-        dataset = Dataset(**dataset_kwargs)
-        dataset_uri = DatasetURI(uri=dataset_info.url, dataset=dataset)
         if self.save_raw_metadata:
             tags = self.get_tags(dataset_info)
         else:
             tags = []
-        return (dataset, dataset_uri, [], [], tags)
+        return (dataset_kwargs, dataset_info.url, [], [], tags)
 
     def get_entry_id(self, dataset_info):
         filename_match = NC_H5_FILENAME_MATCHER.search(dataset_info.url)
@@ -36,12 +34,7 @@ class RawMetadataNormalizer(MetadataNormalizer):
             return None
 
     def get_tags(self, dataset_info):
-        tags = []
-        for key, value in dataset_info.metadata.items():
-            value = str(value)
-            try:
-                tag = Tag.objects.get(name=key, value=value)
-            except Tag.DoesNotExist:
-                tag = Tag(name=key, value=value)
-            tags.append(tag)
-        return tags
+        return [
+            {'name': key, 'value': str(value)}
+            for key, value in dataset_info.metadata.items()
+        ]

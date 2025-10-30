@@ -9,8 +9,7 @@ import django.db.transaction
 from django.contrib.gis.geos import GEOSGeometry
 import django.db.transaction
 
-from geospaas.catalog.models import Dataset, DatasetURI
-from geospaas.vocabularies.models import Parameter
+from geospaas.catalog.models import Dataset, DatasetURI, Tag
 
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -39,24 +38,28 @@ class Ingester():
         """Writes a dataset to the database based on its attributes and
         URL. The input should be a DatasetInfo object.
         """
-        dataset, dataset_uri, keywords, parameters, tags = to_ingest
+        dataset_kwargs, url, keywords, parameters, tags = to_ingest
 
         dataset_status = dataset_uri_status = OperationStatus.NOOP
 
         with django.db.transaction.atomic():
-            try:
-                existing_dataset = Dataset.objects.get(entry_id=dataset.entry_id)
-            except Dataset.DoesNotExist:
-                dataset.save()
+            dataset, dataset_created = Dataset.objects.get_or_create(**dataset_kwargs)
+            if dataset_created:
                 dataset_status = OperationStatus.CREATED
             else:
-                dataset.id = existing_dataset.id
                 if self.update:
-                    dataset.save()
-                    dataset_status = OperationStatus.UPDATED
+                    dataset, dataset_created = Dataset.objects.update_or_create(**dataset_kwargs)
+                    if dataset_created:
+                        dataset_status = OperationStatus.CREATED
+                        self.logger.warning(
+                            "Dataset %s created despite already existing. This should not happen.",
+                            dataset)
+                    else:
+                        dataset_status = OperationStatus.UPDATED
 
-            if not DatasetURI.objects.filter(uri=dataset_uri.uri, dataset=dataset).exists():
-                dataset_uri.save()
+            dataset_uri, uri_created = DatasetURI.objects.get_or_create(uri=url, dataset=dataset)
+
+            if uri_created:
                 dataset_uri_status = OperationStatus.CREATED
 
             # add many-to-many relationships
@@ -64,11 +67,8 @@ class Ingester():
                 dataset.keywords.add(keyword)
             for parameter in parameters:
                 dataset.parameters.add(parameter)
-            for tag in tags:
-                try:
-                    tag.save()
-                except django.db.utils.IntegrityError:
-                    self.logger.debug("Tried to save existing tag: %s", tag)
+            for tag_kwargs in tags:
+                tag, _ = Tag.objects.get_or_create(**tag_kwargs)
                 dataset.tags.add(tag)
 
         return (dataset_uri.uri, dataset.entry_id, dataset_status, dataset_uri_status)

@@ -26,6 +26,10 @@ class MetadataNormalizer():
         self.logger = logging.getLogger(f"geospaas_harvesting.normalizers.{self.name}")
 
     def normalize(self, dataset_info):
+        """Takes a DatasetInfo object and returns the necessary
+        arguments to instantiate a Dataset, DatasetURI and the
+        associated keywords, parameters and tags
+        """
         dataset_kwargs = {
             'time_coverage_start': self.get_time_coverage_start(dataset_info),
             'time_coverage_end': self.get_time_coverage_end(dataset_info),
@@ -40,12 +44,10 @@ class MetadataNormalizer():
         if entry_id:
             dataset_kwargs['entry_id'] = entry_id
 
-        dataset = Dataset(**dataset_kwargs)
-        dataset_uri = DatasetURI(uri=dataset_info.url, dataset=dataset)
         keywords = self.get_keywords(dataset_info)
         parameters = self.get_dataset_parameters(dataset_info)
-        tags = self.get_tags(dataset_info)
-        return (dataset, dataset_uri, keywords, parameters, tags)
+        tags_kwargs = self.get_tags(dataset_info)
+        return (dataset_kwargs, dataset_info.url, keywords, parameters, tags_kwargs)
 
     def normalize_stream(self, dataset_infos, max_threads=1):
         """Normalize an iterable of DatasetInfo objects.
@@ -83,12 +85,14 @@ class MetadataNormalizer():
         return []
 
     def get_tags(self, dataset_info):
-        """Find and/or create relevant tags"""
+        """Find relevant tags. Returns a dict of arguments used to
+        instantiate Tag objects
+        """
         return []
 
     def get_dataset_parameters(self, dataset_info):
         """Get the dataset's parameters, if any, from the raw metadata
-        Note that if a parameter is not found is pythesint, no error is
+        Note that if a parameter is not found in the database, no error is
         raised, but a warning is logged
         """
         try:
