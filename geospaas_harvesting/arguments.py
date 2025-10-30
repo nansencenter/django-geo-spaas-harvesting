@@ -182,6 +182,7 @@ class DictArgument(Argument):
 
     def __init__(self, name, **kwargs):
         self.valid_keys = set(kwargs.pop('valid_keys', []))
+        self.values_types = kwargs.pop('values_types', [])
         super().__init__(name, **kwargs)
 
     def __eq__(self, other):
@@ -194,9 +195,30 @@ class DictArgument(Argument):
     def parse(self, value):
         if not isinstance(value, dict):
             raise ValueError(f"{self.name} should be a dictionary")
-        keys = set(value.keys())
-        if self.valid_keys and not keys.issubset(self.valid_keys):
-            raise ValueError(f"Invalid keys {keys.difference(self.valid_keys)}")
+
+        for dict_key, dict_value in value.items():
+            if self.valid_keys and dict_key not in self.valid_keys:
+                raise ValueError(f"Invalid key '{dict_key}'")
+            valid = False
+            if self.values_types:
+                # self.values_types can contain Python types or
+                # Argument instances
+                for valid_type in self.values_types:
+                    if isinstance(valid_type, Argument):
+                        try:
+                            valid_type.parse(dict_value)
+                        except ValueError:
+                            continue
+                        else:
+                            valid = True
+                            break
+                    elif isinstance(dict_value, valid_type):
+                        valid = True
+                        break
+                if not valid:
+                    raise ValueError(
+                        f"The value for '{dict_key}' should be of one of the following types: " +
+                        str(self.values_types))
         return value
 
 
