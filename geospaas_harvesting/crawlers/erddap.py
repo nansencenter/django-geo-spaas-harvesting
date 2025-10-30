@@ -25,7 +25,7 @@ class ERDDAPTableCrawler(Crawler):
         arguments.StringArgument('time_qc_attr', default=''),
         arguments.SequenceArgument(
             'valid_qc_codes', contents_type=arguments.StringArgument, default=None),
-        arguments.DictArgument('search_terms', default=None),
+        arguments.ListArgument('search_terms', default=None),
         arguments.WKTArgument('location', default=None, ),
         arguments.SequenceArgument(
             'variables', default=None, contents_type=arguments.StringArgument),
