@@ -43,11 +43,17 @@ class ProvidersArgument(DictArgument):
     """This argument is a dict of providers in the format:
     {
         'provider_name1':
-            'type': 'type1'
+            'crawler':
+                'name': 'crawler1'
+                'param1': 'value1'
         'provider_name2:
-            'type': 'type2'
-            'username': 'user1'
-            'password': 'pass123'
+            'crawler':
+                'name': 'crawler2'
+                'param2': 'value2'
+            'normalizer':
+                'name': 'normalizer2'
+            'ingester':
+                'update': True
     }
     """
 
@@ -60,17 +66,8 @@ class ProvidersArgument(DictArgument):
         """
         _providers = []
         providers_dict = super().parse(value)
-        for provider_name, provider_settings in providers_dict.items():
-            _providers.append(Provider(
-                name=provider_name,
-                crawler_name=provider_settings['crawler']['name'],
-                normalizer_name=provider_settings.get('normalizer', {}).get('name', 'raw'),
-                config={
-                    'crawler': provider_settings['crawler'].get('defaults', {}),
-                    'normalizer': provider_settings.get('normalizer', {}).get('config', {}),
-                    'ingester': provider_settings.get('ingester', {}).get('config', {}),
-                }
-            ))
+        for provider_name, provider_config in providers_dict.items():
+            _providers.append(Provider.from_config(provider_name, provider_config))
         return _providers
 
 class GeneralConfiguration(Configuration):
@@ -80,7 +77,7 @@ class GeneralConfiguration(Configuration):
             BooleanArgument('update_vocabularies', default=True),
             BooleanArgument('update_pythesint', default=True),
             DictArgument('pythesint_versions', default=None),
-            ProvidersArgument('default_providers', required=True)
+            ProvidersArgument('default_providers', required=False)
         ])
 
 
