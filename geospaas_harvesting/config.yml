@@ -10,15 +10,11 @@ default_providers:
   thredds:
     crawler:
       name: 'thredds'
-    normalizer:
-      config:
-        max_threads: 30
+    max_normalizer_threads: 30
   opendap:
     crawler:
       name: 'opendap'
-    normalizer:
-      config:
-        max_threads: 30
+    max_normalizer_threads: 30
   http:
     crawler:
       name: 'html_directory'
@@ -30,125 +26,106 @@ default_providers:
   netcdf_lon_lat:
     crawler:
       name: 'netcdf'
-      defaults:
-        longitude_attribute: 'lon'
-        latitude_attribute: 'lat'
+      longitude_attribute: 'lon'
+      latitude_attribute: 'lat'
   netcdf_l:
     crawler:
       name: 'netcdf'
-      defaults:
-        longitude_attribute: 'longitude'
-        latitude_attribute: 'latitude'
+      longitude_attribute: 'longitude'
+      latitude_attribute: 'latitude'
   netcdf_L:
     crawler:
       name: 'netcdf'
-      defaults:
-        longitude_attribute: 'LONGITUDE'
-        latitude_attribute: 'LATITUDE'
+      longitude_attribute: 'LONGITUDE'
+      latitude_attribute: 'LATITUDE'
 
   # specific providers
   ceda:
     crawler:
       name: 'ftp'
-      defaults:
-        url: 'ftp://anon-ftp.ceda.ac.uk/neodc/esacci/sst/data/CDR_v2/Climatology/L4/v2.1'
-        include: '\.nc$'
-        username: 'anonymous'
-        password: ''
+      url: 'ftp://anon-ftp.ceda.ac.uk/neodc/esacci/sst/data/CDR_v2/Climatology/L4/v2.1'
+      include: '\.nc$'
+      username: 'anonymous'
+      password: ''
     normalizer:
       name: 'ceda_esa_cci'
   gportal:
     crawler:
       name: 'ftp'
-      defaults:
-        url: 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3'
-        include: '\.h5$'
-        username: !ENV JAXA_USERNAME
-        password: !ENV JAXA_PASSWORD
+      url: 'ftp://ftp.gportal.jaxa.jp/standard/GCOM-W/GCOM-W.AMSR2/L3.SST_25/3'
+      include: '\.h5$'
+      username: !ENV JAXA_USERNAME
+      password: !ENV JAXA_PASSWORD
     normalizer:
       name: 'gportal_gcom'
   metno:
     crawler:
       name: 'thredds'
-      defaults:
-        url: 'https://thredds.met.no/thredds'
-        include: '\.nc$'
-    normalizer:
-      config:
-        max_threads: 30
+      url: 'https://thredds.met.no/thredds'
+      include: '\.nc$'
+    max_normalizer_threads: 30
   metno_osisaf:
     crawler:
       name: 'thredds'
-      defaults:
-        url: 'https://thredds.met.no/thredds'
-        include: '\.nc$'
+      url: 'https://thredds.met.no/thredds'
+      include: '\.nc$'
     normalizer:
       name: 'osisaf'
-      config:
-        max_threads: 30
+    max_normalizer_threads: 30
   aviso:
     crawler:
       name: 'thredds'
-      defaults:
-        url: 'https://tds-odatis.aviso.altimetry.fr/thredds'
-        include: '\.nc$'
-        username: !ENV AVISO_USERNAME
-        password: !ENV AVISO_PASSWORD
+      url: 'https://tds-odatis.aviso.altimetry.fr/thredds'
+      include: '\.nc$'
+      username: !ENV AVISO_USERNAME
+      password: !ENV AVISO_PASSWORD
     normalizer:
       name: 'aviso'
-      config:
-        max_threads: 30
+    max_normalizer_threads: 30
   noaa_rtofs:
     crawler:
       name: 'ftp'
-      defaults:
-        url: 'ftp://ftpprd.ncep.noaa.gov/pub/data/nccf/com/rtofs/prod'
-        include: '\.nc(\.gz)?$'
+      url: 'ftp://ftpprd.ncep.noaa.gov/pub/data/nccf/com/rtofs/prod'
+      include: '\.nc(\.gz)?$'
     normalizer:
       name: 'noaa_rtofs'
   cpom:
     crawler:
       name: 'netcdf'
-      defaults:
-        longitude_attribute: 'lon'
-        latitude_attribute: 'lat'
+      longitude_attribute: 'lon'
+      latitude_attribute: 'lat'
     normalizer:
       name: 'cpom'
   cmems:
     crawler:
       name: 'cmems'
-      defaults:
-        username: !ENV CMEMS_USERNAME
-        password: !ENV CMEMS_PASSWORD
+      username: !ENV CMEMS_USERNAME
+      password: !ENV CMEMS_PASSWORD
     normalizer:
       name: 'cmems'
   creodias:
     crawler:
       name: 'resto'
-      defaults:
-        url: 'https://datahub.creodias.eu'
+      url: 'https://datahub.creodias.eu'
     normalizer:
       name: 'resto'
   copernicus_data_space:
     crawler:
       name: 'resto'
-      defaults:
-        url: 'https://catalogue.dataspace.copernicus.eu'
+      url: 'https://catalogue.dataspace.copernicus.eu'
     normalizer:
       name: 'resto'
   earthdata_cmr:
     crawler:
       name: 'earthdata_cmr'
-      defaults:
-        url: 'https://cmr.earthdata.nasa.gov/search/granules.umm_json'
+      url: 'https://cmr.earthdata.nasa.gov/search/granules.umm_json'
     normalizer:
       name: 'earthdata_cmr'
   uni_bremen:
     crawler:
       name: 'html_directory'
-      defaults:
-        url: 'https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath/n6250/netcdf'
-        include: '.*\.nc'
+      url: 'https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath/n6250/netcdf'
+      include: '.*\.nc'
     normalizer:
       name: 'amsr2_asi'
   argo_profile:
@@ -156,97 +133,93 @@ default_providers:
       name: 'tabledap'
     crawler:
       name: 'tabledap'
-      defaults:
-        url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json'
-        entry_id_prefix: 'argo_profile_'
-        id_attrs: ['platform_number', 'cycle_number']
-        longitude_attr: 'longitude'
-        latitude_attr: 'latitude'
-        time_attr: 'time'
-        position_qc_attr: 'position_qc'
-        time_qc_attr: 'time_qc'
-        valid_qc_codes: ['1', '2', '8']
-        variables:
-        - 'platform_number'
-        - 'cycle_number'
-        - 'pres'
-        - 'pres_qc'
-        - 'pres_adjusted'
-        - 'pres_adjusted_qc'
-        - 'pres_adjusted_error'
-        - 'temp'
-        - 'temp_qc'
-        - 'temp_adjusted'
-        - 'temp_adjusted_qc'
-        - 'temp_adjusted_error'
-        - 'psal'
-        - 'psal_qc'
-        - 'psal_adjusted'
-        - 'psal_adjusted_qc'
-        - 'psal_adjusted_error'
+      url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json'
+      entry_id_prefix: 'argo_profile_'
+      id_attrs: ['platform_number', 'cycle_number']
+      longitude_attr: 'longitude'
+      latitude_attr: 'latitude'
+      time_attr: 'time'
+      position_qc_attr: 'position_qc'
+      time_qc_attr: 'time_qc'
+      valid_qc_codes: ['1', '2', '8']
+      variables:
+      - 'platform_number'
+      - 'cycle_number'
+      - 'pres'
+      - 'pres_qc'
+      - 'pres_adjusted'
+      - 'pres_adjusted_qc'
+      - 'pres_adjusted_error'
+      - 'temp'
+      - 'temp_qc'
+      - 'temp_adjusted'
+      - 'temp_adjusted_qc'
+      - 'temp_adjusted_error'
+      - 'psal'
+      - 'psal_qc'
+      - 'psal_adjusted'
+      - 'psal_adjusted_qc'
+      - 'psal_adjusted_error'
   argo_trajectory:
     normalizer:
       name: 'tabledap'
     crawler:
       name: 'tabledap'
-      defaults:
-        url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json'
-        entry_id_prefix: 'argo_trajectory_'
-        id_attrs: ['platform_number']
-        longitude_attr: 'longitude'
-        latitude_attr: 'latitude'
-        time_attr: 'time'
-        position_qc_attr: 'position_qc'
-        time_qc_attr: 'time_qc'
-        valid_qc_codes: ['1', '2', '8']
-        variables:
-        - 'platform_number'
+      url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json'
+      entry_id_prefix: 'argo_trajectory_'
+      id_attrs: ['platform_number']
+      longitude_attr: 'longitude'
+      latitude_attr: 'latitude'
+      time_attr: 'time'
+      position_qc_attr: 'position_qc'
+      time_qc_attr: 'time_qc'
+      valid_qc_codes: ['1', '2', '8']
+      variables:
+      - 'platform_number'
   bioargo_profile:
     normalizer:
       name: 'tabledap'
     crawler:
       name: 'tabledap'
-      defaults:
-        url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats-synthetic-BGC.json'
-        entry_id_prefix: 'bioargo_profile_'
-        id_attrs: ['platform_number', 'cycle_number']
-        longitude_attr: 'longitude'
-        latitude_attr: 'latitude'
-        time_attr: 'time'
-        position_qc_attr: 'position_qc'
-        time_qc_attr: 'time_qc'
-        valid_qc_codes: ['1', '2', '8']
-        variables:
-        - 'platform_number'
-        - 'cycle_number'
-        - 'pres'
-        - 'pres_qc'
-        - 'pres_adjusted'
-        - 'pres_adjusted_qc'
-        - 'pres_adjusted_error'
-        - 'doxy'
-        - 'doxy_qc'
-        - 'doxy_adjusted'
-        - 'doxy_adjusted_qc'
-        - 'chla'
-        - 'chla_qc'
-        - 'chla_adjusted'
-        - 'chla_adjusted_qc'
+      url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats-synthetic-BGC.json'
+      entry_id_prefix: 'bioargo_profile_'
+      id_attrs: ['platform_number', 'cycle_number']
+      longitude_attr: 'longitude'
+      latitude_attr: 'latitude'
+      time_attr: 'time'
+      position_qc_attr: 'position_qc'
+      time_qc_attr: 'time_qc'
+      valid_qc_codes: ['1', '2', '8']
+      variables:
+      - 'platform_number'
+      - 'cycle_number'
+      - 'pres'
+      - 'pres_qc'
+      - 'pres_adjusted'
+      - 'pres_adjusted_qc'
+      - 'pres_adjusted_error'
+      - 'doxy'
+      - 'doxy_qc'
+      - 'doxy_adjusted'
+      - 'doxy_adjusted_qc'
+      - 'chla'
+      - 'chla_qc'
+      - 'chla_adjusted'
+      - 'chla_adjusted_qc'
   bioargo_trajectory:
     normalizer:
       name: 'tabledap'
     crawler:
       name: 'tabledap'
-      defaults:
-        url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats-synthetic-BGC.json'
-        entry_id_prefix: 'bioargo_trajectory_'
-        id_attrs: ['platform_number']
-        longitude_attr: 'longitude'
-        latitude_attr: 'latitude'
-        time_attr: 'time'
-        position_qc_attr: 'position_qc'
-        time_qc_attr: 'time_qc'
-        valid_qc_codes: ['1', '2', '8']
-        variables:
-        - 'platform_number'
+      url: 'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats-synthetic-BGC.json'
+      entry_id_prefix: 'bioargo_trajectory_'
+      id_attrs: ['platform_number']
+      longitude_attr: 'longitude'
+      latitude_attr: 'latitude'
+      time_attr: 'time'
+      position_qc_attr: 'position_qc'
+      time_qc_attr: 'time_qc'
+      valid_qc_codes: ['1', '2', '8']
+      variables:
+      - 'platform_number'
 ...
