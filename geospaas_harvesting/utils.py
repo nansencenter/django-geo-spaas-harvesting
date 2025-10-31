@@ -125,3 +125,48 @@ def mask_secrets(dictionary, secret_keys=('password',)):
         if key in dictionary:
             masked[key] = '******'
     return masked
+
+def merge_configs(config_dict: dict, override: dict):
+    """Merge two configuration dictionaries.
+    The values in `override` are added to `config_dict`.
+    In case keys are present in both dicts:
+    - if the value is a dict, update this dict with the values from
+      `override`
+    - otherwise, replace the values in `config_dict` by the ones from
+      `override`
+    For example:
+        merge_configs(
+            config_dict={
+                'a': 1,
+                'b': [2, 3],
+                'c': {'d': 4, 'e': 5},
+                'f': 6
+            },
+            override={
+                'a': 10,
+                'b': [20],
+                'c': {'d':40}
+            })
+    results in:
+        {
+            'a': 10,
+            'b': [20],
+            'c': {'d': 40, 'e': 5},
+            'f': 6
+        }
+    """
+    final_config = config_dict.copy()
+    for key in override:
+        if key in final_config:
+            if type(final_config[key]) == type(override[key]):
+                if isinstance(final_config[key], dict):
+                    final_config[key].update(override[key])
+                else:
+                    final_config[key] = override[key]
+            else:
+                raise ValueError(
+                    f"'{key}' must have the same type in the "
+                    "'common' and 'searches sections'")
+        else:
+            final_config[key] = override[key]
+    return final_config

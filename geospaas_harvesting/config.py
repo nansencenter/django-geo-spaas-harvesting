@@ -3,7 +3,7 @@ import importlib
 import logging
 import pkgutil
 
-import geospaas_harvesting
+import geospaas_harvesting.utils as utils
 from .arguments import ArgumentParser, BooleanArgument, DictArgument, ListArgument
 from .providers import Provider
 from .utils import read_yaml_file
@@ -104,7 +104,6 @@ class SearchConfiguration(Configuration):
         searches = []
         for search in self.searches:  # pylint: disable=no-member
             provider_name = search.pop('provider_name')
-            search_terms = self.common.copy()  # pylint: disable=no-member
-            search_terms.update(search)
-            searches.append(Provider.objects.get(name=provider_name).search(**search_terms))
+            search_params = utils.merge_configs(self.common, search)
+            searches.append(Provider.objects.get(name=provider_name).search(**search_params))
         return searches
