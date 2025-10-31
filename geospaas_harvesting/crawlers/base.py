@@ -44,6 +44,7 @@ class Crawler():
             contents_type=arguments.DatetimeArgument,
             length=2,
             default=(None, None)),
+        arguments.WKTArgument('location', default=None),
         arguments.StringArgument('username', default=None),
         arguments.StringArgument('password', default=None),
     ])
