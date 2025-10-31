@@ -91,30 +91,29 @@ class Provider(models.Model):
         except KeyError:
             raise ValueError(f"Unknown normalizer {self.normalizer_name}")
 
-    def get_config_section(self, key, override_parameters=None):
+    @staticmethod
+    def get_config_section(config_dict, key):
         """Returns a config section without the 'name' attribute.
         Overrides values with `override_parameters` if provided
         """
-        config_ = self.config.get(key, {}).copy()
+        config_ = config_dict.get(key, {}).copy()
         config_.pop('name', None)
-        if override_parameters and key in override_parameters:
-            config_.update(override_parameters[key])
         return config_
 
     def search(self, **search_parameters):
         """Returns a Search object which can be used to explore the
         search results returned by the crawler
         """
-        crawler_config = self.get_config_section('crawler', override_parameters=search_parameters)
+        final_config = utils.merge_configs(self.config, search_parameters)
+        crawler_config = self.get_config_section(final_config, 'crawler')
         crawler_config_str = utils.mask_secrets(crawler_config)
-        normalizer_config = self.get_config_section(
-            'normalizer', override_parameters=search_parameters)
-        ingester_config = self.get_config_section('ingester', override_parameters=search_parameters)
+        normalizer_config = self.get_config_section(final_config, 'normalizer')
+        ingester_config = self.get_config_section(final_config, 'ingester')
 
         crawler = self.crawler_class.from_config(crawler_config)
         normalizer = self.normalizer_class(**normalizer_config)
         ingester = ingesters.Ingester(**ingester_config)
-        max_threads = self.config['max_normalizer_threads']
+        max_threads = final_config['max_normalizer_threads']
 
         return SearchResults(
             (f"crawler: {crawler} {crawler_config_str}, "
