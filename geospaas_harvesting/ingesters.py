@@ -62,14 +62,19 @@ class Ingester():
             if uri_created:
                 dataset_uri_status = OperationStatus.CREATED
 
-            # add many-to-many relationships
-            for keyword in keywords:
-                dataset.keywords.add(keyword)
-            for parameter in parameters:
-                dataset.parameters.add(parameter)
-            for tag_kwargs in tags:
-                tag, _ = Tag.objects.get_or_create(**tag_kwargs)
-                dataset.tags.add(tag)
+            # add many-to-many relationships if the dataset was created
+            # or update is True
+            if dataset_status == OperationStatus.CREATED or self.update:
+                for keyword in keywords:
+                    self.logger.debug("Adding keyword %s to dataset %s", keyword, dataset)
+                    dataset.keywords.add(keyword)
+                for parameter in parameters:
+                    self.logger.debug("Adding parameter %s to dataset %s", parameter, dataset)
+                    dataset.parameters.add(parameter)
+                for tag_kwargs in tags:
+                    tag, _ = Tag.objects.get_or_create(**tag_kwargs)
+                    self.logger.debug("Adding tag %s to dataset %s", tag, dataset)
+                    dataset.tags.add(tag)
 
         return (dataset_uri.uri, dataset.entry_id, dataset_status, dataset_uri_status)
 

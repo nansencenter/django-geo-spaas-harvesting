@@ -24,6 +24,7 @@ class MetadataNormalizer():
 
     def __init__(self, **kwargs):
         self.logger = logging.getLogger(f"geospaas_harvesting.normalizers.{self.name}")
+        self.extra_tags = kwargs.get('tags', {})
 
     def __str__(self):
         return self.name
@@ -49,7 +50,7 @@ class MetadataNormalizer():
 
         keywords = self.get_keywords(dataset_info)
         parameters = self.get_dataset_parameters(dataset_info)
-        tags_kwargs = self.get_tags(dataset_info)
+        tags_kwargs = self._get_all_tags(dataset_info)
         return (dataset_kwargs, dataset_info.url, keywords, parameters, tags_kwargs)
 
     def normalize_stream(self, dataset_infos, max_threads=1):
@@ -87,9 +88,22 @@ class MetadataNormalizer():
         """Find relevant keywords"""
         return []
 
+    def _get_all_tags(self, dataset_info):
+        """Get tags from the dataset_info and manually specified at the
+        Normalizer level
+        """
+        # initialize list with forced tags
+        tags_kwargs = [
+            {'name': key, 'value': value}
+            for key, value in self.extra_tags.items()
+        ]
+        # add tags retrieved from dataset metadata
+        tags_kwargs.extend(self.get_tags(dataset_info))
+        return tags_kwargs
+
     def get_tags(self, dataset_info):
-        """Find relevant tags. Returns a dict of arguments used to
-        instantiate Tag objects
+        """Find relevant tags. Returns a list of dicts of arguments
+        used to instantiate Tag objects
         """
         return []
 

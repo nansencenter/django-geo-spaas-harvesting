@@ -12,19 +12,8 @@ class RawMetadataNormalizer(MetadataNormalizer):
     name = 'raw'
 
     def __init__(self, **kwargs):
-        self.save_raw_metadata = kwargs.get('save_raw_metadata', True)
         super().__init__(**kwargs)
-
-    def normalize(self, dataset_info):
-        dataset_kwargs = {}
-        entry_id = self.get_entry_id(dataset_info)
-        if entry_id:
-            dataset_kwargs['entry_id'] = entry_id
-        if self.save_raw_metadata:
-            tags = self.get_tags(dataset_info)
-        else:
-            tags = []
-        return (dataset_kwargs, dataset_info.url, [], [], tags)
+        self.save_raw_metadata = kwargs.get('save_raw_metadata', True)
 
     def get_entry_id(self, dataset_info):
         filename_match = NC_H5_FILENAME_MATCHER.search(dataset_info.url)
@@ -33,8 +22,20 @@ class RawMetadataNormalizer(MetadataNormalizer):
         else:
             return None
 
+    def get_time_coverage_start(self, dataset_info):
+        return None
+
+    def get_time_coverage_end(self, dataset_info):
+        return None
+
+    def get_location_geometry(self, dataset_info):
+        return None
+
     def get_tags(self, dataset_info):
-        return [
-            {'name': key, 'value': str(value)}
-            for key, value in dataset_info.metadata.items()
-        ]
+        tags_kwargs = []
+        if self.save_raw_metadata:
+            tags_kwargs = [
+                {'name': key, 'value': str(value)}
+                for key, value in dataset_info.metadata.items()
+            ]
+        return tags_kwargs
