@@ -8,6 +8,7 @@ import logging
 import os
 import signal
 from pathlib import Path
+from typing import Union
 
 import django
 import django.conf
@@ -88,35 +89,49 @@ def parse_providers_config(providers_config_path):
     return providers_config.providers
 
 
+def print_providers():
+    """Print all existing providers"""
+    print('Available providers:')
+    for provider in Provider.objects.all():
+        print(provider)
+
+
+def delete_providers(names_to_delete: list[str]):
+    """Delete the providers whose names are in `names_to_delete`"""
+    to_delete = Provider.objects.filter(name__in=names_to_delete)
+    print(f'Deleting {list(to_delete)}')
+    to_delete.all().delete()
+
+
+def update_providers(providers_path: Union[Path, str]):
+    """Update providers from a file"""
+    providers = parse_providers_config(providers_path)
+    print(f"Updating providers from {providers_path}")
+    for provider in providers:
+        try:
+            existing_provider = Provider.objects.get(name=provider.name)
+        except Provider.DoesNotExist:
+            print(f"Creating provider {provider}")
+            provider.save()
+        else:
+            if provider != existing_provider:
+                print(f"Updating provider {existing_provider} to {provider}")
+                provider.id = existing_provider.id
+                provider.save()
+
+
 def handle_providers(cli_arguments, general_config):
     """List/update/delete providers"""
     if cli_arguments.providers_path:
         if cli_arguments.providers_path is CreateDefaultProviders:
-            providers = general_config.default_providers
-            message = "Updating default providers"
+            providers_path = general_config.providers_path
         else:
-            providers = parse_providers_config(cli_arguments.providers_path)
-            message = f"Updating providers from {cli_arguments.providers_path}"
-        print(message)
-        for provider in providers:
-            try:
-                existing_provider = Provider.objects.get(name=provider.name)
-            except Provider.DoesNotExist:
-                print(f"Creating provider {provider}")
-                provider.save()
-            else:
-                if provider != existing_provider:
-                    print(f"Updating provider {existing_provider} to {provider}")
-                    provider.id = existing_provider.id
-                    provider.save()
+            providers_path = cli_arguments.providers_path
+        update_providers(providers_path)
     elif cli_arguments.delete:
-        to_delete = Provider.objects.filter(name__in=cli_arguments.delete)
-        print(f'Deleting {list(to_delete)}')
-        to_delete.all().delete()
+        delete_providers(cli_arguments.delete)
     elif cli_arguments.list:
-        print('Available providers:')
-        for provider in Provider.objects.all():
-            print(provider)
+        print_providers()
 
 
 def harvest(cli_arguments, general_config):
@@ -148,13 +163,13 @@ def make_arg_parser():
     providers_subparser = subparsers.add_parser('providers', help='Provider functions')
     providers_subparser.set_defaults(func=handle_providers)
     action_group = providers_subparser.add_mutually_exclusive_group()
-    action_group.add_argument('-p', '--create-providers',
+    action_group.add_argument('-u', '--update',
                               dest='providers_path',
                               default=None,
                               const=CreateDefaultProviders,
                               nargs="?",
                               help='Create/update providers from YAML file. '
-                                   'If no file is provided, create the default providers')
+                                   'If no file is provided, use the default file')
     action_group.add_argument('-d', '--delete', action='extend', nargs='+', type=str,
                               help='Delete providers')
     action_group.add_argument('-l', '--list', action='store_true', help='List providers')

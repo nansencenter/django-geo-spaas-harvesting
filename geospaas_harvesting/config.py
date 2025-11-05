@@ -2,8 +2,10 @@
 import importlib
 import logging
 import pkgutil
+from pathlib import Path
 
 import geospaas_harvesting.utils as utils
+import geospaas_harvesting.arguments as arguments
 from .arguments import ArgumentParser, BooleanArgument, DictArgument, ListArgument
 from .providers import Provider
 from .utils import read_yaml_file
@@ -39,7 +41,7 @@ class Configuration():
         return cls.from_dict(read_yaml_file(config_path))
 
 
-class ProvidersArgument(DictArgument):
+class ProvidersArgument(arguments.DictArgument):
     """This argument is a dict of providers in the format:
     {
         'provider_name1':
@@ -70,21 +72,26 @@ class ProvidersArgument(DictArgument):
             _providers.append(Provider.from_config(provider_name, provider_config))
         return _providers
 
+
 class GeneralConfiguration(Configuration):
     """Configuration manager for general harvesting settings"""
-    def __init__(self):
-        self.config_arguments_parser = ArgumentParser([
-            BooleanArgument('update_vocabularies', default=True),
-            BooleanArgument('update_pythesint', default=True),
-            DictArgument('pythesint_versions', default=None),
-            ProvidersArgument('default_providers', required=False)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.config_arguments_parser = arguments.ArgumentParser([
+            arguments.BooleanArgument('update_vocabularies', default=True),
+            arguments.BooleanArgument('update_pythesint', default=True),
+            arguments.DictArgument('pythesint_versions', default=None),
+            arguments.PathArgument('providers_path',
+                                   default=Path(__file__).parent / 'default_providers.yml',
+                                   description=('Path to the file containing the default '
+                                                'providers definitions.'))
         ])
 
 
 class ProvidersConfiguration(Configuration):
     """Configuration manager for providers"""
     def __init__(self):
-        self.config_arguments_parser = ArgumentParser([
+        self.config_arguments_parser = arguments.ArgumentParser([
             ProvidersArgument('providers', required=True)
         ])
 
@@ -92,9 +99,9 @@ class ProvidersConfiguration(Configuration):
 class SearchConfiguration(Configuration):
     """Configuration manager used to parse search parameters"""
     def __init__(self):
-        self.config_arguments_parser = ArgumentParser([
-            DictArgument('common', default=dict),
-            ListArgument('searches', default=list)
+        self.config_arguments_parser = arguments.ArgumentParser([
+            arguments.DictArgument('common', default=dict),
+            arguments.ListArgument('searches', default=list)
         ])
 
     def create_provider_searches(self):
