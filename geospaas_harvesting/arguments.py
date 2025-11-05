@@ -3,6 +3,7 @@
 import copy
 import re
 from datetime import timezone
+from pathlib import Path
 from typing import Sequence
 
 import dateutil.parser
@@ -290,28 +291,23 @@ class PathArgument(ChoiceArgument):
     Subdirectories of the valid options are still valid.
     """
     type = 'path'
-    SEP = '/'
-    path_re = re.compile(rf'^\.{{,2}}({SEP}[^{SEP}]*)*{SEP}?$')
 
-    def is_path(self, path):
-        """Returns True if the value is a valid path"""
-        return self.path_re.match(path)
-
-    def validate(self, value):
-        # check path format
-        if not self.is_path(value):
-            raise ValueError(f"{value} is not a valid path")
-
+    def validate(self, value: Path):
         # check valid options
         if self.valid_options:
             found = False
             for valid_path in self.valid_options:
-                if value.startswith(valid_path):
+                if value.is_relative_to(valid_path):
                     found = True
                     break
             if not found:
                 raise ValueError(
-                    f"{value} is not an accepted path :{self.valid_options}")
+                    f"{value} is not an accepted path. Accepted paths are: {self.valid_options}")
+
+    def parse(self, value):
+        path_value = Path(value)
+        self.validate(path_value)
+        return path_value
 
 
 class StringArgument(Argument):
