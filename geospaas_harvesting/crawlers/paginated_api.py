@@ -28,7 +28,6 @@ class HTTPPaginatedAPICrawler(Crawler):
 
     def __init__(self, **kwargs):
         self.url = kwargs['url']
-        self._results = None
         self.initial_offset = kwargs['initial_offset'] or self.MIN_OFFSET
         self.request_parameters = self._build_request_parameters(
             kwargs['search_terms'], kwargs['time_range'], kwargs['location'],
@@ -75,7 +74,6 @@ class HTTPPaginatedAPICrawler(Crawler):
 
     def set_initial_state(self):
         self.page_offset = self.initial_offset
-        self._results = []
 
     def crawl(self):
         self.set_initial_state()
@@ -104,10 +102,6 @@ class HTTPPaginatedAPICrawler(Crawler):
         """Get datasets information from raw entries and yield
         DatasetInfo objects.
         """
-        raise NotImplementedError()
-
-    # --------- get metadata ---------
-    def get_normalized_attributes(self, dataset_info, **kwargs):
         raise NotImplementedError()
 
 
@@ -201,8 +195,7 @@ class EarthDataCMRCrawler(HTTPPaginatedAPICrawler):
 
     def _get_datasets_info(self, entries):
         """Get dataset attributes from the current page and
-        adds them to self._results.
-        Returns True if attributes were found, False otherwise"""
+        yields them"""
         for entry in entries:
             url = self._find_download_url(entry)
             yield DatasetInfo(url, entry)
@@ -265,7 +258,7 @@ class RestoCrawler(HTTPPaginatedAPICrawler):
 
     def _get_datasets_info(self, entries):
         """Get dataset attributes from the current page and
-        adds them to self._results.
+        yields them.
         Returns True if attributes were found, False otherwise"""
         for entry in entries:
             metadata = entry['properties']
