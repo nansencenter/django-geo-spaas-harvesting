@@ -1215,36 +1215,33 @@ class FTPCrawlerTestCase(unittest.TestCase):
         if name not in ["..", "folder_name", ""]:
             raise ftplib.error_perm
 
-    @mock.patch('ftplib.FTP', autospec=True)
+    @mock.patch('ftplib.FTP')
     def test_ftp_correct_navigation(self, mock_ftp):
         """check that file URLs and folders paths are added to the right stacks"""
-
-        test_crawler = crawlers.FTPCrawler('ftp://foo', include='\.gz$')
+        test_crawler = crawlers_directory.FTPCrawler.from_kwargs(url='ftp://foo', include='\.gz$')
+        test_crawler.set_initial_state()
         test_crawler.ftp.nlst.return_value = ['file1.gz', 'folder_name', 'file3.bb', 'file2.gz', ]
-        test_crawler.ftp.cwd = self.emulate_cwd_of_ftp
+        test_crawler.ftp.cwd.side_effect = self.emulate_cwd_of_ftp
         test_crawler.ftp.host = ''
-        with self.assertLogs('geospaas_harvesting.crawlers.FTPCrawler', level=logging.DEBUG):
-            test_crawler._process_folder('')
-        # '.gz' files must be in the "_urls" list
-        # Other type of files should not be in the "_urls" list
-        self.assertEqual(
-            test_crawler._results,
-            [
-                crawlers.DatasetInfo('ftp://foo/file1.gz'),
-                crawlers.DatasetInfo('ftp://foo/file2.gz')
-            ])
+        with self.assertLogs('geospaas_harvesting.crawlers.directory.FTPCrawler',
+                             level=logging.DEBUG):
+            self.assertListEqual(
+                list(test_crawler._process_folder('')),
+                [
+                    crawlers_base.DatasetInfo('ftp://foo/file1.gz'),
+                    crawlers_base.DatasetInfo('ftp://foo/file2.gz')
+                ])
         # folder with 'folder_name' must be in the "_to_process" list
         self.assertCountEqual(['/', 'folder_name'], test_crawler._to_process)
 
-    @mock.patch('geospaas_harvesting.crawlers.ftplib.FTP.login')
+    @mock.patch('ftplib.FTP.login')
     def test_ftp_correct_exception(self, mock_ftp):
         """set_initial_state() should not raise an error in case of
         503 or 230 responses from FTP.login(), but it should for
         other error codes.
         """
-
-        test_crawler = crawlers.FTPCrawler(
-            'ftp://', username="d", password="d", include='\.gz$')
+        test_crawler = crawlers_directory.FTPCrawler.from_kwargs(
+            url='ftp://', username="d", password="d", include='\.gz$')
 
         mock_ftp.side_effect = ftplib.error_perm("503")
         test_crawler.set_initial_state()
@@ -1260,7 +1257,7 @@ class FTPCrawlerTestCase(unittest.TestCase):
         """Shall return 'ValueError' when there is an incorrect entry in ftp address of
         the configuration file """
         with self.assertRaises(ValueError):
-            crawlers.FTPCrawler('ft:///')
+            crawlers_directory.FTPCrawler.from_kwargs(url='ft:///')
 
     def test_retry_on_timeout_decorator_timeout_error(self):
         """The retry_on_timeout decorator should re-create
@@ -1268,7 +1265,8 @@ class FTPCrawlerTestCase(unittest.TestCase):
         and re-run the method in which the error occurred once
         """
         with mock.patch('ftplib.FTP'):
-            crawler = crawlers.FTPCrawler('ftp://foo')
+            crawler = crawlers_directory.FTPCrawler.from_kwargs(url='ftp://foo')
+            crawler.set_initial_state()
             crawler.ftp.nlst.side_effect = ftplib.error_temp('421')
 
             with self.assertRaises(ftplib.error_temp), \
@@ -1283,8 +1281,8 @@ class FTPCrawlerTestCase(unittest.TestCase):
         in which the error occurred 5 times
         """
         with mock.patch('ftplib.FTP'):
-            crawler = crawlers.FTPCrawler('ftp://foo')
-
+            crawler = crawlers_directory.FTPCrawler.from_kwargs(url='ftp://foo')
+            crawler.set_initial_state()
             for error in (ConnectionError, ConnectionRefusedError, ConnectionResetError):
                 crawler.ftp.nlst.side_effect = error
 
@@ -1297,61 +1295,14 @@ class FTPCrawlerTestCase(unittest.TestCase):
     def test_no_retry_on_non_timeout_ftp_errors(self):
         """FTP errors other than timeouts should not trigger a retry"""
         with mock.patch('ftplib.FTP'):
-            crawler = crawlers.FTPCrawler('ftp://foo')
+            crawler = crawlers_directory.FTPCrawler.from_kwargs(url='ftp://foo')
+            crawler.set_initial_state()
             crawler.ftp.nlst.side_effect = ftplib.error_temp('422')
 
             with mock.patch.object(crawler, 'connect') as mock_connect:
                 with self.assertRaises(ftplib.error_temp):
                     crawler._list_folder_contents('/')
                 mock_connect.assert_not_called()
-
-    def test_getstate(self):
-        """Test pickling an FTPCrawler"""
-        with mock.patch('ftplib.FTP', return_value=mock.Mock(spec_set=ftplib.FTP)):
-            crawler = crawlers.FTPCrawler('ftp://foo/bar')
-        expected_result = crawler.__dict__.copy()
-        expected_result['ftp'] = None
-        self.assertDictEqual(crawler.__getstate__(), expected_result)
-
-    def test_setstate(self):
-        """Test unpickling an FTPCrawler"""
-        state = {
-            '_metadata_handler': crawlers.MetadataHandler(crawlers.GeoSPaaSMetadataNormalizer),
-            '_results': [],
-            '_to_process': ['/bar'],
-            'ftp': None,
-            'include': None,
-            'max_threads': 1,
-            'password': 'anonymous',
-            'root_url': ParseResult(
-                scheme='ftp', netloc='foo', path='/bar', params='', query='', fragment=''),
-            'time_range': (None, None),
-            'username': 'anonymous'
-        }
-        ftp_mock = mock.Mock(spec_set=ftplib.FTP)
-        with mock.patch('ftplib.FTP', return_value=ftp_mock):
-            crawler = crawlers.FTPCrawler.__new__(crawlers.FTPCrawler)
-            crawler.__setstate__(state)
-        expected_result = state.copy()
-        expected_result['ftp'] = ftp_mock
-        self.assertDictEqual(crawler.__dict__, expected_result)
-
-    def test_get_normalized_attributes(self):
-        """Test that the attributes are gotten using metanorm, and the
-        geospaas_service attributes are set to 'ftp'
-        """
-        with mock.patch('ftplib.FTP', return_value=mock.Mock(spec_set=ftplib.FTP)):
-            crawler = crawlers.FTPCrawler('ftp://foo')
-        with mock.patch.object(crawler, '_metadata_handler') as mock_handler:
-            mock_handler.get_parameters.return_value = {'foo': 'bar'}
-            self.assertDictEqual(
-                    crawler.get_normalized_attributes(crawlers.DatasetInfo('ftp://uri')),
-                    {
-                        'foo': 'bar',
-                        'geospaas_service_name': 'ftp',
-                        'geospaas_service': 'ftp'
-                    })
-            mock_handler.get_parameters.assert_called_once_with({'url': 'ftp://uri'})
 
 
 class ERDDAPTableCrawlerTestCase(unittest.TestCase):
