@@ -98,7 +98,6 @@ class DirectoryCrawler(Crawler):
         self.include = re.compile(include) if include else None
         self.username = kwargs['username']
         self.password = kwargs['password']
-        self._results = None
         self._to_process = None
 
     def __eq__(self, other):
@@ -130,7 +129,6 @@ class DirectoryCrawler(Crawler):
         The `_to_process` attribute contains URLs to pages which
         need to be searched for resources.
         """
-        self._results = []
         self._to_process = [self.root_url.path.rstrip('/')]
 
     def crawl(self):
@@ -443,7 +441,6 @@ class FTPCrawler(DirectoryCrawler):
         The `_urls` attribute contains URLs to the resources which will be returned by the crawler.
         The `_to_process` attribute contains URLs to pages which need to be searched for resources.
         """
-        self._results = []
         self._to_process = [self.root_url.path or '/']
         self.connect()
 
@@ -503,17 +500,6 @@ class FTPCrawler(DirectoryCrawler):
             return False
         else:
             return True
-
-    # --------- get metadata ---------
-    def get_normalized_attributes(self, dataset_info, **kwargs):
-        """Gets dataset attributes using ftp"""
-        raw_attributes = {}
-        self.add_url(dataset_info.url, raw_attributes)
-        normalized_attributes = self._metadata_handler.get_parameters(raw_attributes)
-        # TODO: add FTP_SERVICE_NAME and FTP_SERVICE in django-geo-spaas
-        normalized_attributes['geospaas_service_name'] = 'ftp'
-        normalized_attributes['geospaas_service'] = 'ftp'
-        return normalized_attributes
 
 
 class LocalDirectoryCrawler(DirectoryCrawler):
