@@ -18,8 +18,11 @@ from urllib.parse import ParseResult
 
 import requests
 
-import geospaas.catalog.managers
 import geospaas_harvesting.crawlers as crawlers
+import geospaas_harvesting.crawlers.base as crawlers_base
+import geospaas_harvesting.crawlers.directory as crawlers_directory
+import geospaas_harvesting.crawlers.paginated_api as crawlers_paginated_api
+import geospaas_harvesting.crawlers.erddap as crawlers_erddap
 
 
 class DatasetInfoTestCase(unittest.TestCase):
