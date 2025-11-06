@@ -2,7 +2,7 @@
 """
 import copy
 import re
-from datetime import timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
@@ -171,7 +171,11 @@ class DatetimeArgument(Argument):
     def parse(self, value):
         if value is None:
             return None
-        _datetime = dateutil.parser.parse(value)
+        elif isinstance(value, datetime):
+            _datetime = value
+        else:
+            _datetime = dateutil.parser.parse(value)
+
         if _datetime.tzinfo is None:
             _datetime = _datetime.replace(tzinfo=timezone.utc)
         return _datetime
