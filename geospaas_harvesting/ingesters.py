@@ -39,23 +39,25 @@ class Ingester():
         URL. The input should be a DatasetInfo object.
         """
         dataset_kwargs, url, keywords, parameters, tags = to_ingest
-
         dataset_status = dataset_uri_status = OperationStatus.NOOP
 
         with django.db.transaction.atomic():
-            dataset, dataset_created = Dataset.objects.get_or_create(**dataset_kwargs)
+            if self.update:
+                operation = Dataset.objects.update_or_create
+            else:
+                operation = Dataset.objects.get_or_create
+
+            try:
+                dataset, dataset_created = operation(
+                    entry_id=dataset_kwargs['entry_id'],
+                    defaults=dataset_kwargs)
+            except KeyError:
+                dataset, dataset_created = operation(**dataset_kwargs)
+
             if dataset_created:
                 dataset_status = OperationStatus.CREATED
-            else:
-                if self.update:
-                    dataset, dataset_created = Dataset.objects.update_or_create(**dataset_kwargs)
-                    if dataset_created:
-                        dataset_status = OperationStatus.CREATED
-                        self.logger.warning(
-                            "Dataset %s created despite already existing. This should not happen.",
-                            dataset)
-                    else:
-                        dataset_status = OperationStatus.UPDATED
+            elif self.update:
+                dataset_status = OperationStatus.UPDATED
 
             dataset_uri, uri_created = DatasetURI.objects.get_or_create(uri=url, dataset=dataset)
 
