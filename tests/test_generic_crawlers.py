@@ -128,11 +128,6 @@ class BaseCrawlerTestCase(unittest.TestCase):
             with self.assertRaises(requests.HTTPError):
                 crawlers.Crawler()._http_get('http://foo')
 
-    def test_abstract_get_normalized_attributes(self):
-        """get_normalized_attributes() should raise a NotImplementedError"""
-        with self.assertRaises(NotImplementedError):
-            crawlers.Crawler().get_normalized_attributes({})
-
     def test_add_url(self):
         """Test adding a dataset's url to its raw attributes dictionary
         """
@@ -177,18 +172,6 @@ class CrawlerIteratorTestCase(unittest.TestCase):
 
         def set_initial_state(self):
             pass
-
-        def get_normalized_attributes(self, dataset_info, **kwargs):
-            #used for testing error management
-            if dataset_info.url == 'https://bar':
-                raise RuntimeError()
-            elif dataset_info.url == 'https://baz':
-                # bypass the broad exception catch in
-                # _thread_get_normalized_attributes() to check handling
-                # of exceptions happening in that method
-                raise BaseException() # pylint: disable=broad-exception-raised
-
-            return {'foo': 'bar'}
 
     def test_iterating(self):
         """Test iterating over normalization results"""
@@ -611,11 +594,6 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         # no upper limit and no start_time, without intersection
         self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
 
-    def test_abstract_get_normalized_attributes(self):
-        """get_normalized_attributes is abstract in DirectoryCrawler"""
-        with self.assertRaises(NotImplementedError):
-            crawlers.DirectoryCrawler('').get_normalized_attributes(mock.Mock())
-
     def test_crawl(self):
         """Test crawling"""
         crawler = crawlers.DirectoryCrawler('https://foo/bar.nc')
@@ -670,11 +648,6 @@ class LocalDirectoryCrawlerTestCase(unittest.TestCase):
             self.assertTrue(self.crawler._is_folder(''), "_is_folder() should return True")
         with mock.patch('os.path.isdir', return_value=False):
             self.assertFalse(self.crawler._is_folder(''), "_is_folder() should return False")
-
-    def test_abstract_get_normalized_attributes(self):
-        """get_normalized_attributes is abstract in LocalDirectoryCrawler"""
-        with self.assertRaises(NotImplementedError):
-            crawlers.LocalDirectoryCrawler('').get_normalized_attributes(mock.Mock())
 
 
 class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
@@ -757,22 +730,6 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         mock_http_get.assert_called_once_with('http://foo/bar',
                                               request_parameters={'auth': ('user', 'pass')},
                                               max_tries=5, wait_time=5)
-
-    def test_get_normalized_attributes(self):
-        """Test that the attributes are gotten using metanorm, and the
-        geospaas_service attributes are set
-        """
-        crawler = crawlers.HTMLDirectoryCrawler('http://foo')
-        with mock.patch.object(crawler, '_metadata_handler') as mock_handler:
-            mock_handler.get_parameters.return_value = {'foo': 'bar'}
-            self.assertDictEqual(
-                    crawler.get_normalized_attributes(crawlers.DatasetInfo('ftp://uri')),
-                    {
-                        'foo': 'bar',
-                        'geospaas_service_name': geospaas.catalog.managers.HTTP_SERVICE_NAME,
-                        'geospaas_service': geospaas.catalog.managers.HTTP_SERVICE
-                    })
-            mock_handler.get_parameters.assert_called_once_with({'url': 'ftp://uri'})
 
 
 class OpenDAPCrawlerTestCase(unittest.TestCase):
@@ -1101,11 +1058,6 @@ class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
         crawler = crawlers.HTTPPaginatedAPICrawler('foo')
         with self.assertRaises(NotImplementedError):
             crawler._get_datasets_info('')
-
-    def test_abstract_get_normalized_attributes(self):
-        """get_normalized_attributes() should raise a NotImplementedError"""
-        with self.assertRaises(NotImplementedError):
-            crawlers.HTTPPaginatedAPICrawler('https://foo').get_normalized_attributes({})
 
     def test_crawl(self):
         """Test the crawling mechanism for HTTP paginated APIs"""
@@ -1455,24 +1407,3 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
         with mock.patch.object(crawler, '_http_get', side_effect=error):
             with self.assertRaises(error), self.assertLogs(crawler.logger, logging.ERROR):
                 crawler.get_product_metadata()
-
-    def test_get_normalized_attributes(self):
-        """Test attributes normalization"""
-        dataset_info = crawlers.DatasetInfo('https://foo.json?id=bar',
-                                            {'id_attributes': {'platform_number':'bar'}})
-        crawler = crawlers.ERDDAPTableCrawler('https://foo.json', ['id'])
-        with mock.patch.object(crawler, 'get_coverage') as mock_get_coverage, \
-             mock.patch.object(crawler, 'get_product_metadata') as mock_get_product_metadata, \
-             mock.patch.object(crawler._metadata_handler, 'get_parameters') as mock_get_parameters:
-            mock_get_coverage.return_value = (('date1', 'date2'), [(1, 2), (3, 4)])
-            mock_get_product_metadata.return_value = {'baz': 'qux'}
-            mock_get_parameters.return_value = {'key1': 'value1', 'key2': 'value2'}
-            result = crawler.get_normalized_attributes(dataset_info)
-        self.assertDictEqual(
-            result,
-            {
-                'key1': 'value1',
-                'key2': 'value2',
-                'geospaas_service_name': geospaas.catalog.managers.HTTP_SERVICE_NAME,
-                'geospaas_service': geospaas.catalog.managers.HTTP_SERVICE
-            })
