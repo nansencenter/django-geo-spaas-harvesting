@@ -658,13 +658,13 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         folder path
         """
         self.assertEqual(
-            crawlers.HTMLDirectoryCrawler._strip_folder_page('/foo/bar/contents.html'),
+            crawlers_directory.HTMLDirectoryCrawler._strip_folder_page('/foo/bar/contents.html'),
             '/foo/bar')
         self.assertEqual(
-            crawlers.HTMLDirectoryCrawler._strip_folder_page('/foo/bar/'),
+            crawlers_directory.HTMLDirectoryCrawler._strip_folder_page('/foo/bar/'),
             '/foo/bar')
         self.assertEqual(
-            crawlers.HTMLDirectoryCrawler._strip_folder_page('/foo/bar'),
+            crawlers_directory.HTMLDirectoryCrawler._strip_folder_page('/foo/bar'),
             '/foo/bar')
 
     def test_get_right_number_of_links(self):
@@ -672,15 +672,15 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         with open(os.path.join(
                 os.path.dirname(__file__), 'data', 'opendap', 'root.html')) as data_file:
             html = data_file.read()
-        self.assertEqual(len(crawlers.HTMLDirectoryCrawler._get_links(html)), 4)
+        self.assertEqual(len(crawlers_directory.HTMLDirectoryCrawler._get_links(html)), 4)
 
         with open(os.path.join(os.path.dirname(__file__), 'data', 'empty.html')) as data_file:
             html = data_file.read()
-        self.assertEqual(len(crawlers.HTMLDirectoryCrawler._get_links(html)), 0)
+        self.assertEqual(len(crawlers_directory.HTMLDirectoryCrawler._get_links(html)), 0)
 
     def test_link_extractor_error(self):
         """In case of error, LinkExtractor must use a logger"""
-        parser = crawlers.LinkExtractor()
+        parser = crawlers_directory.LinkExtractor()
         with self.assertLogs(parser.logger, level=logging.ERROR):
             parser.error('some message')
 
@@ -691,7 +691,7 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         parent_path = '/foo'
         paths = ['/foo/bar', 'baz', 'https://external/site']
         self.assertEqual(
-            crawlers.HTMLDirectoryCrawler._prepend_parent_path(parent_path, paths),
+            crawlers_directory.HTMLDirectoryCrawler._prepend_parent_path(parent_path, paths),
             ['/foo/bar', '/foo/baz']
         )
 
@@ -703,7 +703,7 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
                 '<a href="bar/contents.html">folder/</a>'
                 '<a href="baz/">folder/</a>'
                 '<html/>')
-            crawler = crawlers.HTMLDirectoryCrawler('')
+            crawler = crawlers_directory.HTMLDirectoryCrawler.from_kwargs(url='')
             self.assertListEqual(
                 crawler._list_folder_contents('/foo/contents.html'),
                 ['/foo/bar/contents.html', '/foo/baz/'])
@@ -714,7 +714,7 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         """
         with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_http_get:
             mock_http_get.return_value.text = '<html><html/>'
-            crawler = crawlers.HTMLDirectoryCrawler('http://foo')
+            crawler = crawlers_directory.HTMLDirectoryCrawler.from_kwargs(url='http://foo')
             crawler._list_folder_contents('/bar')
             mock_http_get.assert_called_once_with('http://foo/bar', request_parameters={},
                                                   max_tries=5, wait_time=5)
@@ -725,7 +725,8 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
         """
         with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_http_get:
             mock_http_get.return_value.text = '<html><html/>'
-            crawler = crawlers.HTMLDirectoryCrawler('http://foo', username='user', password='pass')
+            crawler = crawlers_directory.HTMLDirectoryCrawler.from_kwargs(
+                url='http://foo', username='user', password='pass')
             crawler._list_folder_contents('/bar')
         mock_http_get.assert_called_once_with('http://foo/bar',
                                               request_parameters={'auth': ('user', 'pass')},
