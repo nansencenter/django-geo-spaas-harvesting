@@ -29,23 +29,23 @@ class DatasetInfoTestCase(unittest.TestCase):
 
     def test_instanciation(self):
         """Test the correct creation of a DatasetInfo object"""
-        dataset_info = crawlers.DatasetInfo('url', metadata={'foo': 'bar'})
+        dataset_info = crawlers_base.DatasetInfo('url', metadata={'foo': 'bar'})
         self.assertEqual(dataset_info.url, 'url')
         self.assertDictEqual(dataset_info.metadata, {'foo': 'bar'})
 
     def test_equality(self):
         """Test equality between two DatasetInfo objects"""
         self.assertEqual(
-            crawlers.DatasetInfo('foo', {'bar': 'baz'}),
-            crawlers.DatasetInfo('foo', {'bar': 'baz'}))
+            crawlers_base.DatasetInfo('foo', {'bar': 'baz'}),
+            crawlers_base.DatasetInfo('foo', {'bar': 'baz'}))
         self.assertNotEqual(
-            crawlers.DatasetInfo('foo', {'bar': 'baz'}),
-            crawlers.DatasetInfo('foo', {'bar': 'quz'}))
+            crawlers_base.DatasetInfo('foo', {'bar': 'baz'}),
+            crawlers_base.DatasetInfo('foo', {'bar': 'quz'}))
 
     def test_representation(self):
         """Test string reprensentation of DatasetInfo objects"""
         self.assertEqual(
-            repr(crawlers.DatasetInfo('https://foo', {'a': 1})),
+            repr(crawlers_base.DatasetInfo('https://foo', {'a': 1})),
             "DatasetInfo(url='https://foo', metadata={'a': 1})")
 
 
