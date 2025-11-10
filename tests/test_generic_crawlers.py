@@ -613,7 +613,7 @@ class LocalDirectoryCrawlerTestCase(unittest.TestCase):
     """Tests for LocalDirectoryCrawler"""
 
     def setUp(self):
-        self.crawler = crawlers.LocalDirectoryCrawler('')
+        self.crawler = crawlers_directory.LocalDirectoryCrawler.from_kwargs(url='')
 
     def test_list_folder_contents(self):
         """_list_folder_contents() should return the absolute
