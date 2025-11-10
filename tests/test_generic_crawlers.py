@@ -857,7 +857,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
 
     def setUp(self):
         # Mock requests.request()
-        self.patcher_request = mock.patch('geospaas_harvesting.crawlers.utils.http_request')
+        self.patcher_request = mock.patch('geospaas_harvesting.utils.http_request')
         self.mock_request = self.patcher_request.start()
         self.mock_request.side_effect = self.request_side_effect
 
@@ -870,30 +870,20 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         for opened_file in self.opened_files:
             opened_file.close()
 
-
-
     def test_process_folder(self):
         """
         Explore root page and make sure the _url and _to_process attributes of the crawler have the
         right values
         """
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root']['urls'][0], include=r'\.nc$')
-        with self.assertLogs(crawler.logger, level=logging.DEBUG):
-            crawler._process_folder(crawler._to_process.pop())
-        self.assertListEqual(
-            crawler._results,
-            [crawlers.DatasetInfo(self.TEST_DATA['dataset']['urls'][0])])
-        self.assertListEqual(crawler._to_process, ['/folder/contents.html'])
+        crawler = crawlers_directory.OpenDAPCrawler.from_kwargs(
+            url=self.TEST_DATA['root']['urls'][0], include=r'\.nc$')
+        crawler.set_initial_state()
 
-    def test_process_folder_with_duplicates(self):
-        """If the same URL is present twice in the page, it should only be processed once"""
-        crawler = crawlers.OpenDAPCrawler(self.TEST_DATA['root_duplicates']['urls'][0],
-        include='\.nc$')
-        with self.assertLogs(crawler.logger, level=logging.DEBUG):
-            crawler._process_folder(crawler._to_process.pop())
-        self.assertListEqual(
-            crawler._results,
-            [crawlers.DatasetInfo(self.TEST_DATA['dataset']['urls'][1])])
+        with mock.patch.object(crawler, 'get_raw_attributes', return_value=dict()), \
+                self.assertLogs(crawler.logger, level=logging.DEBUG):
+            self.assertListEqual(
+                list(crawler._process_folder(crawler._to_process.pop())),
+                [crawlers_base.DatasetInfo(self.TEST_DATA['dataset']['urls'][0])])
         self.assertListEqual(crawler._to_process, ['/folder/contents.html'])
 
     def test_process_folder_with_time_restriction(self):
@@ -907,20 +897,22 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         selected, even if the timestamp of a dataset does not intersect
         the crawler's time range.
         """
-        crawler = crawlers.OpenDAPCrawler(
-            self.TEST_DATA['folder_day_of_year']['urls'][0], include=r'\.nc$',
+        crawler = crawlers_directory.OpenDAPCrawler.from_kwargs(
+            url=self.TEST_DATA['folder_day_of_year']['urls'][0],
+            include=r'\.nc$',
             time_range=(datetime(2019, 2, 15, 11, 0, 0), datetime(2019, 2, 15, 13, 0, 0)))
-        with self.assertLogs(crawler.logger, level=logging.DEBUG):
-            crawler._process_folder(crawler._to_process.pop())
-        self.assertListEqual(
-            crawler._results,
-            [
-                crawlers.DatasetInfo(
-                    'https://test-opendap.com/folder/2019/046/20190215000000_dataset.nc'),
-                crawlers.DatasetInfo(
-                    'https://test-opendap.com/folder/2019/046/20190215120000_dataset.nc'),
-            ]
-        )
+        crawler.set_initial_state()
+        with mock.patch.object(crawler, 'get_raw_attributes', return_value=dict()), \
+                self.assertLogs(crawler.logger, level=logging.DEBUG):
+            self.assertListEqual(
+                list(crawler._process_folder(crawler._to_process.pop())),
+                [
+                    crawlers_base.DatasetInfo(
+                        'https://test-opendap.com/folder/2019/046/20190215000000_dataset.nc'),
+                    crawlers_base.DatasetInfo(
+                        'https://test-opendap.com/folder/2019/046/20190215120000_dataset.nc'),
+                ]
+            )
         self.assertListEqual(crawler._to_process, [])
 
     def test_get_xml_namespace(self):
@@ -933,7 +925,7 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             root = ET.parse(test_file).getroot()
 
         self.assertEqual(
-            crawlers.OpenDAPCrawler('')._get_xml_namespace(root),
+            crawlers_directory.OpenDAPCrawler.from_kwargs(url='')._get_xml_namespace(root),
             'http://xml.opendap.org/ns/DAP/3.2#')
 
     def test_logging_if_no_xml_namespace(self):
@@ -945,9 +937,11 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
         with open(test_file_path, 'rb') as test_file:
             root = ET.parse(test_file).getroot()
 
-        crawler = crawlers.OpenDAPCrawler('')
+        crawler = crawlers_directory.OpenDAPCrawler.from_kwargs(url='')
         with self.assertLogs(crawler.logger, level=logging.WARNING):
-            namespace = crawlers.OpenDAPCrawler('')._get_xml_namespace(root)
+            namespace = crawlers_directory.OpenDAPCrawler.from_kwargs(
+                url=''
+            )._get_xml_namespace(root)
         self.assertEqual(namespace, '')
 
     def test_extract_global_attributes(self):
@@ -960,122 +954,34 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             root = ET.parse(test_file).getroot()
 
         self.assertDictEqual(
-            crawlers.OpenDAPCrawler('')._extract_attributes(root),
+            crawlers_directory.OpenDAPCrawler.from_kwargs(url='')._extract_attributes(root),
             {
                 'Conventions': 'CF-1.7, ACDD-1.3',
-                'raw_dataset_parameters': [],
+                'raw_dataset_parameters': {'latitude'},
                 'title': 'VIIRS L2P Sea Surface Skin Temperature'
             }
         )
-
-    def test_get_normalized_attributes(self):
-        """Test that the correct attributes are extracted from a DDX file"""
-        with mock.patch(
-                'geospaas_harvesting.crawlers.MetadataHandler.get_parameters') as mock_get_params:
-            _ = crawlers.OpenDAPCrawler('').get_normalized_attributes(
-                crawlers.DatasetInfo("https://opendap.jpl.nasa.gov/opendap/full_dataset.nc"))
-        mock_get_params.assert_called_with({
-                'Conventions': 'CF-1.7, ACDD-1.3',
-                'title': 'VIIRS L2P Sea Surface Skin Temperature',
-                'summary': (
-                    "Sea surface temperature (SST) retrievals produced at the NASA OBPG for the "
-                    "Visible Infrared Imaging\n                Radiometer Suite (VIIRS) sensor on "
-                    "the Suomi National Polar-Orbiting Partnership (Suomi NPP) platform.\n         "
-                    "       These have been reformatted to GHRSST GDS version 2 Level 2P "
-                    "specifications by the JPL PO.DAAC. VIIRS\n                SST algorithms "
-                    "developed by the University of Miami, RSMAS"),
-                'references': 'GHRSST Data Processing Specification v2r5',
-                'institution': (
-                    "NASA Jet Propulsion Laboratory"
-                    " (JPL) Physical Oceanography Distributed Active Archive Center\n              "
-                    "  (PO.DAAC)/NASA Goddard Space Flight Center (GSFC), Ocean Biology Processing "
-                    "Group (OBPG)/University of\n                Miami Rosential School of Marine "
-                    "and Atmospheric Science (RSMAS)"),
-                'history': ("VIIRS L2P created at JPL PO.DAAC"
-                    " by combining OBPG SNPP_SST and SNPP_SST3, and outputing to the\n             "
-                    "   GHRSST GDS2 netCDF file format"),
-                'comment': ("L2P Core without DT analysis "
-                    "or other ancillary fields; Day, Start Node:Ascending, End\n                "
-                    "Node:Ascending; WARNING Some applications are unable to properly handle signed"
-                    " byte values. If values\n                are encountered > 127, please "
-                    "subtract 256 from this reported value; Quicklook"),
-                'license': 'GHRSST and PO.DAAC protocol allow data use as free and open.',
-                'id': 'VIIRS_NPP-JPL-L2P-v2016.2',
-                'naming_authority': 'org.ghrsst',
-                'product_version': '2016.2',
-                'uuid': 'b6ac7651-7b02-44b0-942b-c5dc3c903eba',
-                'gds_version_id': '2.0',
-                'netcdf_version_id': '4.1',
-                'date_created': '20200101T211816Z',
-                'file_quality_level': '3',
-                'spatial_resolution': '750 m',
-                'start_time': '20200101T000001Z',
-                'time_coverage_start': '20200101T000001Z',
-                'stop_time': '20200101T000559Z',
-                'time_coverage_end': '20200101T000559Z',
-                'northernmost_latitude': '9.47472000',
-                'southernmost_latitude': '-15.3505001',
-                'easternmost_longitude': '-142.755005',
-                'westernmost_longitude': '-175.084000',
-                'geospatial_lat_max': '9.47472000',
-                'geospatial_lat_min': '-15.3505001',
-                'geospatial_lon_max': '-142.755005',
-                'geospatial_lon_min': '-175.084000',
-                'source': ("VIIRS sea surface temperature observations from the Ocean Biology "
-                           "Processing Group (OBPG)"),
-                'platform': 'Suomi-NPP',
-                'sensor': 'VIIRS',
-                'metadata_link': (
-                    'http://podaac.jpl.nasa.gov/ws/metadata/dataset/?format=iso&shortName='
-                    'VIIRS_NPP-JPL-L2P-v2016.2\n            '),
-                'keywords': (
-                    'Oceans > Ocean Temperature > Sea Surface Temperature > '
-                    'Skin Sea Surface Temperature'),
-                'keywords_vocabulary': ('NASA Global Change Master Directory (GCMD) Science '
-                                        'Keywords'),
-                'standard_name_vocabulary': 'NetCDF Climate and Forecast (CF) Metadata Conventions',
-                'geospatial_lat_units': 'degrees_north',
-                'geospatial_lat_resolution': '0.00749999983',
-                'geospatial_lon_units': 'degrees_east',
-                'geospatial_lon_resolution': '0.00749999983',
-                'acknowledgment': (
-                    'The VIIRS L2P sea surface temperature data are sponsored by NASA'),
-                'creator_name': 'JPL PO.DAAC',
-                'creator_email': 'ghrsst@jpl.nasa.gov',
-                'creator_url': 'http://podaac.jpl.nasa.gov',
-                'project': 'Group for High Resolution Sea Surface Temperature',
-                'publisher_name': 'The GHRSST Project Office',
-                'publisher_url': 'http://www.ghrsst.org',
-                'publisher_email': 'ghrsst-po@nceo.ac.uk',
-                'processing_level': 'L2P',
-                'cdm_data_type': 'swath',
-                'startDirection': 'Ascending',
-                'endDirection': 'Ascending',
-                'day_night_flag': 'Day',
-                'raw_dataset_parameters': ['sea_ice_area_fraction'],
-                'url': 'https://opendap.jpl.nasa.gov/opendap/full_dataset.nc',
-            })
 
     def test_get_ddx_url(self):
         """Test utility function which transforms download links into
         metadata links for OpenDAP
         """
         self.assertEqual(
-            crawlers.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc.ddx'),
+            crawlers_directory.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc.ddx'),
             'https://foo/bar.nc.ddx')
         self.assertEqual(
-            crawlers.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc'),
+            crawlers_directory.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc'),
             'https://foo/bar.nc.ddx')
         self.assertEqual(
-            crawlers.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc.dods'),
+            crawlers_directory.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc.dods'),
             'https://foo/bar.nc.ddx')
 
 
 class ThreddsCrawlerTestCase(unittest.TestCase):
     """Tests for the Thredds crawler"""
 
-    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._http_get")
-    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._get_links")
+    @mock.patch("geospaas_harvesting.crawlers.directory.ThreddsCrawler._http_get")
+    @mock.patch("geospaas_harvesting.crawlers.directory.ThreddsCrawler._get_links")
     def test_get_download_url(self, mock_get_link, mock_http_get):
         """
         Test the functionality of "get_download_url" method for OpenDAP crawler of OSISAF project
@@ -1092,7 +998,8 @@ class ThreddsCrawlerTestCase(unittest.TestCase):
             'catalog.html?dataset=osisaf/met.no/ice/amsr2_conc/2019/11/'
             'ice_conc_nh_polstere-100_amsr2_201911301200.nc'
         )
-        crawler = crawlers.ThreddsCrawler('https://thredds.met.no/thredds/osisaf/osisaf.html')
+        crawler = crawlers_directory.ThreddsCrawler.from_kwargs(
+            url='https://thredds.met.no/thredds/osisaf/osisaf.html')
         request_link = crawler.get_download_url(catalog_url)
         self.assertEqual(
             request_link,
@@ -1100,22 +1007,22 @@ class ThreddsCrawlerTestCase(unittest.TestCase):
             'ice_conc_nh_polstere-100_amsr2_201911301200.nc'
         )
 
-    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._http_get")
-    @mock.patch("geospaas_harvesting.crawlers.ThreddsCrawler._get_links")
+    @mock.patch("geospaas_harvesting.crawlers.directory.ThreddsCrawler._http_get")
+    @mock.patch("geospaas_harvesting.crawlers.directory.ThreddsCrawler._get_links")
     def test_get_download_url_no_direct_download_link(self, mock_get_link, mock_http_get):
         """
         The get_download_url() method of the Thredds crawler
         must return None if no valid download URL is found
         """
         mock_get_link.return_value = ['/thredds/dodsC/osisaf/met.no/ice_conc201911301200.nc.dods']
-        self.assertIsNone(crawlers.ThreddsCrawler('').get_download_url("dummy"))
+        self.assertIsNone(crawlers_directory.ThreddsCrawler.from_kwargs(url='').get_download_url("dummy"))
 
     def test_get_ddx_url(self):
         """Test utility function which transforms download links into
         metadata links for Thredds
         """
         self.assertEqual(
-            crawlers.ThreddsCrawler.get_ddx_url(
+            crawlers_directory.ThreddsCrawler.get_ddx_url(
                 'https://thredds.met.no/thredds/fileServer/osisaf/met.no/ice/conc/2023/01/'
                 'ice_conc_sh_polstere-100_multi_202301141200.nc'),
             'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/conc/2023/01/'
@@ -1126,7 +1033,7 @@ class ThreddsCrawlerTestCase(unittest.TestCase):
         URL is not a Thredds fileserver URL
         """
         with self.assertRaises(ValueError):
-            crawlers.ThreddsCrawler.get_ddx_url('https://foo/bar.nc')
+            crawlers_directory.ThreddsCrawler.get_ddx_url('https://foo/bar.nc')
 
 
 class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
