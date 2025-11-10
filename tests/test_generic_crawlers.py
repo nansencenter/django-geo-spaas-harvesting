@@ -124,46 +124,47 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
     def test_instantiation(self):
         """Test the correct instantiation of a DirectoryCrawler
         """
-        crawler = crawlers.DirectoryCrawler(
-            'https://foo/bar.nc',
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(
+            url='https://foo/bar.nc',
             time_range=(
                 datetime(2020, 1, 1, tzinfo=timezone.utc),
                 datetime(2020, 1, 2, tzinfo=timezone.utc)),
             include='.*')
-        self.assertIsInstance(crawler, crawlers.Crawler)
+        crawler.set_initial_state()
+        self.assertIsInstance(crawler, crawlers_base.Crawler)
         self.assertEqual(
             crawler.root_url,
             ParseResult(scheme='https', netloc='foo', path='/bar.nc',
                         params='', query='', fragment=''))
-        self.assertEqual(
+        self.assertSequenceEqual(
             crawler.time_range,
             (datetime(2020, 1, 1, tzinfo=timezone.utc),
              datetime(2020, 1, 2, tzinfo=timezone.utc)))
-        self.assertListEqual(crawler._results, [])
         self.assertListEqual(crawler._to_process, ['/bar.nc'])
 
     def test_equality(self):
         """Test equality of two DirectoryCrawler objects"""
         self.assertEqual(
-            crawlers.DirectoryCrawler(
-                'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
-                r'.*\.nc', 'user', 'pass'),
-            crawlers.DirectoryCrawler(
-                'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
-                r'.*\.nc', 'user', 'pass'))
+            crawlers_directory.DirectoryCrawler.from_kwargs(
+                url='http://foo', time_range=(datetime(2024, 1, 2), datetime(2024, 1, 3)),
+                include=r'.*\.nc', username='user', password='pass'),
+            crawlers_directory.DirectoryCrawler.from_kwargs(
+                url='http://foo', time_range=(datetime(2024, 1, 2), datetime(2024, 1, 3)),
+                include=r'.*\.nc', username='user', password='pass'))
         self.assertNotEqual(
-            crawlers.DirectoryCrawler(
-                'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
-                r'.*\.nc', 'user', 'pass'),
-            crawlers.DirectoryCrawler(
-                'http://foo', (datetime(2024, 1, 2), datetime(2024, 1, 3)),
-                r'.*\.nc', 'user', 'password'))
+            crawlers_directory.DirectoryCrawler.from_kwargs(
+                url='http://foo', time_range=(datetime(2024, 1, 2), datetime(2024, 1, 3)),
+                include=r'.*\.nc', username='user', password='pass'),
+            crawlers_directory.DirectoryCrawler.from_kwargs(
+                url='http://foo', time_range=(datetime(2024, 1, 2), datetime(2024, 1, 3)),
+                include=r'.*\.nc', username='user', password='password'))
 
     def test_http_get_with_auth(self):
         """If no username and password are provided, HTTP requests
         should not have an 'auth' parameter
         """
-        crawler = crawlers.DirectoryCrawler('', username='user', password='pass')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(
+            url='', username='user', password='pass')
         with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_get:
             crawler._http_get('http://foo/bar')
             crawler._http_get('http://foo/bar', request_parameters={'quz': 'qux'})
@@ -178,7 +179,7 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         """If no username and password are provided, HTTP requests
         should not have an 'auth' parameter
         """
-        crawler = crawlers.DirectoryCrawler('')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(url='')
         with mock.patch('geospaas_harvesting.crawlers.Crawler._http_get') as mock_get:
             crawler._http_get('http://foo/bar')
         mock_get.assert_called_with('http://foo/bar', request_parameters=None,
@@ -189,7 +190,7 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         A NotImplementedError should be raised if the _list_folder_contents() method
         is accessed directly on the DirectoryCrawler class
         """
-        crawler = crawlers.DirectoryCrawler('')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(url='')
         with self.assertRaises(NotImplementedError):
             crawler._list_folder_contents('')
 
@@ -198,7 +199,7 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         A NotImplementedError should be raised if the _is_folder() method
         is accessed directly on the DirectoryCrawler class
         """
-        crawler = crawlers.DirectoryCrawler('')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(url='')
         with self.assertRaises(NotImplementedError):
             crawler._is_folder('')
 
@@ -207,38 +208,27 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         The get_download_url() method of the DirectoryCrawler
         should return the resource URL unchanged
         """
-        crawler = crawlers.DirectoryCrawler('https://foo')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(url='https://foo')
         self.assertEqual(crawler.get_download_url('bar'), 'https://foo/bar')
 
     def test_base_url(self):
         """The base_url property should return the root_url without path"""
-        crawler = crawlers.DirectoryCrawler('http://foo/bar')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(url='http://foo/bar')
         self.assertEqual(crawler.base_url, 'http://foo')
 
     def test_set_initial_state(self):
         """set_initial_state() should set the right values for _urls and _to_process"""
-        crawler = crawlers.DirectoryCrawler('http://foo/bar')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(url='http://foo/bar')
         crawler._results = None
         crawler._to_process = None
         crawler.set_initial_state()
-        self.assertListEqual(crawler._results, [])
         self.assertListEqual(crawler._to_process, ['/bar'])
-
-    def test_add_url_to_return(self):
-        """
-        _add_url_to_return() should add the full URL corresponding
-        to the path if it fits in the time range constraint
-        """
-        crawler = crawlers.DirectoryCrawler('http://foo/bar')
-        crawler.logger = mock.Mock()
-        crawler._add_url_to_return('/bar/baz.nc')
-        self.assertListEqual(crawler._results, [crawlers.DatasetInfo('http://foo/bar/baz.nc')])
 
     def test_add_folder_to_process(self):
         """_add_folder_to_process() should add the path of the folder
         if it fits in the time range constraint
         """
-        crawler = crawlers.DirectoryCrawler('http://foo/bar')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(url='http://foo/bar')
         crawler.logger = mock.Mock()
         crawler._to_process = []
         crawler._add_folder_to_process('/bar/baz')
@@ -248,34 +238,37 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         """_process_folder() should feed the _urls stack
         with only file paths which are included
         """
-        crawler = crawlers.DirectoryCrawler('http://foo/bar', include='\.nc$')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(
+            url='http://foo/bar', include='\.nc$')
         crawler.EXCLUDE = re.compile(r'\.h5$')
         crawler.logger = mock.Mock()
         with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
                 mock.patch.object(crawler, '_is_folder', return_value=False), \
-                mock.patch.object(crawler, '_add_url_to_return') as mock_add_url:
+                mock.patch.object(crawler, 'get_raw_attributes', return_value={}):
             mock_folder_contents.return_value = ['/bar/baz.nc', '/bar/qux.gz']
-            crawler._process_folder('')
-        mock_add_url.assert_called_once_with('/bar/baz.nc')
+            self.assertSequenceEqual(
+                list(crawler._process_folder('')),
+                [crawlers_base.DatasetInfo('http://foo/bar/baz.nc')])
 
     def test_process_folder_with_folder(self):
         """_process_folder() should feed the _to_process stack
         with folder paths which are not excluded
         """
-        crawler = crawlers.DirectoryCrawler('http://foo/bar', include='baz')
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(
+            url='http://foo/bar', include='baz')
         crawler.EXCLUDE = re.compile(r'qux')
         crawler.logger = mock.Mock()
         with mock.patch.object(crawler, '_list_folder_contents') as mock_folder_contents, \
                 mock.patch.object(crawler, '_is_folder', return_value=True), \
                 mock.patch.object(crawler, '_add_folder_to_process') as mock_add_folder:
             mock_folder_contents.return_value = ['/bar/baz', '/bar/qux']
-            crawler._process_folder('')
+            list(crawler._process_folder(''))
         mock_add_folder.assert_called_once_with('/bar/baz')
 
     def test_get_year_folder_coverage(self):
         """Get the correct time range from a year folder"""
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/contents.html'),
             (datetime(2019, 1, 1, tzinfo=timezone.utc), datetime(2020, 1, 1, tzinfo=timezone.utc))
         )
@@ -283,12 +276,12 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
     def test_get_month_folder_coverage(self):
         """Get the correct time range from a month folder"""
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/02/contents.html'),
             (datetime(2019, 2, 1, tzinfo=timezone.utc), datetime(2019, 3, 1, tzinfo=timezone.utc))
         )
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/201902/contents.html'),
             (datetime(2019, 2, 1, tzinfo=timezone.utc), datetime(2019, 3, 1, tzinfo=timezone.utc))
         )
@@ -296,12 +289,12 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
     def test_get_day_of_month_folder_coverage(self):
         """Get the correct time range from a day of month folder"""
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/02/14/contents.html'),
             (datetime(2019, 2, 14, tzinfo=timezone.utc), datetime(2019, 2, 15, tzinfo=timezone.utc))
         )
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/20190214/contents.html'),
             (datetime(2019, 2, 14, tzinfo=timezone.utc), datetime(2019, 2, 15, tzinfo=timezone.utc))
         )
@@ -309,7 +302,7 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
     def test_get_day_of_year_folder_coverage(self):
         """Get the correct time range from a day of year folder"""
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/2019/046/contents.html'),
             (datetime(2019, 2, 15, tzinfo=timezone.utc), datetime(2019, 2, 16, tzinfo=timezone.utc))
         )
@@ -320,15 +313,15 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         folder's path
         """
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/contents.html'), (None, None))
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/046/contents.html'),
             (None, None)
         )
         self.assertEqual(
-            crawlers.DirectoryCrawler._folder_coverage(
+            crawlers_directory.DirectoryCrawler._folder_coverage(
                 'https://test-opendap.com/folder/02/contents.html'),
             (None, None)
         )
@@ -340,45 +333,51 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.DirectoryCrawler(
-            '', time_range=(datetime(2019, 2, 14), datetime(2019, 2, 20)))
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(
+            url='', time_range=(datetime(2019, 2, 14), datetime(2019, 2, 20)))
 
         # start_time < time_range[0] < stop_time < time_range[1]
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 10), datetime(2019, 2, 17)))
+            datetime(2019, 2, 10, tzinfo=timezone.utc), datetime(2019, 2, 17, tzinfo=timezone.utc)))
         # start_time < time_range[0] == stop_time < time_range[1]
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 10), datetime(2019, 2, 14)))
+            datetime(2019, 2, 10, tzinfo=timezone.utc), datetime(2019, 2, 14, tzinfo=timezone.utc)))
         # time_range[0] < start_time < time_range[1] < stop_time
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 17), datetime(2019, 2, 25)))
+            datetime(2019, 2, 17, tzinfo=timezone.utc), datetime(2019, 2, 25, tzinfo=timezone.utc)))
         # time_range[0] < start_time == time_range[1] < stop_time
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 20), datetime(2019, 2, 25)))
+            datetime(2019, 2, 20, tzinfo=timezone.utc), datetime(2019, 2, 25, tzinfo=timezone.utc)))
         # time_range[0] < start_time < stop_time < time_range[1]
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 15), datetime(2019, 2, 19)))
+            datetime(2019, 2, 15, tzinfo=timezone.utc), datetime(2019, 2, 19, tzinfo=timezone.utc)))
         # start_time < time_range[0] < time_range[1] < stop_time
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 13), datetime(2019, 2, 25)))
+            datetime(2019, 2, 13, tzinfo=timezone.utc), datetime(2019, 2, 25, tzinfo=timezone.utc)))
         # start_time < stop_time < time_range[0] < time_range[1]
         self.assertFalse(crawler._intersects_time_range(
-            datetime(2019, 2, 10), datetime(2019, 2, 13)))
+            datetime(2019, 2, 10, tzinfo=timezone.utc), datetime(2019, 2, 13, tzinfo=timezone.utc)))
         # time_range[0] < time_range[1] < start_time < stop_time
         self.assertFalse(crawler._intersects_time_range(
-            datetime(2019, 2, 25), datetime(2019, 2, 26)))
+            datetime(2019, 2, 25, tzinfo=timezone.utc), datetime(2019, 2, 26, tzinfo=timezone.utc)))
         # no start_time < time_range[0] < time_range[1] < stop_time
-        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 27)))
+        self.assertTrue(
+            crawler._intersects_time_range(None, datetime(2019, 2, 27, tzinfo=timezone.utc)))
         # no start_time < time_range[0] < stop_time < time_range[1]
-        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 17)))
+        self.assertTrue(
+            crawler._intersects_time_range(None, datetime(2019, 2, 17, tzinfo=timezone.utc)))
         # no start_time < stop_time < time_range[0] < time_range[1]
-        self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 10)))
+        self.assertFalse(
+            crawler._intersects_time_range(None, datetime(2019, 2, 10, tzinfo=timezone.utc)))
         # start_time < time_range[0] < time_range[1] < no stop time
-        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 10), None))
+        self.assertTrue(
+            crawler._intersects_time_range(datetime(2019, 2, 10, tzinfo=timezone.utc), None))
         # time_range[0] < start_time < time_range[1] < no stop time
-        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 18), None))
+        self.assertTrue(
+            crawler._intersects_time_range(datetime(2019, 2, 18, tzinfo=timezone.utc), None))
         # time_range[0] < time_range[1] < start_time < no stop time
-        self.assertFalse(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+        self.assertFalse(
+            crawler._intersects_time_range(datetime(2019, 2, 21, tzinfo=timezone.utc), None))
 
     def test_intersects_time_range_no_lower_limit(self):
         """
@@ -388,23 +387,27 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.DirectoryCrawler('', time_range=(None, datetime(2019, 2, 20)))
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(
+            url='', time_range=(None, datetime(2019, 2, 20, tzinfo=timezone.utc)))
 
         # no lower limit < time_range[1] < start_time < stop_time
         self.assertFalse(crawler._intersects_time_range(
-            datetime(2019, 2, 25), datetime(2019, 2, 26)))
+            datetime(2019, 2, 25, tzinfo=timezone.utc), datetime(2019, 2, 26, tzinfo=timezone.utc)))
         # no lower limit < start_time < time_range[1] < stop_time
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 18), datetime(2019, 2, 26)))
+            datetime(2019, 2, 18, tzinfo=timezone.utc), datetime(2019, 2, 26, tzinfo=timezone.utc)))
         # no lower limit < start_time < stop_time < time_range[1]
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 18), datetime(2019, 2, 19)))
+            datetime(2019, 2, 18, tzinfo=timezone.utc), datetime(2019, 2, 19, tzinfo=timezone.utc)))
         # no lower limit and no start time
-        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
+        self.assertTrue(
+            crawler._intersects_time_range(None, datetime(2019, 2, 21, tzinfo=timezone.utc)))
         # no lower limit and no stop_time, with intersection
-        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 19), None))
+        self.assertTrue(
+            crawler._intersects_time_range(datetime(2019, 2, 19, tzinfo=timezone.utc), None))
         # no lower limit and no stop_time, without intersection
-        self.assertFalse(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+        self.assertFalse(
+            crawler._intersects_time_range(datetime(2019, 2, 21, tzinfo=timezone.utc), None))
 
     def test_intersects_time_range_no_upper_limit(self):
         """
@@ -414,34 +417,37 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
         `start_time` and `stop_time` are the limits of the time range which is tested against the
         crawler's condition
         """
-        crawler = crawlers.DirectoryCrawler('', time_range=(datetime(2019, 2, 20), None))
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(
+            url='', time_range=(datetime(2019, 2, 20), None))
 
         # start_time < stop_time < time_range[0] < no upper limit
         self.assertFalse(crawler._intersects_time_range(
-            datetime(2019, 2, 10), datetime(2019, 2, 15)))
+            datetime(2019, 2, 10, tzinfo=timezone.utc), datetime(2019, 2, 15, tzinfo=timezone.utc)))
         # start_time < time_range[0] < stop_time < no upper limit
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 18), datetime(2019, 2, 26)))
+            datetime(2019, 2, 18, tzinfo=timezone.utc), datetime(2019, 2, 26, tzinfo=timezone.utc)))
         # time_range[0] < start_time < stop_time < no upper limit
         self.assertTrue(crawler._intersects_time_range(
-            datetime(2019, 2, 21), datetime(2019, 2, 25)))
+            datetime(2019, 2, 21, tzinfo=timezone.utc), datetime(2019, 2, 25, tzinfo=timezone.utc)))
         # no upper limit and no stop_time
-        self.assertTrue(crawler._intersects_time_range(datetime(2019, 2, 21), None))
+        self.assertTrue(
+            crawler._intersects_time_range(datetime(2019, 2, 21, tzinfo=timezone.utc), None))
         # no upper limit and no start_time, with intersection
-        self.assertTrue(crawler._intersects_time_range(None, datetime(2019, 2, 21)))
+        self.assertTrue(
+            crawler._intersects_time_range(None, datetime(2019, 2, 21, tzinfo=timezone.utc)))
         # no upper limit and no start_time, without intersection
-        self.assertFalse(crawler._intersects_time_range(None, datetime(2019, 2, 19)))
+        self.assertFalse(
+            crawler._intersects_time_range(None, datetime(2019, 2, 19, tzinfo=timezone.utc)))
 
     def test_crawl(self):
         """Test crawling"""
-        crawler = crawlers.DirectoryCrawler('https://foo/bar.nc')
-        crawler._results = ['foo', 'bar']
+        crawler = crawlers_directory.DirectoryCrawler.from_kwargs(url='https://foo/bar.nc')
 
         with mock.patch.object(crawler, '_process_folder') as mock_process_folder:
+            mock_process_folder.return_value = ['foo', 'bar']
             generator = crawler.crawl()
-            self.assertEqual(next(generator), 'bar')
             self.assertEqual(next(generator), 'foo')
-            self.assertListEqual(crawler._results, [])
+            self.assertEqual(next(generator), 'bar')
             with self.assertRaises(StopIteration):
                 next(generator)
             mock_process_folder.assert_called()
