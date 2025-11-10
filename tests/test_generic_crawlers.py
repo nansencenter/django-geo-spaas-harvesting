@@ -18,7 +18,6 @@ from urllib.parse import ParseResult
 
 import requests
 
-import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.crawlers.base as crawlers_base
 import geospaas_harvesting.crawlers.directory as crawlers_directory
 import geospaas_harvesting.crawlers.paginated_api as crawlers_paginated_api
@@ -53,25 +52,15 @@ class DatasetInfoTestCase(unittest.TestCase):
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
 
-    def test_abstract_set_initial_state(self):
-        """
-        A NotImplementedError should be raised if the set_initial_state() method
-        is accessed directly on the Crawler class
-        """
-        crawler = crawlers.Crawler()
-        with self.assertRaises(NotImplementedError):
-            crawler.set_initial_state()
-
     def test_iter(self):
         """__iter__() should return self"""
-        crawler = crawlers.Crawler()
+        crawler = crawlers_base.Crawler()
         crawler.crawl = lambda: []
-        self.assertIsInstance(iter(crawler), crawlers.CrawlerIterator)
 
     def test_abstract_crawl(self):
         """The crawl method should raise a NotImplementedError"""
         with self.assertRaises(NotImplementedError):
-            crawlers.Crawler().crawl()
+            crawlers_base.Crawler().crawl()
 
     def test_http_get_retry(self):
         """Test that _http_get retries the request when a connection
@@ -88,8 +77,8 @@ class BaseCrawlerTestCase(unittest.TestCase):
                 requests.ReadTimeout,
                 http_500_error,
                 mock.Mock())
-            with self.assertLogs(crawlers.Crawler.logger, level=logging.WARNING):
-                crawlers.Crawler()._http_get('url', max_tries=5, wait_time=30)
+            with self.assertLogs(crawlers_base.Crawler.logger, level=logging.WARNING):
+                crawlers_base.Crawler()._http_get('url', max_tries=5, wait_time=30)
 
             self.assertEqual(len(mock_request.mock_calls), 5)
             self.assertListEqual(mock_sleep.mock_calls, [mock.call(30 * (2**i)) for i in range(4)])
@@ -103,9 +92,9 @@ class BaseCrawlerTestCase(unittest.TestCase):
                 mock.patch('time.sleep') as mock_sleep:
             mock_request.side_effect = requests.ConnectionError
 
-            with self.assertLogs(crawlers.Crawler.logger, level=logging.WARNING), \
+            with self.assertLogs(crawlers_base.Crawler.logger, level=logging.WARNING), \
                  self.assertRaises(RuntimeError):
-                crawlers.Crawler()._http_get('url')
+                crawlers_base.Crawler()._http_get('url')
 
             self.assertEqual(len(mock_request.mock_calls), 5)
             self.assertEqual(len(mock_sleep.mock_calls), 5)
@@ -117,7 +106,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
         with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
             mock_request.side_effect = requests.TooManyRedirects
             with self.assertRaises(requests.RequestException):
-                self.assertIsNone(crawlers.Crawler()._http_get('url'))
+                self.assertIsNone(crawlers_base.Crawler()._http_get('url'))
 
     def test_http_get_error_on_404_status(self):
         """Test that an exception is raised in case of HTTP error code"""
@@ -126,158 +115,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
         with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
             mock_request.side_effect = requests.HTTPError(response=response)
             with self.assertRaises(requests.HTTPError):
-                crawlers.Crawler()._http_get('http://foo')
-
-    def test_add_url(self):
-        """Test adding a dataset's url to its raw attributes dictionary
-        """
-        raw_attributes = {'bar': 'baz'}
-        crawlers.Crawler.add_url('foo', raw_attributes)
-        self.assertDictEqual(
-            raw_attributes,
-            {'url': 'foo', 'bar': 'baz'})
-
-    def test_add_url_already_present(self):
-        """Don't add the url if it is already there
-        """
-        raw_attributes = {'url': 'baz'}
-        crawlers.Crawler.add_url('foo', raw_attributes)
-        self.assertDictEqual(
-            raw_attributes,
-            {'url': 'baz'})
-
-
-class CrawlerIteratorTestCase(unittest.TestCase):
-    """Tests for CrawlerIterator.
-    """
-
-    def setUp(self):
-        self.tmp_dir = tempfile.mkdtemp()
-        self.old_ingestion_path = crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH
-        self.old_max_failed = crawlers.CrawlerIterator.MAX_FAILED
-        crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH = self.tmp_dir
-        crawlers.CrawlerIterator.MAX_FAILED = 2
-
-    def tearDown(self):
-        crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH = self.old_ingestion_path
-        crawlers.CrawlerIterator.MAX_FAILED = self.old_max_failed
-        shutil.rmtree(self.tmp_dir)
-
-    class TestCrawler(crawlers.Crawler):
-        """Crawler used for testing the CrawlerIterator"""
-
-        def crawl(self):
-            for url in ['https://foo', 'https://bar', 'https://baz']:
-                yield crawlers.DatasetInfo(url)
-
-        def set_initial_state(self):
-            pass
-
-    def test_iterating(self):
-        """Test iterating over normalization results"""
-        crawler = self.TestCrawler()
-        with self.assertLogs(crawlers.CrawlerIterator.logger, level=logging.ERROR) as scm:
-            crawler_iterator = iter(crawler)
-            crawler_iterator.manager_thread.join()
-
-        self.assertIs(scm.records[0].exc_info[0], RuntimeError)
-        self.assertIs(scm.records[1].exc_info[0], BaseException)
-
-        results = list(crawler_iterator)
-
-        self.assertListEqual(results, [crawlers.DatasetInfo('https://foo', {'foo': 'bar'})])
-
-        failed_ingestion_files = os.listdir(self.tmp_dir)
-        self.assertEqual(len(failed_ingestion_files), 1)
-        self.assertTrue(failed_ingestion_files[0].endswith(crawler_iterator.RECOVERY_SUFFIX))
-
-    def test_pickle_list_elements(self):
-        """Test pickling a list of objects"""
-        # create a crawler iterator without starting the processing threads
-        with mock.patch('threading.Thread'):
-            crawler_iterator = iter(self.TestCrawler())
-        objects_to_pickle = [1, 'one', 2.2]
-        reference = list(objects_to_pickle)  # needed because the list will be cleared
-        with tempfile.TemporaryDirectory() as tmp_dir, self.assertLogs(crawler_iterator.logger):
-            file_path = os.path.join(tmp_dir, 'random_objects.pickle')
-            # pickle various objects to a temporary file
-            crawler_iterator._pickle_list_elements(objects_to_pickle, file_path)
-
-            # retrieve the pickled objects and check they are the same
-            # as the ones which were pickled
-            unpickled_objects = []
-            with open(file_path, 'rb') as pickle_file:
-                while True:
-                    try:
-                        unpickled_objects.append(pickle.load(pickle_file))
-                    except EOFError:
-                        break
-
-            self.assertListEqual(unpickled_objects, reference)
-            self.assertFalse(objects_to_pickle)  # check that the list has been cleared
-
-    def test_thread_manage_failed_ingestions(self):
-        """Test the processing of failed ingestions"""
-        # create a crawler iterator without starting the processing threads
-        with mock.patch('threading.Thread'):
-            crawler_iterator = iter(self.TestCrawler())
-
-        # start the thread
-        thread = threading.Thread(target=crawler_iterator._thread_manage_failed_normalizing)
-        with self.assertLogs(crawler_iterator.logger, level=logging.INFO) as log_manager:
-            thread.start()
-            # put two items in the failed queue (one more than the
-            # max number of items per file)
-            items_to_pickle = [
-                (crawlers.DatasetInfo('foo', {}), RuntimeError()),
-                (crawlers.DatasetInfo('baz', {}), ValueError()),
-                (crawlers.DatasetInfo('quux', {}), KeyError())
-            ]
-            for item in items_to_pickle:
-                crawler_iterator._failed.put(item)
-            # stop the thread
-            crawler_iterator._failed.put(crawlers.Stop)
-            # wait for the thread to stop
-            thread.join()
-
-        # check that one file is created
-        failed_dir_contents = os.listdir(self.tmp_dir)
-        self.assertEqual(len(failed_dir_contents), 1)
-
-        with open(os.path.join(self.tmp_dir, failed_dir_contents[0]), 'rb') as pickle_file:
-            pickled_objects = [
-                pickle.load(pickle_file) for _ in range(len(items_to_pickle))
-            ]
-
-            with self.assertRaises(EOFError):
-                pickle.load(pickle_file)
-
-        # check the contents of the file
-        self.assertTrue(all(
-            (to_pickle[0] == result[0],
-             type(to_pickle[1]) == type(result[1]) and to_pickle[1].args == result[1].args)
-            for to_pickle, result in zip(items_to_pickle, pickled_objects)
-        ))
-
-        # check that the dump method has been called twice
-        # (because the number of items exceeds the max number
-        # of items per file)
-        dump_messages = 0
-        for record in log_manager.records:
-            if record.getMessage().startswith('Dumping items to'):
-                dump_messages += 1
-        self.assertEqual(dump_messages, 2)
-
-    def test_keyboard_interruption(self):
-        """Test that keyboard interrupts are managed properly"""
-        mock_futures = (mock.Mock(), KeyboardInterrupt)
-        with mock.patch('concurrent.futures.ThreadPoolExecutor.submit',
-                        side_effect=mock_futures) as mock_submit, \
-             mock.patch('concurrent.futures.as_completed') as mock_as_completed:
-            with self.assertLogs(crawlers.CrawlerIterator.logger, level=logging.DEBUG):
-                crawler_iterator = iter(self.TestCrawler())
-                crawler_iterator.manager_thread.join()
-            mock_futures[0].cancel.assert_called()
+                crawlers_base.Crawler()._http_get('http://foo')
 
 
 class DirectoryCrawlerTestCase(unittest.TestCase):
