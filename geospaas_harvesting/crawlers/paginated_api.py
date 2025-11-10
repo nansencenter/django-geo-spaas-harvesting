@@ -98,7 +98,7 @@ class HTTPPaginatedAPICrawler(Crawler):
         """
         raise NotImplementedError()
 
-    def _get_datasets_info(self, page):
+    def _get_datasets_info(self, entries):
         """Get datasets information from raw entries and yield
         DatasetInfo objects.
         """
