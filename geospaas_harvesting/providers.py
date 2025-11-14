@@ -44,8 +44,6 @@ class Provider(models.Model):
 
     def __repr__(self):
         return (f"{self.__class__.__name__}(name='{self.name}', "
-                f"normalizer_name='{self.normalizer_name}', "
-                f"crawler_name='{self.crawler_name}', "
                 f"config={self.get_config_repr()})")
 
     def get_config_repr(self):
