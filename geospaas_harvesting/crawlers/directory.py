@@ -3,23 +3,17 @@ import ftplib
 import functools
 import io
 import itertools
-import json
 import logging
 import os
 import re
-import uuid
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 from datetime import datetime, timedelta, timezone
 
-import dateutil.parser
 import netCDF4
 import numpy as np
 import shapely.wkt
-import pythesint as pti
-from dateutil.tz import tzutc
-from metanorm.utils import get_cf_or_wkv_standard_name
 from nansat import Nansat
 from geospaas.utils.utils import nansat_filename
 from shapely.geometry import MultiPoint
