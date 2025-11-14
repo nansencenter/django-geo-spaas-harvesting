@@ -126,6 +126,7 @@ def mask_secrets(dictionary, secret_keys=('password',)):
             masked[key] = '******'
     return masked
 
+
 def merge_configs(config_dict: dict, override: dict):
     """Merge two configuration dictionaries.
     The values in `override` are added to `config_dict`.
