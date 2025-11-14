@@ -49,8 +49,22 @@ class Crawler():
         arguments.StringArgument('password', default=None),
     ])
 
+    def __init__(self, **kwargs):
+        self.time_range = kwargs['time_range']
+        self.location = kwargs['location']
+        self.username = kwargs['username']
+        self.password = kwargs['password']
+
     def __str__(self):
         return self.name
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}("
+                f"location={self.location}"
+                f"time_range={self.time_range}"
+                f"username={self.username}"
+                f"password=******"
+                ")")
 
     @classmethod
     def from_config(cls, config: dict):
