@@ -94,6 +94,15 @@ class DirectoryCrawler(Crawler):
         self.password = kwargs['password']
         self._to_process = None
 
+    def __repr__(self):
+        return (f"{self.__class__.__name__}("
+                f"url={self.root_url}"
+                f"include={self.include}"
+                f"time_range={self.time_range}"
+                f"username={self.username}"
+                f"password=******"
+                ")")
+
     def __eq__(self, other):
         return (
             self.root_url == other.root_url and
@@ -561,6 +570,17 @@ class NetCDFCrawler(LocalDirectoryCrawler):
         self.longitude_attribute = kwargs.pop('longitude_attribute')
         self.latitude_attribute = kwargs.pop('latitude_attribute')
         super().__init__(*args, **kwargs)
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}("
+                f"url={self.root_url}"
+                f"include={self.include}"
+                f"longitude_attribute={self.longitude_attribute}"
+                f"latitude_attribute={self.latitude_attribute}"
+                f"time_range={self.time_range}"
+                f"username={self.username}"
+                f"password=******"
+                ")")
 
     # --------- get metadata ---------
     def _get_geometry_wkt(self, dataset):

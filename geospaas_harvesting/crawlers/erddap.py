@@ -51,6 +51,24 @@ class ERDDAPTableCrawler(Crawler):
         self.search_terms.extend(self._make_temporal_condition(kwargs['time_range']))
         self.variables = kwargs['variables'] if kwargs['variables'] else []
 
+    def __repr__(self):
+        return (f"{self.__class__.__name__}("
+                f"url={self.url}"
+                f"id_attrs={self.id_attrs}"
+                f"entry_id_prefix={self.entry_id_prefix}"
+                f"longitude_attr={self.longitude_attr}"
+                f"latitude_attr={self.latitude_attr}"
+                f"time_attr={self.time_attr}"
+                f"position_qc_attr={self.position_qc_attr}"
+                f"time_qc_attr={self.time_qc_attr}"
+                f"valid_qc_codes={self.valid_qc_codes}"
+                f"search_terms={self.search_terms}"
+                f"variables={self.variables}"
+                f"time_range={self.time_range}"
+                f"username={self.username}"
+                f"password=******"
+                ")")
+
     def __eq__(self, other):
         return (
             self.url == other.url and

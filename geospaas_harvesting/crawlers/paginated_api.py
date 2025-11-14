@@ -41,6 +41,15 @@ class HTTPPaginatedAPICrawler(Crawler):
             self.request_parameters == other.request_parameters
         )
 
+    def __repr__(self):
+        request_parameters = self.request_parameters.copy()
+        request_parameters['params'] = utils.mask_secrets(request_parameters['params'])
+        return (f"{self.__class__.__name__}("
+                f"url={self.url}"
+                f"initial_offset={self.initial_offset}"
+                f"request_parameters={request_parameters}"
+                ")")
+
     # ------------- crawl ------------
     @property
     def page_size(self):
