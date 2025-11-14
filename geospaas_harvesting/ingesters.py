@@ -34,6 +34,11 @@ class Ingester():
         self.max_db_threads = max_db_threads
         self.update = update
 
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}(max_db_threads={self.max_db_threads}, update={self.update})"
+        )
+
     def _ingest_dataset(self, to_ingest):
         """Writes a dataset to the database based on its attributes and
         URL. The input should be a DatasetInfo object.
