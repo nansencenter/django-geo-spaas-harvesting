@@ -28,7 +28,6 @@ class Provider(models.Model):
         arguments.DictArgument('crawler', required=True),
         arguments.DictArgument('normalizer', default={'name': 'raw'}),
         arguments.DictArgument('ingester', default=dict),
-        arguments.IntegerArgument('max_normalizer_threads', default=1),
     ])
 
     @classmethod
@@ -113,8 +112,6 @@ class Provider(models.Model):
         crawler = self.crawler_class.from_config(crawler_config)
         normalizer = self.normalizer_class(**normalizer_config)
         ingester = ingesters.Ingester(**ingester_config)
-        max_threads = final_config['max_normalizer_threads']
-
         return SearchResults(
             (f"crawler: {crawler} {crawler_config_str}, "
              f"normalizer: {normalizer} {normalizer_config}, "

@@ -7,11 +7,15 @@ providers:
   thredds:
     crawler:
       name: 'thredds'
-    max_normalizer_threads: 30
+    normalizer:
+      name: raw
+      max_threads: 30
   opendap:
     crawler:
       name: 'opendap'
-    max_normalizer_threads: 30
+    normalizer:
+      name: raw
+      max_threads: 30
   http:
     crawler:
       name: 'html_directory'
@@ -60,7 +64,9 @@ providers:
       name: 'thredds'
       url: 'https://thredds.met.no/thredds'
       include: '\.nc$'
-    max_normalizer_threads: 30
+    normalizer:
+      name: raw
+      max_threads: 30
   metno_osisaf:
     crawler:
       name: 'thredds'
@@ -68,7 +74,7 @@ providers:
       include: '\.nc$'
     normalizer:
       name: 'osisaf'
-    max_normalizer_threads: 30
+      max_threads: 30
   aviso:
     crawler:
       name: 'thredds'
@@ -78,7 +84,7 @@ providers:
       password: !ENV AVISO_PASSWORD
     normalizer:
       name: 'aviso'
-    max_normalizer_threads: 30
+      max_threads: 30
   noaa_rtofs:
     crawler:
       name: 'ftp'

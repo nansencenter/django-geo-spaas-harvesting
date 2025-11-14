@@ -25,9 +25,13 @@ class MetadataNormalizer():
     def __init__(self, **kwargs):
         self.logger = logging.getLogger(f"geospaas_harvesting.normalizers.{self.name}")
         self.extra_tags = kwargs.get('tags', {})
+        self.max_threads = kwargs.get('max_threads', 1)
 
     def __str__(self):
         return self.name
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(tags={self.extra_tags}, max_threads={self.max_threads})"
 
     def normalize(self, dataset_info):
         """Takes a DatasetInfo object and returns the necessary
@@ -53,10 +57,10 @@ class MetadataNormalizer():
         tags_kwargs = self._get_all_tags(dataset_info)
         return (dataset_kwargs, dataset_info.url, keywords, parameters, tags_kwargs)
 
-    def normalize_stream(self, dataset_infos, max_threads=1):
+    def normalize_stream(self, dataset_infos):
         """Normalize an iterable of DatasetInfo objects.
         """
-        return StreamMetadataNormalizer(self, dataset_infos, max_threads=max_threads)
+        return StreamMetadataNormalizer(self, dataset_infos)
 
     def get_entry_id(self, dataset_info):
         """Get the entry ID from the raw metadata"""
@@ -134,13 +138,12 @@ class StreamMetadataNormalizer():
     MAX_FAILED = 500000  # max number of failed objects per recovery file
     RECOVERY_SUFFIX = 'failed_ingestions.pickle'
 
-    def __init__(self, normalizer, dataset_infos, max_threads=1):
+    def __init__(self, normalizer, dataset_infos):
         """Creates a managing thread which will in turn spawn
         normalization threads
         """
         self.dataset_infos = dataset_infos
         self.normalizer = normalizer
-        self.max_threads = max_threads
 
         self._results = None
         self._failed = None
@@ -191,10 +194,10 @@ class StreamMetadataNormalizer():
         failed_queue_thread = threading.Thread(target=self._thread_manage_failed_normalizing)
         failed_queue_thread.start()
         self.logger.debug("Starting normalizer threads for %s (max %s)",
-                          self.normalizer.name, self.max_threads)
+                          self.normalizer.name, self.normalizer.max_threads)
         try:
             with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self.max_threads,
+                    max_workers=self.normalizer.max_threads,
                     thread_name_prefix=self.__class__.__name__) as executor:
                 futures = []
                 for dataset_info in self.dataset_infos:
