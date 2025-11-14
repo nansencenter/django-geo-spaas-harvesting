@@ -102,20 +102,11 @@ class Provider(models.Model):
         search results returned by the crawler
         """
         final_config = utils.merge_configs(self.config, search_parameters)
-        crawler_config = self.get_config_section(final_config, 'crawler')
-        crawler_config_str = utils.mask_secrets(crawler_config)
-        normalizer_config = self.get_config_section(final_config, 'normalizer')
-        ingester_config = self.get_config_section(final_config, 'ingester')
-
-        crawler = self.crawler_class.from_config(crawler_config)
-        normalizer = self.normalizer_class(**normalizer_config)
-        ingester = ingesters.Ingester(**ingester_config)
         return SearchResults(
-            (f"crawler: {crawler} {crawler_config_str}, "
-             f"normalizer: {normalizer} {normalizer_config}, "
-             f"ingester: {ingester_config}"),
-            normalizer.normalize_stream(crawler, max_threads),
-            ingester)
+            crawler=self.crawler_class.from_config(
+                self.get_config_section(final_config, 'crawler')),
+            normalizer=self.normalizer_class(**self.get_config_section(final_config, 'normalizer')),
+            ingester=ingesters.Ingester(**self.get_config_section(final_config, 'ingester')))
 
 
 class SearchResults():
@@ -124,9 +115,12 @@ class SearchResults():
     Provides only basic functionality for now. To be extended when
     integrating the search and harvesting process in the web UI.
     """
-    def __init__(self, search_info, results_iterable, ingester=None):
-        self.search_info = search_info
-        self.results_iterable = results_iterable
+    def __init__(self, crawler, normalizer, ingester):
+        self.search_info = (
+            f"crawler: {repr(crawler)}, "
+            f"normalizer: {repr(normalizer)}, "
+            f"ingester: {repr(ingester)}")
+        self.results_iterable = normalizer.normalize_stream(crawler)
         self.ingester = ingester
         self._cached_results = []
 
