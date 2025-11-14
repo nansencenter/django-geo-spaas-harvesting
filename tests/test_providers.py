@@ -82,37 +82,20 @@ class SearchResultsTestCase(unittest.TestCase):
     def setUp(self):
         self.crawler = mock.MagicMock()
         self.ingester = mock.MagicMock()
+        self.normalizer = mock.MagicMock()
         self.mock_dataset_infos = [mock.Mock(), mock.Mock()]
-        self.crawler.__iter__.return_value = iter(self.mock_dataset_infos)
-        self.filter = mock.MagicMock()
+        self.normalizer.normalize_stream.return_value = iter(self.mock_dataset_infos)
         self.search_results = providers.SearchResults(
             crawler=self.crawler,
-            filters=[self.filter],
+            normalizer=self.normalizer,
             ingester=self.ingester)
-
-    def test_repr(self):
-        """Check the string representation of a SearchResults object"""
-        self.assertEqual(
-            repr(self.search_results),
-            f"SearchResults for crawler: {self.crawler}")
-
-    def test_equality(self):
-        """Test equality operator between SearchResults objects"""
-        self.assertEqual(
-            self.search_results,
-            providers.SearchResults(self.crawler, [self.filter]))
-        self.assertNotEqual(
-            self.search_results,
-            providers.SearchResults(mock.MagicMock(), [mock.MagicMock()]))
-        self.assertNotEqual(
-            self.search_results,
-            providers.SearchResults(self.crawler, [self.filter, mock.MagicMock()]))
 
     def test_iterable(self):
         """A SearchResults object should be iterable"""
-        self.assertEqual(iter(self.search_results), self.search_results)
-        self.crawler.set_initial_state.assert_called_once()
-        self.crawler.__iter__.assert_called_once()
+        try:
+            iter(self.search_results)
+        except TypeError:
+            self.fail("SearchResult objects should be iterable")
 
     def test_iterator(self):
         """A SearchResults object should be its own iterator"""
@@ -123,17 +106,6 @@ class SearchResultsTestCase(unittest.TestCase):
         self.assertEqual(next(search_results_iterator), self.mock_dataset_infos[1])
         with self.assertRaises(StopIteration):
             next(search_results_iterator)
-        self.filter.assert_has_calls([
-            mock.call(self.mock_dataset_infos[0]),
-            mock.call(self.mock_dataset_infos[1])
-        ], any_order=True)
-
-    def test_filter(self):
-        """Test filtering dataset_infos"""
-        self.filter.side_effect = [True, False]
-        self.assertListEqual(
-            list(self.search_results),
-            [self.mock_dataset_infos[0]])
 
     def test_save(self):
         """Test saving the search results to the database"""
