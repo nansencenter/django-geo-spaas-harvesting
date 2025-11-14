@@ -32,10 +32,10 @@ class CMEMSCrawler(Crawler):
 
     def __repr__(self):
         return (f"{self.__class__.__name__}("
-                f"product_id={self.product_id}"
-                f"dataset_ids={self.dataset_ids}"
-                f"time_range={self.time_range}"
-                f"username={self.username}"
+                f"product_id={self.product_id}, "
+                f"dataset_ids={self.dataset_ids}, "
+                f"time_range={self.time_range}, "
+                f"username={self.username}, "
                 f"password=******"
                 ")")
 

@@ -96,10 +96,10 @@ class DirectoryCrawler(Crawler):
 
     def __repr__(self):
         return (f"{self.__class__.__name__}("
-                f"url={self.root_url}"
-                f"include={self.include}"
-                f"time_range={self.time_range}"
-                f"username={self.username}"
+                f"url={self.root_url}, "
+                f"include={self.include}, "
+                f"time_range={self.time_range}, "
+                f"username={self.username}, "
                 f"password=******"
                 ")")
 
@@ -573,12 +573,12 @@ class NetCDFCrawler(LocalDirectoryCrawler):
 
     def __repr__(self):
         return (f"{self.__class__.__name__}("
-                f"url={self.root_url}"
-                f"include={self.include}"
-                f"longitude_attribute={self.longitude_attribute}"
-                f"latitude_attribute={self.latitude_attribute}"
-                f"time_range={self.time_range}"
-                f"username={self.username}"
+                f"url={self.root_url}, "
+                f"include={self.include}, "
+                f"longitude_attribute={self.longitude_attribute}, "
+                f"latitude_attribute={self.latitude_attribute}, "
+                f"time_range={self.time_range}, "
+                f"username={self.username}, "
                 f"password=******"
                 ")")
 

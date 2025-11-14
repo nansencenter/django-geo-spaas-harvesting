@@ -45,8 +45,8 @@ class HTTPPaginatedAPICrawler(Crawler):
         request_parameters = self.request_parameters.copy()
         request_parameters['params'] = utils.mask_secrets(request_parameters['params'])
         return (f"{self.__class__.__name__}("
-                f"url={self.url}"
-                f"initial_offset={self.initial_offset}"
+                f"url={self.url}, "
+                f"initial_offset={self.initial_offset}, "
                 f"request_parameters={request_parameters}"
                 ")")
 

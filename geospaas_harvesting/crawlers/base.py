@@ -60,9 +60,9 @@ class Crawler():
 
     def __repr__(self):
         return (f"{self.__class__.__name__}("
-                f"location={self.location}"
-                f"time_range={self.time_range}"
-                f"username={self.username}"
+                f"location={self.location}, "
+                f"time_range={self.time_range}, "
+                f"username={self.username}, "
                 f"password=******"
                 ")")
 
