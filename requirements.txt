@@ -6,7 +6,7 @@ metanorm @ git+https://github.com/nansencenter/metanorm@4.5.3.dev0
 pythesint==1.7.0
 
 # loose requirements
-copernicusmarine==1.*
+copernicusmarine==2.*
 django-geo-spaas==2.*
 django==3.*
 feedparser==6.*
