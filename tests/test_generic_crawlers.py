@@ -5,11 +5,7 @@ import ftplib
 import io
 import logging
 import os
-import pickle
 import re
-import shutil
-import tempfile
-import threading
 import unittest
 import unittest.mock as mock
 import xml.etree.ElementTree as ET
@@ -17,6 +13,7 @@ from datetime import datetime, timezone
 from urllib.parse import ParseResult
 
 import requests
+import shapely.geometry
 
 import geospaas_harvesting.crawlers.base as crawlers_base
 import geospaas_harvesting.crawlers.directory as crawlers_directory
@@ -1122,6 +1119,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
         ids = [["3901480"], ["5905121"], ["5905267"]]
         coverage = [('2025-05-01T00:00:00Z', '2025-05-02T00:00:00Z'), [(1, 2), (3, 4)]]
         metadata = {'foo': 'bar'}
+        expected_trajectory = shapely.geometry.MultiPoint([(1, 2), (3, 4)]).wkt
         crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
             url='http://foo/ArgoFloats.json', id_attrs=['platform_number'],
             position_qc_attr='position_qc', variables=['foo', 'bar'])
@@ -1137,7 +1135,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
                         {
                             'entry_id': '3901480',
                             'temporal_coverage': ('2025-05-01T00:00:00Z', '2025-05-02T00:00:00Z'),
-                            'trajectory': 'MULTIPOINT ((1 2), (3 4))',
+                            'trajectory': expected_trajectory,
                             'product_metadata': metadata,
                         }),
                     crawlers_base.DatasetInfo(
@@ -1146,7 +1144,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
                         {
                             'entry_id': '5905121',
                             'temporal_coverage': ('2025-05-01T00:00:00Z', '2025-05-02T00:00:00Z'),
-                            'trajectory': 'MULTIPOINT ((1 2), (3 4))',
+                            'trajectory': expected_trajectory,
                             'product_metadata': metadata,
 
                         }),
@@ -1156,7 +1154,7 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
                         {
                             'entry_id': '5905267',
                             'temporal_coverage': ('2025-05-01T00:00:00Z', '2025-05-02T00:00:00Z'),
-                            'trajectory': 'MULTIPOINT ((1 2), (3 4))',
+                            'trajectory': expected_trajectory,
                             'product_metadata': metadata,
                         }),
                 ])
