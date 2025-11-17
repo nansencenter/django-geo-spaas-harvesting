@@ -13,7 +13,6 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 if not django.conf.settings.configured:
     django.setup()  # pragma: no cover
 
-import geospaas_harvesting.crawlers as crawlers  # pylint: disable=wrong-import-position
 import geospaas_harvesting.ingesters as ingesters  # pylint: disable=wrong-import-position
 import geospaas_harvesting.normalizers as normalizers
 
