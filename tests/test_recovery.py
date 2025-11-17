@@ -9,7 +9,8 @@ import django.test
 import requests
 
 import geospaas_harvesting.crawlers as crawlers
-import geospaas_harvesting.ingesters as ingesters
+import geospaas_harvesting.crawlers.base as crawlers_base
+import geospaas_harvesting.normalizers as normalizers
 import geospaas_harvesting.recovery as recovery
 
 
@@ -19,7 +20,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
     def setUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
         mock.patch(
-            'geospaas_harvesting.crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH',
+            'geospaas_harvesting.normalizers.base.StreamMetadataNormalizer.FAILED_INGESTIONS_PATH',
             self.tmp_dir.name
         ).start()
         self.addCleanup(mock.patch.stopall)
@@ -29,16 +30,16 @@ class IngestionRecoveryTestCase(django.test.TestCase):
 
     def generate_recovery_file(self, exception_type, errors_count=1):
         """Generate recovery file"""
-        crawler_iterator = crawlers.CrawlerIterator(mock.MagicMock())
+        stream_normalizer = normalizers.StreamMetadataNormalizer(mock.MagicMock(), mock.MagicMock())
         to_pickle = [
-            (crawlers.DatasetInfo(f'http://foo{i}'), exception_type(f'bar{i}'))
+            (crawlers_base.DatasetInfo(f'http://foo{i}'), exception_type(f'bar{i}'))
             for i in range(errors_count)
         ]
         date = datetime.now().strftime('%Y-%m-%dT%H-%M-%S-%f')
         # the assertion is just to remove the logs from the output
-        with self.assertLogs(crawler_iterator.logger):
-            crawler_iterator._pickle_list_elements(
-                to_pickle, Path(self.tmp_dir.name, f"{date}_{crawler_iterator.RECOVERY_SUFFIX}"))
+        with self.assertLogs(stream_normalizer.logger):
+            stream_normalizer._pickle_list_elements(
+                to_pickle, Path(self.tmp_dir.name, f"{date}_{stream_normalizer.RECOVERY_SUFFIX}"))
 
     def test_ingest_file(self):
         """Test ingesting a recovery file"""
@@ -53,7 +54,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
             with self.assertLogs(recovery.logger, level=logging.INFO):
                 recovery.ingest_file(recovery_file)
 
-        mock_ingest.assert_called_once_with([crawlers.DatasetInfo(f'http://foo{i}')
+        mock_ingest.assert_called_once_with([crawlers_base.DatasetInfo(f'http://foo{i}')
                                              for i in range(2)])
         self.assertFalse(recovery_file.exists())
 
@@ -135,7 +136,7 @@ class IngestionRecoveryTestCase(django.test.TestCase):
         # generated when processing the first one
         self.assertEqual(len(mock_ingest_file.call_args_list), 2)
         self.assertTrue(all([
-            call[1][0].name.endswith(crawlers.CrawlerIterator.RECOVERY_SUFFIX)
+            call[1][0].name.endswith(normalizers.StreamMetadataNormalizer.RECOVERY_SUFFIX)
             for call in mock_ingest_file.mock_calls]))
         mock_sleep.assert_called_once_with(60)
 
