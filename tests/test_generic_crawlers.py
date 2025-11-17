@@ -53,14 +53,17 @@ class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
 
     def test_iter(self):
-        """__iter__() should return self"""
-        crawler = crawlers_base.Crawler()
-        crawler.crawl = lambda: []
+        """Test iterating over crawler"""
+        crawler = crawlers_base.Crawler.from_kwargs()
+        crawler.crawl = lambda: ['1', '2']
+        self.assertListEqual(
+            list(crawler),
+            ['1', '2'])
 
     def test_abstract_crawl(self):
         """The crawl method should raise a NotImplementedError"""
         with self.assertRaises(NotImplementedError):
-            crawlers_base.Crawler().crawl()
+            crawlers_base.Crawler.from_kwargs().crawl()
 
     def test_http_get_retry(self):
         """Test that _http_get retries the request when a connection
@@ -78,7 +81,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
                 http_500_error,
                 mock.Mock())
             with self.assertLogs(crawlers_base.Crawler.logger, level=logging.WARNING):
-                crawlers_base.Crawler()._http_get('url', max_tries=5, wait_time=30)
+                crawlers_base.Crawler.from_kwargs()._http_get('url', max_tries=5, wait_time=30)
 
             self.assertEqual(len(mock_request.mock_calls), 5)
             self.assertListEqual(mock_sleep.mock_calls, [mock.call(30 * (2**i)) for i in range(4)])
@@ -94,7 +97,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
 
             with self.assertLogs(crawlers_base.Crawler.logger, level=logging.WARNING), \
                  self.assertRaises(RuntimeError):
-                crawlers_base.Crawler()._http_get('url')
+                crawlers_base.Crawler.from_kwargs()._http_get('url')
 
             self.assertEqual(len(mock_request.mock_calls), 5)
             self.assertEqual(len(mock_sleep.mock_calls), 5)
@@ -106,7 +109,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
         with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
             mock_request.side_effect = requests.TooManyRedirects
             with self.assertRaises(requests.RequestException):
-                self.assertIsNone(crawlers_base.Crawler()._http_get('url'))
+                self.assertIsNone(crawlers_base.Crawler.from_kwargs()._http_get('url'))
 
     def test_http_get_error_on_404_status(self):
         """Test that an exception is raised in case of HTTP error code"""
@@ -115,7 +118,7 @@ class BaseCrawlerTestCase(unittest.TestCase):
         with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
             mock_request.side_effect = requests.HTTPError(response=response)
             with self.assertRaises(requests.HTTPError):
-                crawlers_base.Crawler()._http_get('http://foo')
+                crawlers_base.Crawler.from_kwargs()._http_get('http://foo')
 
 
 class DirectoryCrawlerTestCase(unittest.TestCase):
