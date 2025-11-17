@@ -52,7 +52,7 @@ class ProvidersArgumentTestCase(django.test.TestCase):
             },
             'thredds': {
                 'crawler': {'name': 'thredds'},
-                'max_normalizer_threads': 30
+                'normalizer': {'max_threads': 30}
             }
         }
         parsed_providers = config.ProvidersArgument('providers').parse(providers_arg)
@@ -67,13 +67,11 @@ class ProvidersArgumentTestCase(django.test.TestCase):
                     },
                     'normalizer': {'name': 'cmems'},
                     'ingester': {},
-                    'max_normalizer_threads': 1,
                 }),
                 Provider(name='thredds', config={
                     'crawler': {'name': 'thredds'},
-                    'normalizer': {'name': 'raw'},
+                    'normalizer': {'max_threads': 30},
                     'ingester': {},
-                    'max_normalizer_threads': 30,
                 }),
             ])
 
@@ -110,7 +108,6 @@ class ProvidersConfigurationTestCase(django.test.TestCase):
                             },
                             'normalizer': {'name': 'resto'},
                             'ingester': {},
-                            'max_normalizer_threads': 1,
                          })
                 ])
 
