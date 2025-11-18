@@ -14,8 +14,6 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
 
     name = 'cmems'
 
-    logger = logging.getLogger(__name__ + '.CMEMSMetadataNormalizer')
-
     time_patterns = (
         # dataset-specific time coverage
         (
