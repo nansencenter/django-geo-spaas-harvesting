@@ -17,41 +17,41 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
     time_patterns = (
         # dataset-specific time coverage
         (
-            re.compile(rf'/nrt_global_allsat_phy_l4_{utils.YEARMONTHDAY_REGEX}_'),
+            re.compile(rf'nrt_global_allsat_phy_l4_{utils.YEARMONTHDAY_REGEX}_'),
             utils.create_datetime,
             lambda time: (time - relativedelta(hours=12), time + relativedelta(hours=12))
         ),
         (
-            re.compile(rf'/dataset-uv-nrt-monthly_{utils.YEARMONTH_REGEX}T'),
+            re.compile(rf'dataset-uv-nrt-monthly_{utils.YEARMONTH_REGEX}T'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(months=1))
         ),
         (
-            re.compile(rf'/mercatorpsy4v3r1_gl12_mean_{utils.YEARMONTH_REGEX}($|[/0-9])'),
+            re.compile(rf'mercatorpsy4v3r1_gl12_mean_{utils.YEARMONTH_REGEX}_'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(months=1))
         ),
         (
             re.compile(
-                r'/mercatorpsy4v3r1_gl12_(thetao|so|uovo)_' +
+                r'mercatorpsy4v3r1_gl12_(thetao|so|uovo)_' +
                 utils.YEARMONTHDAY_REGEX +
                 r'_(?P<hour>\d{2})h_R'),
             utils.create_datetime,
             lambda time: (time, time)
         ),
         (
-            re.compile(rf'{utils.YEARMONTHDAY_REGEX}_m-.*\.nc$'),
+            re.compile(rf'{utils.YEARMONTHDAY_REGEX}_m-CMCC-'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(months=1))
         ),
         (
             re.compile(
-                rf'/CMEMS_v5r1_IBI_PHY_NRT_PdE_01mav_{utils.YEARMONTHDAY_REGEX}_.*$'),
+                rf'CMEMS_v5r1_IBI_PHY_NRT_PdE_01mav_{utils.YEARMONTHDAY_REGEX}_'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(months=1))
         ),
         (
-            re.compile(rf"/{utils.YEARMONTHDAY_REGEX}" +
+            re.compile(rf"{utils.YEARMONTHDAY_REGEX}" +
                         r"_mm-12km-NERSC-MODEL-TOPAZ4B-ARC-RAN.*"),
             utils.create_datetime,
             lambda time: (
@@ -60,37 +60,37 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
             )
         ),
         (
-            re.compile(rf"/{utils.YEARMONTHDAY_REGEX}" +
+            re.compile(rf"{utils.YEARMONTHDAY_REGEX}" +
                         r"_ym-12km-NERSC-MODEL-TOPAZ4B-ARC-RAN.*"),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(years=1))
         ),
         (
-            re.compile(rf"/{utils.YEARMONTH_REGEX}" +
+            re.compile(rf"{utils.YEARMONTH_REGEX}" +
                         r"_mm-metno-MODEL-topaz5_ecosmo-ARC-.*"),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(months=1))
         ),
         (
-            re.compile(rf'/mfwamglocep_{utils.YEARMONTHDAY_REGEX}' +
+            re.compile(rf'mfwamglocep_{utils.YEARMONTHDAY_REGEX}' +
                         r'(?P<hour>(00|12))_R[0-9]{8}_(00|12)H'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(hours=12))
         ),
         (
-            re.compile(rf'/mercatorbiomer4v2r1_global_mean_{utils.YEARMONTH_REGEX}$'),
+            re.compile(rf'mercatorbiomer4v2r1_global_mean_{utils.YEARMONTH_REGEX}$'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(months=1))
         ),
         # generic 1 day coverage
         (
-            re.compile(rf'[-_.:/]{utils.YEARMONTHDAY_REGEX}(\d{{6}})?([-_.:T]|$)'),
+            re.compile(rf'(^|[-_.:/]){utils.YEARMONTHDAY_REGEX}(\d{{6}})?([-_.:T]|$)'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(days=1))
         ),
         # generic 1 month coverage
         (
-            re.compile(rf'[-_.:/]{utils.YEARMONTH_REGEX}([-_.:T]|$)'),
+            re.compile(rf'(^|[-_.:/]){utils.YEARMONTH_REGEX}([-_.:T]|$)'),
             utils.create_datetime,
             lambda time: (time, time + relativedelta(months=1))
         ),
