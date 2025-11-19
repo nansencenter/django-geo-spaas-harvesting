@@ -121,26 +121,29 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
         return utils.find_time_coverage(self.time_patterns, dataset_info.url)[1]
 
     def get_keywords(self, dataset_info):
-        results = [Keyword.objects.filter(kind='gcmd_provider', data__Short_Name='CMEMS').first()]
+        results = []
+        cmems_kws = utils.find_keywords([{'kind': 'gcmd_provider', 'data__Short_Name': 'CMEMS'}])
+        if cmems_kws:
+            results.append(cmems_kws[0])
 
         search_strings = (
             dataset_info.metadata['cmems_dataset_name'],
             *dataset_info.metadata['product_info'].sources,
         )
         platform = None
-        platforms = utils.find_keywords({'kind': 'gcmd_platform', 'data__icontains': s}
-                                        for s in search_strings)
+        platforms = utils.find_keywords([{'kind': 'gcmd_platform', 'data__icontains': s}
+                                         for s in search_strings])
         if platforms:
             platform = platforms[0]
             results.append(platform)
 
         if platform and 'Models' in platform.data['Category']:
             results.append(Keyword.objects.filter(kind='gcmd_instrument',
-                                                data__Long_Name='Computer',
-                                                data__Short_Name='Computer'))
+                                                  data__Long_Name='Computer',
+                                                  data__Short_Name='Computer').first())
         else:
-            instruments = utils.find_keywords({'kind': 'gcmd_instrument', 'data__icontains': s}
-                                                for s in search_strings)
+            instruments = utils.find_keywords([{'kind': 'gcmd_instrument', 'data__icontains': s}
+                                               for s in search_strings])
             if instruments:
                 results.append(instruments[0])
 
@@ -163,7 +166,7 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
                 search_names.append(short_name)
             else:
                 self.logger.warning('No available name for the following variable, skipping: %s',
-                                  variable)
+                                    variable)
                 continue
 
         return utils.create_parameter_list(search_names)
