@@ -72,7 +72,7 @@ class EarthdataCMRMetadataNormalizer(MetadataNormalizer):
         return dataset_info.metadata['umm']['Platforms'][0]['Instruments'][0]['ShortName']
 
     def _get_provider_string(self, dataset_info):
-        dataset_info.metadata['meta']['provider-id']
+        return dataset_info.metadata['meta']['provider-id']
 
     def get_keywords(self, dataset_info):
         vocabularies = (
