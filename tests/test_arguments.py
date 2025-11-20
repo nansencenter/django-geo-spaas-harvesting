@@ -325,3 +325,15 @@ class WKTArgumentTestCase(unittest.TestCase):
                                       required=True,
                                       geometry_types=[shapely.geometry.Point])),
             "foo, type=WKT string, required, accepted geometries=['Point']")
+
+
+class WKTOrStringArgumentTestCase(unittest.TestCase):
+    """Tests for the WKTOrStringArgument class"""
+
+    def test_parse(self):
+        """Should return a shapely object if valid WKT, else pass along
+        the string
+        """
+        arg = arguments.WKTOrStringArgument()
+        self.assertEqual(arg.parse("Point(1 1)"), shapely.Point(1, 1))
+        self.assertEqual(arg.parse("bbox(1,2,3,4)"), "bbox(1,2,3,4)")
