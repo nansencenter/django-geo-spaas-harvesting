@@ -1,6 +1,5 @@
 """Tests for the CLI"""
 import argparse
-import io
 import logging
 import unittest
 import unittest.mock as mock
