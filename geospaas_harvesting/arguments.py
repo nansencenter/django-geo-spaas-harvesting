@@ -276,7 +276,7 @@ class SequenceArgument(Argument):
             raise ValueError(f"{self.name} should be a sequence")
         if self.length is not None and len(value) != self.length:
             raise ValueError(f"{self.name} should have {self.length} elements")
-        return [self.contents_type(f'{self.name} element').parse(elt) for elt in value]
+        return type(value)(self.contents_type(f'{self.name} element').parse(elt) for elt in value)
 
 
 class ListArgument(SequenceArgument):
