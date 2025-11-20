@@ -21,7 +21,7 @@ class Argument():
     """
     type = 'unknown'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.name = name
         self.required = kwargs.get('required', False)
         self.default = kwargs.get('default', NoDefault)
@@ -140,7 +140,7 @@ class ChoiceArgument(Argument):
     """
     type = 'multiple choices'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.valid_options = kwargs.pop('valid_options', [])
         super().__init__(name, **kwargs)
         if self.default is not NoDefault:
@@ -185,7 +185,7 @@ class DictArgument(Argument):
     """Dictionary argument"""
     type = 'dictionary'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.valid_keys = set(kwargs.pop('valid_keys', []))
         self.values_types = kwargs.pop('values_types', [])
         super().__init__(name, **kwargs)
@@ -233,7 +233,7 @@ class IntegerArgument(Argument):
     """
     type = 'integer'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         min_value = kwargs.pop('min_value', None)
         max_value = kwargs.pop('max_value', None)
         self.min_value = int(min_value) if min_value is not None else min_value
@@ -266,7 +266,7 @@ class SequenceArgument(Argument):
     """The argument can be any sequence"""
     type = 'sequence'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         super().__init__(name, **kwargs)
         self.contents_type = kwargs.get('contents_type', AnyArgument) # should be an argument class
         self.length = kwargs.get('length', None)
@@ -318,7 +318,7 @@ class StringArgument(Argument):
     """String argument with optional regex validation"""
     type = 'string'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.regex = kwargs.pop('regex', None)
         super().__init__(name, **kwargs)
 
@@ -341,7 +341,7 @@ class WKTArgument(Argument):
     """Creates a shapely geometry object from a WKT string"""
     type = 'WKT string'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.geometry_types = kwargs.pop('geometry_types', [])
         super().__init__(name, **kwargs)
 
