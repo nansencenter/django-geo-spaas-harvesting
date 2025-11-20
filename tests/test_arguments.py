@@ -143,14 +143,23 @@ class DictArgumentTestCase(unittest.TestCase):
     def test_parse(self):
         """Test data validation"""
         arg = arguments.DictArgument(name='dict_arg', valid_keys=['foo'])
-
         self.assertEqual(arg.parse({'foo': 'bar'}), {'foo': 'bar'})
-
         with self.assertRaises(ValueError):
             arg.parse('foo')
-
         with self.assertRaises(ValueError):
             arg.parse({'baz': 'qux'})
+
+    def test_parse_values_types(self):
+        """Test data validation with values types"""
+        arg = arguments.DictArgument(
+                name='dict_arg',
+                valid_keys=['foo', 'bar', 'baz'],
+                values_types=[str, arguments.BooleanArgument()])
+        self.assertDictEqual(
+            arg.parse({'foo': True, 'bar': 'quz'}),
+            {'foo': True, 'bar': 'quz'})
+        with self.assertRaises(ValueError):
+            arg.parse({'foo': True, 'bar': 'quz', 'baz': 1})
 
     def test_eq(self):
         """Test equality between dict arguments"""
@@ -202,6 +211,33 @@ class IntegerArgumentTestCase(unittest.TestCase):
         self.assertEqual(
             str(arguments.IntegerArgument('foo', required=True, min_value=1, max_value=5)),
             "foo, type=integer, required, minimum value=1, maximum value=5")
+
+
+class SequenceArgumentTestCase(unittest.TestCase):
+    """Tests for the SequenceArgument class"""
+
+    def test_parse(self):
+        """Test simple sequence parsing"""
+        arg = arguments.SequenceArgument()
+        self.assertEqual(arg.parse((1, 2, 3)), (1, 2, 3))
+        self.assertEqual(arg.parse([1, 2, 3]), [1, 2, 3])
+        with self.assertRaises(ValueError):
+            arg.parse(1)
+
+    def test_parse_length_validation(self):
+        """Test sequence parsing with length validation"""
+        arg = arguments.SequenceArgument(length=3)
+        self.assertEqual(arg.parse((1, 2, 3)), (1, 2, 3))
+        self.assertEqual(arg.parse([1, 2, 3]), [1, 2, 3])
+        with self.assertRaises(ValueError):
+            arg.parse([1])
+
+    def test_parse_content_validation(self):
+        """Test sequence parsing with contents validation"""
+        arg = arguments.SequenceArgument(contents_type=arguments.IntegerArgument)
+        self.assertEqual(arg.parse((1, 2, 3)), (1, 2, 3))
+        with self.assertRaises(ValueError):
+            arg.parse([1, 2, '3'])
 
 
 class ListArgumentTestCase(unittest.TestCase):
