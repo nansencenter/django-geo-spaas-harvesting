@@ -1,8 +1,4 @@
-"""Test suite for crawlers"""
-# pylint: disable=protected-access
-
 import ftplib
-import io
 import logging
 import os
 import re
@@ -13,109 +9,9 @@ from datetime import datetime, timezone
 from urllib.parse import ParseResult
 
 import requests
-import shapely.geometry
 
 import geospaas_harvesting.crawlers.base as crawlers_base
 import geospaas_harvesting.crawlers.directory as crawlers_directory
-import geospaas_harvesting.crawlers.paginated_api as crawlers_paginated_api
-import geospaas_harvesting.crawlers.erddap as crawlers_erddap
-
-
-class DatasetInfoTestCase(unittest.TestCase):
-    """Tests for DatasetInfo"""
-
-    def test_instanciation(self):
-        """Test the correct creation of a DatasetInfo object"""
-        dataset_info = crawlers_base.DatasetInfo('url', metadata={'foo': 'bar'})
-        self.assertEqual(dataset_info.url, 'url')
-        self.assertDictEqual(dataset_info.metadata, {'foo': 'bar'})
-
-    def test_equality(self):
-        """Test equality between two DatasetInfo objects"""
-        self.assertEqual(
-            crawlers_base.DatasetInfo('foo', {'bar': 'baz'}),
-            crawlers_base.DatasetInfo('foo', {'bar': 'baz'}))
-        self.assertNotEqual(
-            crawlers_base.DatasetInfo('foo', {'bar': 'baz'}),
-            crawlers_base.DatasetInfo('foo', {'bar': 'quz'}))
-
-    def test_representation(self):
-        """Test string reprensentation of DatasetInfo objects"""
-        self.assertEqual(
-            repr(crawlers_base.DatasetInfo('https://foo', {'a': 1})),
-            "DatasetInfo(url='https://foo', metadata={'a': 1})")
-
-
-class BaseCrawlerTestCase(unittest.TestCase):
-    """Tests for the base Crawler"""
-
-    def test_iter(self):
-        """Test iterating over crawler"""
-        crawler = crawlers_base.Crawler.from_kwargs()
-        crawler.crawl = lambda: ['1', '2']
-        self.assertListEqual(
-            list(crawler),
-            ['1', '2'])
-
-    def test_abstract_crawl(self):
-        """The crawl method should raise a NotImplementedError"""
-        with self.assertRaises(NotImplementedError):
-            crawlers_base.Crawler.from_kwargs().crawl()
-
-    def test_http_get_retry(self):
-        """Test that _http_get retries the request when a connection
-        error or a server error occurs
-        """
-        http_500_error = requests.HTTPError()
-        http_500_error.response = mock.MagicMock(status_code=500)
-
-        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request, \
-                mock.patch('time.sleep') as mock_sleep:
-            mock_request.side_effect=(
-                requests.ConnectionError,
-                requests.ConnectTimeout,
-                requests.ReadTimeout,
-                http_500_error,
-                mock.Mock())
-            with self.assertLogs(crawlers_base.Crawler.logger, level=logging.WARNING):
-                crawlers_base.Crawler.from_kwargs()._http_get('url', max_tries=5, wait_time=30)
-
-            self.assertEqual(len(mock_request.mock_calls), 5)
-            self.assertListEqual(mock_sleep.mock_calls, [mock.call(30 * (2**i)) for i in range(4)])
-
-    def test_http_get_fails_eventually(self):
-        """Test that _http_get retries the request when a connection
-        error or a server error occurs, then logs an error and returns None
-        if the problem persists
-        """
-        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request, \
-                mock.patch('time.sleep') as mock_sleep:
-            mock_request.side_effect = requests.ConnectionError
-
-            with self.assertLogs(crawlers_base.Crawler.logger, level=logging.WARNING), \
-                 self.assertRaises(RuntimeError):
-                crawlers_base.Crawler.from_kwargs()._http_get('url')
-
-            self.assertEqual(len(mock_request.mock_calls), 5)
-            self.assertEqual(len(mock_sleep.mock_calls), 5)
-
-    def test_http_get_no_retry_error(self):
-        """_http_get should not retry the request if the error is not a
-        connection error or a server error
-        """
-        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
-            mock_request.side_effect = requests.TooManyRedirects
-            with self.assertRaises(requests.RequestException):
-                self.assertIsNone(crawlers_base.Crawler.from_kwargs()._http_get('url'))
-
-    def test_http_get_error_on_404_status(self):
-        """Test that an exception is raised in case of HTTP error code"""
-        response = requests.Response()
-        response.status_code = 404
-        with mock.patch('geospaas_harvesting.utils.http_request') as mock_request:
-            mock_request.side_effect = requests.HTTPError(response=response)
-            with self.assertRaises(requests.HTTPError):
-                crawlers_base.Crawler.from_kwargs()._http_get('http://foo')
 
 
 class DirectoryCrawlerTestCase(unittest.TestCase):
@@ -514,11 +410,11 @@ class HTMLDirectoryCrawlerTestCase(unittest.TestCase):
     def test_get_right_number_of_links(self):
         """Test that the crawler gets the correct number of links from a test page"""
         with open(os.path.join(
-                os.path.dirname(__file__), 'data', 'opendap', 'root.html')) as data_file:
+                os.path.dirname(__file__), '..', 'data', 'opendap', 'root.html')) as data_file:
             html = data_file.read()
         self.assertEqual(len(crawlers_directory.HTMLDirectoryCrawler._get_links(html)), 4)
 
-        with open(os.path.join(os.path.dirname(__file__), 'data', 'empty.html')) as data_file:
+        with open(os.path.join(os.path.dirname(__file__), '..', 'data', 'empty.html')) as data_file:
             html = data_file.read()
         self.assertEqual(len(crawlers_directory.HTMLDirectoryCrawler._get_links(html)), 0)
 
@@ -583,10 +479,10 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
     TEST_DATA = {
         'root': {
             'urls': ["https://test-opendap.com"],
-            'file_path': "data/opendap/root.html"},
+            'file_path': "../data/opendap/root.html"},
         'root_duplicates': {
             'urls': ["https://test2-opendap.com"],
-            'file_path': "data/opendap/root_duplicates.html"},
+            'file_path': "../data/opendap/root_duplicates.html"},
         'dataset': {
             'urls': [
                 'https://test-opendap.com/dataset.nc',
@@ -598,34 +494,34 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             'file_path': None},
         'full_ddx': {
             'urls': ["https://opendap.jpl.nasa.gov/opendap/full_dataset.nc.ddx"],
-            'file_path': "data/opendap/full_ddx.xml"},
+            'file_path': "../data/opendap/full_ddx.xml"},
         'short_ddx': {
             'urls': ["https://test-opendap.com/short_dataset.nc.ddx"],
-            'file_path': "data/opendap/short_ddx.xml"},
+            'file_path': "../data/opendap/short_ddx.xml"},
         'no_ns_ddx': {
             'urls': ["https://test-opendap.com/no_ns_dataset.nc.ddx"],
-            'file_path': "data/opendap/ddx_no_ns.xml"},
+            'file_path': "../data/opendap/ddx_no_ns.xml"},
         'folder': {
             'urls': [
                 'https://test-opendap.com/folder/contents.html',
                 'https://test2-opendap.com/folder/contents.html'
             ],
-            'file_path': 'data/opendap/folder/contents.html'},
+            'file_path': '../data/opendap/folder/contents.html'},
         'folder_year': {
             'urls': ['https://test-opendap.com/folder/2019/contents.html'],
-            'file_path': 'data/opendap/folder/2019/contents.html'},
+            'file_path': '../data/opendap/folder/2019/contents.html'},
         'folder_month': {
             'urls': ['https://test-opendap.com/folder/2019/02/contents.html'],
-            'file_path': 'data/opendap/folder/2019/02/contents.html'},
+            'file_path': '../data/opendap/folder/2019/02/contents.html'},
         'folder_day_of_month': {
             'urls': ['https://test-opendap.com/folder/2019/02/14/contents.html'],
-            'file_path': 'data/opendap/folder/2019/02/14/contents.html'},
+            'file_path': '../data/opendap/folder/2019/02/14/contents.html'},
         'folder_day_of_year': {
             'urls': ['https://test-opendap.com/folder/2019/046/contents.html'],
-            'file_path': 'data/opendap/folder/2019/046/contents.html'},
+            'file_path': '../data/opendap/folder/2019/046/contents.html'},
         'empty': {
             'urls': ['http://empty.com'],
-            'file_path': 'data/empty.html'},
+            'file_path': '../data/empty.html'},
         'inexistent': {
             'urls': ['http://random.url'],
             'file_path': None}
@@ -838,117 +734,6 @@ class ThreddsCrawlerTestCase(unittest.TestCase):
             crawlers_directory.ThreddsCrawler.get_ddx_url('https://foo/bar.nc')
 
 
-class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
-    """Tests for the HTTPPaginatedAPICrawler base class"""
-
-    def test_equality(self):
-        """Test the equality operator between crawlers"""
-        self.assertEqual(
-            crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='http://foo'),
-            crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='http://foo'))
-        self.assertEqual(
-            crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(
-                url='http://foo', username='user', password='pass', search_terms={'bar': 'baz'}),
-            crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(
-                url='http://foo', username='user', password='pass', search_terms={'bar': 'baz'}))
-        self.assertNotEqual(
-            crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='http://foo'),
-            crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='http://bar'))
-
-    def test_get_page_size(self):
-        """Test page_size getter"""
-        with mock.patch(
-                'geospaas_harvesting.crawlers.paginated_api.HTTPPaginatedAPICrawler.PAGE_SIZE_NAME',
-                'size'):
-            crawler = crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(
-                url='https://foo', page_size=10)
-            crawler.set_initial_state()
-            self.assertEqual(crawler.page_size, 10)
-
-    def test_get_page_offset(self):
-        """Test page_offset getter"""
-        crawler = crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(
-                url='foo', initial_offset=10)
-        crawler.set_initial_state()
-        self.assertEqual(crawler.page_offset, 10)
-
-    def test_set_page_offset(self):
-        """Test page_offset setter"""
-        crawler = crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='https://foo')
-        crawler.page_offset = 12
-        self.assertEqual(crawler.page_offset, 12)
-
-    def test_set_initial_state(self):
-        """Test that set_initial_state correctly resets the crawler"""
-        crawler = crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='https://foo')
-        # Set non-default offset and _urls values
-        crawler.request_parameters['params'][crawler.PAGE_OFFSET_NAME] = 200
-        crawler.page_offset = 15
-
-        crawler.set_initial_state()
-        self.assertEqual(
-            crawler.request_parameters['params'][crawler.PAGE_OFFSET_NAME], crawler.initial_offset)
-
-    def test_get_next_page(self):
-        """_get_next_page() should get the page at the current offset,
-        then increment the offset
-        """
-        crawler = crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='https://foo')
-        crawler.set_initial_state()
-        response = requests.Response()
-        response.status_code = 200
-        response.raw = io.BytesIO(b'foo')
-        with mock.patch.object(crawler, '_http_get', return_value=response), \
-                self.assertLogs(crawler.logger, level=logging.DEBUG):
-            self.assertEqual(crawler._get_next_page(), 'foo')
-            self.assertEqual(crawler.request_parameters['params'][crawler.PAGE_OFFSET_NAME], 1)
-
-    def test_abstract_get_datasets_info(self):
-        """_get_datasets_info() should raise a NotImplementedError
-        when called directly from HTTPPaginatedAPICrawler
-        """
-        crawler = crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='foo')
-        with self.assertRaises(NotImplementedError):
-            crawler._get_datasets_info('')
-
-    def test_abstract_get_entries(self):
-        """_get_entries() should raise a NotImplementedError
-        when called directly from HTTPPaginatedAPICrawler
-        """
-        crawler = crawlers_paginated_api.HTTPPaginatedAPICrawler.from_kwargs(url='foo')
-        with self.assertRaises(NotImplementedError):
-            crawler._get_entries('')
-
-    def test_crawl(self):
-        """Test the crawling mechanism for HTTP paginated APIs"""
-        class TestHTTPAPICrawler(crawlers_paginated_api.HTTPPaginatedAPICrawler):
-            def __init__(self, **kwargs):
-                super().__init__(**kwargs)
-                self.ran = False
-
-            def _get_next_page(self):
-                if self.ran:
-                    return ''
-                else:
-                    self.ran = True
-                    return 'https://foo/bar.nc;https://foo/baz.nc'
-
-            def _get_entries(self, page:str):
-                if page:
-                    return page.split(';')
-                else:
-                    return None
-
-            def _get_datasets_info(self, entries):
-                return [crawlers_base.DatasetInfo(url) for url in entries]
-
-        crawler = TestHTTPAPICrawler.from_kwargs(url='https://foo')
-        self.assertListEqual(
-            list(crawler.crawl()),
-            [crawlers_base.DatasetInfo('https://foo/bar.nc'),
-             crawlers_base.DatasetInfo('https://foo/baz.nc')])
-
-
 class FTPCrawlerTestCase(unittest.TestCase):
     """Tests for the FTP crawler"""
 
@@ -1046,274 +831,3 @@ class FTPCrawlerTestCase(unittest.TestCase):
                 with self.assertRaises(ftplib.error_temp):
                     crawler._list_folder_contents('/')
                 mock_connect.assert_not_called()
-
-
-class ERDDAPTableCrawlerTestCase(unittest.TestCase):
-    """Tests for ERDDAPTableCrawler"""
-
-    TEST_DATA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'erddap')
-
-    def test_url_check(self):
-        """ERDDAPTableCrawler's url should end with .json"""
-        with self.assertRaises(ValueError):
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url='http://foo', id_attrs=['bar'])
-
-    def test_equality(self):
-        """Test equality of two DirectoryCrawler objects"""
-        self.assertEqual(
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
-                url='http://foo/ArgoFloats.json', id_attrs=['platform_number']),
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
-                url='http://foo/ArgoFloats.json', id_attrs=['platform_number']))
-        self.assertNotEqual(
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
-                url='http://foo/ArgoFloats.json', id_attrs=['platform_number']),
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
-                url='http://foo/ArgoFloats.json', id_attrs=['platform_number'],
-                longitude_attr='lon', latitude_attr='lat'))
-
-    def test_get_ids(self):
-        """Test gettings identifiers which match search terms"""
-        response_path = os.path.join(self.TEST_DATA_PATH, 'ids.json')
-        response = requests.Response()
-        response.status_code = 200
-        response.raw = open(response_path, 'rb')
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
-            url='http://foo/ArgoFloats.json',
-            id_attrs=['platform_number'],
-            search_terms=['time>=2024-01-01T00:00:00Z',
-                          'time<=2024-01-01T01:00:00Z'])
-        with mock.patch.object(crawler, '_http_get', return_value=response):
-            ids = crawler.get_ids()
-            self.assertListEqual(
-                list(ids),
-                [["3901480"], ["5905121"], ["5905267"], ["5905498"], ["5905533"], ["5905765"],
-                 ["5905878"], ["5906337"], ["5906912"], ["5906993"], ["6902906"], ["6903060"]])
-        response.raw.close()
-
-    def test_get_ids_error(self):
-        """An error message must be logged if an error happens when
-        fetching IDs
-        """
-        error = requests.HTTPError(response=mock.Mock(content='error message'))
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
-            url='http://foo/ArgoFloats.json', id_attrs=['platform_number'])
-        with mock.patch.object(crawler, '_http_get', side_effect=error):
-            with self.assertLogs(logger=crawler.logger, level=logging.ERROR), \
-                 self.assertRaises(requests.HTTPError):
-                list(crawler.get_ids())
-
-    def test__make_condition_parameters(self):
-        """Check that string parameters get quotes"""
-        self.assertDictEqual(
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url='url.json', id_attrs=['id_attr'])._make_condition_parameters({
-                'a': 'foo',
-                'b': 1,
-                'c': True
-            }),
-            {'a': '"foo"', 'b': 1, 'c': True}
-        )
-
-    def test_crawl(self):
-        """Test the DatasetInfo objects returned by the crawler"""
-        ids = [["3901480"], ["5905121"], ["5905267"]]
-        coverage = [('2025-05-01T00:00:00Z', '2025-05-02T00:00:00Z'), [(1, 2), (3, 4)]]
-        metadata = {'foo': 'bar'}
-        expected_trajectory = shapely.geometry.MultiPoint([(1, 2), (3, 4)]).wkt
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
-            url='http://foo/ArgoFloats.json', id_attrs=['platform_number'],
-            position_qc_attr='position_qc', variables=['foo', 'bar'])
-        with mock.patch.object(crawler, 'get_ids', return_value=ids), \
-             mock.patch.object(crawler, 'get_coverage', return_value=coverage), \
-             mock.patch.object(crawler, 'get_product_metadata', return_value=metadata):
-            self.assertListEqual(
-                list(crawler.crawl()),
-                [
-                    crawlers_base.DatasetInfo(
-                        'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
-                        '&platform_number="3901480"',
-                        {
-                            'entry_id': '3901480',
-                            'temporal_coverage': ('2025-05-01T00:00:00Z', '2025-05-02T00:00:00Z'),
-                            'trajectory': expected_trajectory,
-                            'product_metadata': metadata,
-                        }),
-                    crawlers_base.DatasetInfo(
-                        'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
-                        '&platform_number="5905121"',
-                        {
-                            'entry_id': '5905121',
-                            'temporal_coverage': ('2025-05-01T00:00:00Z', '2025-05-02T00:00:00Z'),
-                            'trajectory': expected_trajectory,
-                            'product_metadata': metadata,
-
-                        }),
-                    crawlers_base.DatasetInfo(
-                        'http://foo/ArgoFloats.json?time,longitude,latitude,position_qc,foo,bar'
-                        '&platform_number="5905267"',
-                        {
-                            'entry_id': '5905267',
-                            'temporal_coverage': ('2025-05-01T00:00:00Z', '2025-05-02T00:00:00Z'),
-                            'trajectory': expected_trajectory,
-                            'product_metadata': metadata,
-                        }),
-                ])
-
-    def test_check_qc(self):
-        """Test the QC validation"""
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url='foo.json', id_attrs=['bar'], valid_qc_codes=('1', '2'))
-        self.assertTrue(crawler._check_qc('1'))
-        self.assertTrue(crawler._check_qc('2'))
-        self.assertFalse(crawler._check_qc('0'))
-        self.assertFalse(crawler._check_qc('3'))
-        self.assertFalse(crawler._check_qc(1))
-
-    def test_make_coverage_url(self):
-        """Test making the URL to get a dataset's temporal and spatial
-        coverage
-        """
-        self.assertEqual(
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url='https://foo.json', id_attrs=['id'],
-                                        longitude_attr='lon', latitude_attr='lat', time_attr='time',
-                                        position_qc_attr='pos_qc',
-                                        variables=['bar', 'baz'])._make_coverage_url(),
-            'https://foo.json?time,lon,lat,pos_qc&distinct()&orderBy("time")'
-        )
-
-    def test_get_coverage(self):
-        """Test getting the temporal and spatial coverage for one
-        dataset
-        """
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url=
-            'https://foo.json', id_attrs=['platform_number'],
-            longitude_attr='longitude', latitude_attr='latitude',
-            time_attr='time',
-            position_qc_attr='position_qc', time_qc_attr='time_qc')
-
-        response = requests.Response()
-        response.status_code = 200
-        response.raw = open(os.path.join(self.TEST_DATA_PATH, 'coverage.json'), 'rb')
-
-        expected_trajectory = [
-            (-11.863, -0.126),
-            (-13.83, -0.035),
-            (-15.744, 0.68),
-            (-16.674, 0.76),
-            (-17.133, 1.21),
-            (-17.74, 1.403),
-            (-17.734, 1.263),
-            (-17.189, 1.756),
-            (-16.437, 1.191),
-            (-16.039, 1.409),
-            (-15.451, 1.177),
-            (-15.075, 1.132),
-            (-14.329, 1.182),
-            (-13.586, 1.285),
-            (-13.488, 1.766),
-            (-13.593, 2.086),
-            (-14.115, 2.533),
-            (-15.016, 2.923),
-            (-15.901, 3.11),
-            (-16.634, 3.042),
-            (-16.874, 3.115),
-            (-17.081, 3.125),
-            (-17.515, 3.171),
-            (-17.623, 3.318),
-            (-17.668, 3.358),
-            (-17.332, 3.699),
-            (-16.714, 3.96),
-            (-15.962, 4.15),
-            (-15.254, 3.998),
-            (-14.585, 4.127),
-            (-14.048, 4.175),
-            (-13.926, 4.17),
-            (-13.769, 4.183),
-            (-13.47, 4.276),
-            (-13.134, 4.322),
-            (-12.887, 4.221),
-            (-12.702, 4.292),
-            (-12.415, 4.275),
-            (-12.116, 4.126),
-            (-11.792, 3.997),
-            (-11.3, 3.732),
-            (-10.925, 3.94),
-            (-10.152, 3.852),
-            (-9.558, 4.015),
-            (-9.756, 4.6),
-            (-10.046, 5.203),
-            (-9.934, 5.179),
-            (-9.612, 4.975),
-        ]
-
-        with mock.patch.object(crawler, '_http_get', return_value=response) as mock_http_get:
-            self.assertTupleEqual(
-                crawler.get_coverage({'platform_number': '13858'}),
-                (("1997-07-28T20:26:20Z", "1998-12-27T20:00:25Z"), expected_trajectory))
-        mock_http_get.assert_called_once_with(
-            crawler._make_coverage_url(),
-            request_parameters={'params': {'platform_number': '"13858"'}})
-        response.raw.close()
-
-    def test_get_coverage_error(self):
-        """`get_coverage` must raise an exception when the coverage
-        cannot be determined
-        """
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url=
-            'https://foo.json', id_attrs=['platform_number'], valid_qc_codes=('1',))
-        with mock.patch.object(crawler, '_http_get') as mock_http_get:
-            mock_http_get.return_value.json.return_value = {
-                'table': {
-                    'rows': [
-                        ["1997-07-28T20:26:20Z", -11.863, -0.126, "3", "1"],
-                        ["1997-08-09T01:52:41Z", -13.83, -0.035, "5", "1"],
-                        ["1997-08-19T20:44:44Z", -15.744, 0.68, "3", "1"],
-                        ["1997-08-30T20:12:43Z", -16.674, 0.76, "4", "1"],
-                        ["1997-09-10T21:03:19Z", -17.133, 1.21, "4", "1"],
-                    ]
-                }
-            }
-            with self.assertRaises(RuntimeError):
-                crawler.get_coverage({'platform_number': '123456'})
-
-    def test_get_coverage_http_error(self):
-        """`get_coverage` must raise an exception when an HTTP error
-        happens
-        """
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
-            url='https://foo.json', id_attrs=['platform_number'])
-        error = requests.HTTPError(response=mock.MagicMock())
-        with mock.patch.object(crawler, '_http_get', side_effect=error):
-            with self.assertRaises(requests.HTTPError), \
-                 self.assertLogs(crawler.logger, logging.ERROR):
-                crawler.get_coverage({'platform_number': '123456'})
-
-    def test_make_product_metadata_url(self):
-        """Test creating the URL to a product's metadata"""
-        self.assertEqual(
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url=
-                'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', id_attrs=['id']
-            )._make_product_metadata_url(),
-            'https://erddap.ifremer.fr/erddap/info/ArgoFloats/index.json')
-
-        with self.assertRaises(RuntimeError):
-            crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url='https://foo.json', id_attrs=['id'])._make_product_metadata_url()
-
-    def test_get_product_metadata(self):
-        """Test getting a product's metadata"""
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url=
-            'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', id_attrs=['id'])
-        with mock.patch.object(crawler, '_http_get') as mock_http_get:
-            result = crawler.get_product_metadata()
-        self.assertEqual(result, mock_http_get.return_value.json.return_value)
-        mock_http_get.assert_called_with(crawler._make_product_metadata_url())
-
-    def test_get_product_metadata_http_error(self):
-        """`get_coverage` must raise an exception when an HTTP error
-        happens
-        """
-        crawler = crawlers_erddap.ERDDAPTableCrawler.from_kwargs(url=
-            'https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.json', id_attrs=['id'])
-        error = requests.HTTPError
-        with mock.patch.object(crawler, '_http_get', side_effect=error):
-            with self.assertRaises(error), self.assertLogs(crawler.logger, logging.ERROR):
-                crawler.get_product_metadata()
