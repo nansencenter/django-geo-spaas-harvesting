@@ -83,12 +83,6 @@ def save_results(searches_results):
             raise
 
 
-def parse_providers_config(providers_config_path):
-    """Parse a file for provider configurations"""
-    providers_config = config.ProvidersConfiguration.from_file(providers_config_path)
-    return providers_config.providers
-
-
 def print_providers():
     """Print all existing providers"""
     print('Available providers:')
@@ -105,7 +99,7 @@ def delete_providers(names_to_delete: list[str]):
 
 def update_providers(providers_path: Union[Path, str]):
     """Update providers from a file"""
-    providers = parse_providers_config(providers_path)
+    providers = config.ProvidersConfiguration.from_file(providers_path).providers
     print(f"Updating providers from {providers_path}")
     for provider in providers:
         try:
@@ -114,7 +108,7 @@ def update_providers(providers_path: Union[Path, str]):
             print(f"Creating provider {provider}")
             provider.save()
         else:
-            if provider != existing_provider:
+            if provider.config != existing_provider.config:
                 print(f"Updating provider {existing_provider} to {provider}")
                 provider.id = existing_provider.id
                 provider.save()
