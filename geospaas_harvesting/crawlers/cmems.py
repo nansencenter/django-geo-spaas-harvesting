@@ -54,7 +54,7 @@ class CMEMSCrawler(Crawler):
         first_date = self.time_range[0]
         last_date = self.time_range[1]
 
-        if first_date is None and last_date is None:
+        if first_date is None or last_date is None:
             return None
 
         years = list(range(first_date.year, last_date.year + 1))
