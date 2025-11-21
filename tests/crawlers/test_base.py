@@ -35,6 +35,15 @@ class DatasetInfoTestCase(unittest.TestCase):
 class BaseCrawlerTestCase(unittest.TestCase):
     """Tests for the base Crawler"""
 
+    def test_str(self):
+        """Test string conversion"""
+        class TestCrawler(crawlers_base.Crawler):
+            name = 'test'
+
+        self.assertEqual(
+            str(TestCrawler.from_kwargs()),
+            'test')
+
     def test_iter(self):
         """Test iterating over crawler"""
         crawler = crawlers_base.Crawler.from_kwargs()
