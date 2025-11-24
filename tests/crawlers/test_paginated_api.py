@@ -354,3 +354,142 @@ class EarthdataCMRCrawlerTestCase(unittest.TestCase):
 
         dataset_infos = self.crawler._get_datasets_info(self.crawler._get_entries(page))
         self.assertEqual(next(dataset_infos), expected_entry)
+
+
+class RestoCrawlerTestCase(unittest.TestCase):
+    """Tests for RestoCrawler"""
+    def setUp(self):
+        self.crawler = crawlers_paginated_api.RestoCrawler.from_kwargs(
+            url='foo', collection='COLLECTION',
+            search_terms={'param1': 'value1', 'param2': 'value2'})
+
+    def test_build_request_parameters_no_argument(self):
+        """Test building the request parameters without specifying any argument"""
+        self.assertDictEqual(self.crawler._build_request_parameters(), {
+            'params': {
+                'maxRecords': 100,
+                'page': 1,
+                'sortOrder': 'ascending',
+                'sortParam': 'published'
+            }
+        })
+
+    def test_build_request_parameters_no_time_range(self):
+        """Test building the request parameters without time range"""
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(
+                {'param1': 'value1', 'param2': 'value2'}),
+            {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'maxRecords': 100,
+                    'page': 1,
+                    'sortOrder': 'ascending',
+                    'sortParam': 'published'
+                }
+            })
+
+    def test_build_request_parameters_with_time_range(self):
+        """Test building the request parameters with time range"""
+        time_range = (
+            datetime(2020, 2, 1, tzinfo=timezone.utc),
+            datetime(2020, 2, 2, tzinfo=timezone.utc)
+        )
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(
+                    {'param1': 'value1', 'param2': 'value2'},
+                    time_range),
+            {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'maxRecords': 100,
+                    'page': 1,
+                    'sortOrder': 'ascending',
+                    'sortParam': 'published',
+                    'startDate': '2020-02-01T00:00:00Z',
+                    'completionDate': '2020-02-02T00:00:00Z'
+                }
+            }
+        )
+
+    def test_build_request_parameters_with_time_range_start_only(self):
+        """Test building the request parameters with time start only
+        """
+        time_range = (datetime(2020, 2, 1, tzinfo=timezone.utc), None)
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(
+                {'param1': 'value1', 'param2': 'value2'},
+                time_range),
+            {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'maxRecords': 100,
+                    'page': 1,
+                    'sortOrder': 'ascending',
+                    'sortParam': 'published',
+                    'startDate': '2020-02-01T00:00:00Z'
+                }
+            })
+
+    def test_build_request_parameters_with_location(self):
+        """Test building the request parameters with location"""
+        time_range = (datetime(2020, 2, 1, tzinfo=timezone.utc), None)
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(
+                {'param1': 'value1', 'param2': 'value2'},
+                location=shapely.geometry.Polygon(((1, 2), (1, 3), (2, 3), (1, 2)))),
+            {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'maxRecords': 100,
+                    'page': 1,
+                    'sortOrder': 'ascending',
+                    'sortParam': 'published',
+                    'geometry': 'POLYGON ((1 2, 1 3, 2 3, 1 2))'
+                }
+            })
+
+    def test_build_request_parameters_with_time_range_end_only(self):
+        """Test building the request parameters without time range"""
+        time_range = (None, datetime(2020, 2, 2, tzinfo=timezone.utc))
+
+        self.assertDictEqual(
+            self.crawler._build_request_parameters(
+                {'param1': 'value1', 'param2': 'value2'}, time_range),
+            {
+                'params': {
+                    'param1': 'value1',
+                    'param2': 'value2',
+                    'maxRecords': 100,
+                    'page': 1,
+                    'sortOrder': 'ascending',
+                    'sortParam': 'published',
+                    'completionDate': '2020-02-02T00:00:00Z'
+                }
+            })
+
+    def test_get_datasets_info(self):
+        """_get_datasets_info() should extract datasets information from a response page"""
+        data_file_path = str(
+            Path(__file__).parent.parent / 'data/creodias_eofinder/result_page.json')
+
+        with open(data_file_path, 'r', encoding='utf-8') as f_h:
+            page = f_h.read()
+
+        expected_entry = json.loads(page)['features'][0]
+
+        expected_result_metadata = expected_entry['properties'].copy()
+        expected_result_metadata['geometry'] = json.dumps(expected_entry['geometry'])
+        expected_result = crawlers_base.DatasetInfo(
+            'https://zipper.creodias.eu/download/c6ff8061-df12-53b7-8dd8-fb834b998f5b',
+            expected_result_metadata)
+
+        dataset_infos = self.crawler._get_datasets_info(self.crawler._get_entries(page))
+        self.assertEqual(next(dataset_infos), expected_result)
