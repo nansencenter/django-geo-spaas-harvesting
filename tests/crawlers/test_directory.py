@@ -691,6 +691,18 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             crawlers_directory.OpenDAPCrawler.get_ddx_url('https://foo/bar.nc.dods'),
             'https://foo/bar.nc.ddx')
 
+    def test_get_raw_attributes(self):
+        """Test getting raw attributes from a URL"""
+        crawler = crawlers_directory.OpenDAPCrawler.from_kwargs(url='foo')
+        self.assertDictEqual(
+            crawler.get_raw_attributes('https://test-opendap.com/short_dataset.nc'),
+            {
+                'Conventions': 'CF-1.7, ACDD-1.3',
+                'title': 'VIIRS L2P Sea Surface Skin Temperature',
+                'raw_dataset_parameters': {'latitude'}
+            })
+
+
 
 class ThreddsCrawlerTestCase(unittest.TestCase):
     """Tests for the Thredds crawler"""
