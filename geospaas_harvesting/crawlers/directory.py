@@ -96,11 +96,11 @@ class DirectoryCrawler(Crawler):
 
     def __repr__(self):
         return (f"{self.__class__.__name__}("
-                f"url={self.root_url}, "
-                f"include={self.include}, "
+                f"url='{self.root_url.geturl()}', "
+                f"include='{self.include.pattern}', "
                 f"time_range={self.time_range}, "
-                f"username={self.username}, "
-                f"password=******"
+                f"username='{self.username}', "
+                f"password='******'"
                 ")")
 
     def __eq__(self, other):
