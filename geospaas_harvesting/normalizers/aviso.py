@@ -6,8 +6,6 @@ import geospaas_harvesting.normalizers.utils as utils
 from .base import MetadataNormalizer
 from .errors import MetadataNormalizationError
 
-from geospaas.catalog.models import Keyword
-
 
 class AVISOAltimetryMetadataNormalizer(MetadataNormalizer):
     """Generate the properties of a GeoSPaaS Dataset using AVISO
