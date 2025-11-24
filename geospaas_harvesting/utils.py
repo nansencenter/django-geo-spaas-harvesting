@@ -167,7 +167,7 @@ def merge_configs(config_dict: dict, override: dict):
             else:
                 raise ValueError(
                     f"'{key}' must have the same type in the "
-                    "'common' and 'searches sections'")
+                    "override")
         else:
             final_config[key] = override[key]
     return final_config
