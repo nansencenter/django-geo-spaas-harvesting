@@ -126,8 +126,17 @@ class AVISOAltimetryMetadataNormalizerTests(unittest.TestCase):
         with mock.patch(
                 'geospaas_harvesting.normalizers.utils.find_keywords') as mock_find_keywords:
             self.assertEqual(
-                self.normalizer.get_keywords(DatasetInfo(url='https://foo')),
+                self.normalizer.get_keywords(DatasetInfo(
+                    url='https://foo',
+                    metadata={
+                        'platform': 'platform1',
+                        'instrument': 'instrument1',
+                    })),
                 mock_find_keywords.return_value)
+            mock_find_keywords.assert_called_with([
+                {'kind': 'gcmd_provider', 'data__icontains': 'AVISO'},
+                {'kind': 'gcmd_platform', 'data__icontains': 'platform1'},
+                {'kind': 'gcmd_instrument', 'data__icontains': 'instrument1'}])
 
     def test_get_location_geometry(self):
         """Test getting the geometry"""
