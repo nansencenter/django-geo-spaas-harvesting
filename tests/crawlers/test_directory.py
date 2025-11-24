@@ -703,7 +703,6 @@ class OpenDAPCrawlerTestCase(unittest.TestCase):
             })
 
 
-
 class ThreddsCrawlerTestCase(unittest.TestCase):
     """Tests for the Thredds crawler"""
 
