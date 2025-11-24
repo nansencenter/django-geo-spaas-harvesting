@@ -859,3 +859,35 @@ class FTPCrawlerTestCase(unittest.TestCase):
                 with self.assertRaises(ftplib.error_temp):
                     crawler._list_folder_contents('/')
                 mock_connect.assert_not_called()
+
+
+class NansatCrawlerTestCase(unittest.TestCase):
+    """Tests for NansatCrawler"""
+
+    def setUp(self):
+        patcher_nansat = mock.patch('geospaas_harvesting.crawlers.directory.Nansat')
+        self.mock_nansat = patcher_nansat.start()
+        self.addCleanup(mock.patch.stopall)
+
+    def test_get_raw_attributes(self):
+        """Test the ingestion of a netcdf file using nansat"""
+        crawler = crawlers_directory.NansatCrawler.from_kwargs(url='foo')
+        self.assertEqual(
+            crawler.get_raw_attributes(''),
+            self.mock_nansat.return_value.get_metadata.return_value)
+
+    def test_get_raw_attributes_ftp_error(self):
+        """Nansat does not support remote FTP files"""
+        with self.assertRaises(ValueError):
+            crawlers_directory.NansatCrawler.from_kwargs(url='').get_raw_attributes('ftp://foo')
+
+    def test_get_raw_attributes_gcps(self):
+        """Test the ingestion of a netcdf file using nansat, with GCP
+        reprojection
+        """
+        crawler = crawlers_directory.NansatCrawler.from_kwargs(url='foo')
+        self.mock_nansat.return_value.vrt.dataset.GetGCPs.return_value = True
+        self.assertEqual(
+            crawler.get_raw_attributes(''),
+            self.mock_nansat.return_value.get_metadata.return_value)
+        self.mock_nansat.return_value.reproject_gcps.assert_called_once()
