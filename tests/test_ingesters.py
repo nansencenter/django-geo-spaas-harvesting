@@ -2,6 +2,7 @@
 
 import logging
 import unittest.mock as mock
+import uuid
 from datetime import datetime, timezone
 
 import django.test
@@ -154,6 +155,15 @@ class IngesterTestCase(django.test.TransactionTestCase):
         self.assertEqual(dataset.entry_id, 'foo')
         self.assertEqual(dataset.entry_title, 'bar')
         self.assertListEqual(list(dataset.tags.all()), [Tag.objects.get(**tag_kwargs)])
+
+    def test_ingest_no_entry_id(self):
+        """Test ingesting a dataset when no entry_id is provided"""
+        uri, entry_id, dataset_status, uri_status = self.ingester._ingest_dataset(( # pylint: disable=protected-access
+            {'entry_title': 'qux'}, 'https://bar/foo.nc', [], [], []))
+        self.assertEqual(uri, 'https://bar/foo.nc')
+        self.assertIsInstance(entry_id, uuid.UUID)
+        self.assertEqual(dataset_status, ingesters.OperationStatus.CREATED)
+        self.assertEqual(uri_status, ingesters.OperationStatus.CREATED)
 
     def test_log_on_ingestion_error(self):
         """The cause of the error must be logged if an exception is raised while ingesting"""
