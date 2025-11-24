@@ -4,17 +4,13 @@ import logging
 import unittest.mock as mock
 from datetime import datetime, timezone
 
-import django.db
-import django.db.utils
 import django.test
 import yaml
-from django.contrib.gis.geos.geometry import GEOSGeometry
 from geospaas.catalog.models import Dataset, DatasetURI, Tag
 from geospaas.vocabularies.models import Keyword, Parameter
 
 import geospaas_harvesting.ingesters as ingesters
 from . import TEST_FILES_PATH
-from geospaas_harvesting.crawlers.base import DatasetInfo
 
 
 class IngesterTestCase(django.test.TransactionTestCase):
