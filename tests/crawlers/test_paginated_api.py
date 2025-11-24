@@ -2,6 +2,7 @@ import io
 import logging
 import unittest
 import unittest.mock as mock
+from datetime import datetime
 
 import requests
 
@@ -11,6 +12,25 @@ import geospaas_harvesting.crawlers.paginated_api as crawlers_paginated_api
 
 class HTTPPaginatedAPICrawlerTestCase(unittest.TestCase):
     """Tests for the HTTPPaginatedAPICrawler base class"""
+
+    def test_repr(self):
+        """Test string representation"""
+        class TestCrawler(crawlers_paginated_api.HTTPPaginatedAPICrawler):
+            PAGE_OFFSET_NAME = 'page'
+            PAGE_SIZE_NAME = 'page_size'
+        self.assertEqual(
+            repr(TestCrawler.from_kwargs(
+                url='http://foo',
+                initial_offset=0,
+                time_range=[datetime(2025, 1, 1), datetime(2025, 1, 2)],
+                location='POINT(1 2)',
+                username='user',
+                password='pass',
+                page_size=10,)),
+            "TestCrawler("
+                "url='http://foo', "
+                "initial_offset=0, "
+                "request_parameters={'params': {'page': 0, 'page_size': 10}})")
 
     def test_equality(self):
         """Test the equality operator between crawlers"""
