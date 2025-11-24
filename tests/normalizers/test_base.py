@@ -7,11 +7,17 @@ import geospaas_harvesting.normalizers as normalizers
 from geospaas_harvesting.crawlers.base import DatasetInfo
 
 
-class GeoSPaaSMetadataNormalizerTestCase(unittest.TestCase):
-    """Tests for GeoSPaaSMetadataNormalizer"""
+class MetadataNormalizerTestCase(unittest.TestCase):
+    """Tests for MetadataNormalizer"""
 
     def setUp(self):
         self.normalizer = normalizers.base.MetadataNormalizer()
+
+    def test_str(self):
+        """Test __str__"""
+        class TestNormalizer(normalizers.base.MetadataNormalizer):
+            name = 'test'
+        self.assertEqual(str(TestNormalizer()), 'test')
 
     def test_get_entry_title(self):
         """get_entry_title() should return an empty string"""
@@ -41,9 +47,20 @@ class GeoSPaaSMetadataNormalizerTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.normalizer.get_time_coverage_end(DatasetInfo(''))
 
+    def test_get_location_geometry(self):
+        """get_location_geometry() should be raise a
+        NotImplementedError
+        """
+        with self.assertRaises(NotImplementedError):
+            self.normalizer.get_location_geometry(DatasetInfo(''))
+
     def test_get_keywords(self):
         """get_keywords() should be return and empty list"""
         self.assertListEqual(self.normalizer.get_keywords(DatasetInfo('')), [])
+
+    def test_get_tags(self):
+        """Should return en empty list"""
+        self.assertListEqual(self.normalizer.get_tags(DatasetInfo('')), [])
 
     def test_get_dataset_parameters(self):
         """Test getting parameters from the 'raw_dataset_parameters'
