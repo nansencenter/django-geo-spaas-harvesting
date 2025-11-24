@@ -75,6 +75,24 @@ class ProviderTestCase(unittest.TestCase):
             str(self.provider),
             "Provider: test (normalizer: raw, crawler: test)")
 
+    def test_crawler_class(self):
+        """Test getting a crawler class from the provider's config"""
+        mock_crawler = mock.Mock()
+        with mock.patch('geospaas_harvesting.crawlers.index', {'test': mock_crawler}):
+            self.assertEqual(self.provider.crawler_class, mock_crawler)
+            with self.assertRaises(ValueError):
+                providers.Provider(name='test', config={'crawler': {'name': 't'}}).crawler_class
+
+    def test_normalizer_class(self):
+        """Test getting a normalizer class from the provider's config
+        """
+        mock_normalizer = mock.Mock()
+        with mock.patch('geospaas_harvesting.normalizers.index', {'raw': mock_normalizer}):
+            self.assertEqual(self.provider.normalizer_class, mock_normalizer)
+            with self.assertRaises(ValueError):
+                providers.Provider(
+                    name='test', config={'normalizer': {'name': 'n'}}).normalizer_class
+
 
 class SearchResultsTestCase(unittest.TestCase):
     """Tests for the SearchResults class"""
