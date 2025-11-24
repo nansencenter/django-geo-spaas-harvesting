@@ -573,13 +573,13 @@ class NetCDFCrawler(LocalDirectoryCrawler):
 
     def __repr__(self):
         return (f"{self.__class__.__name__}("
-                f"url={self.root_url}, "
-                f"include={self.include}, "
-                f"longitude_attribute={self.longitude_attribute}, "
-                f"latitude_attribute={self.latitude_attribute}, "
+                f"url='{self.root_url.geturl()}', "
+                f"include='{self.include.pattern}', "
+                f"longitude_attribute='{self.longitude_attribute}', "
+                f"latitude_attribute='{self.latitude_attribute}', "
                 f"time_range={self.time_range}, "
-                f"username={self.username}, "
-                f"password=******"
+                f"username='{self.username}', "
+                f"password='******'"
                 ")")
 
     # --------- get metadata ---------
