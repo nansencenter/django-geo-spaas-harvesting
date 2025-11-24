@@ -1,6 +1,7 @@
 """Tests for the geospaas_harvesting.utils module"""
+import importlib
 import io
-import os.path
+import os
 import unittest
 import unittest.mock as mock
 import xml.etree.ElementTree as ET
@@ -101,3 +102,63 @@ class UtilsTestCase(unittest.TestCase):
         xml_file = io.BytesIO(xml)
         with self.assertRaises(KeyError):
             _, _ = utils.parse_xml_get_ns(xml_file)
+
+    def test_merge_configs(self):
+        """Test merging dicts"""
+        self.assertDictEqual(
+            utils.merge_configs(config_dict={'a': 1, 'b': 2, 'c': {'d': 9}},
+                                override={'a': 5, 'c': {'d': 8}, 'f': 0}),
+            {'a': 5, 'b': 2, 'c': {'d': 8}, 'f': 0})
+
+    def test_merge_configs_error(self):
+        """An exception must be raised if the overridin"""
+        with self.assertRaises(ValueError):
+            utils.merge_configs(config_dict={'a': 1, 'b': 2, 'c': 3},
+                                override={'a': 'foo', 'd': 0})
+
+
+class SubclassesTestCase(unittest.TestCase):
+    """Tests for utility functions dealing with subclasses"""
+
+    class Base():
+        """Base class for tests"""
+
+    class A(Base):
+        """Class for testing"""
+
+    class B(Base):
+        """Class for testing"""
+
+    class C(B):
+        """Class for testing"""
+
+    class D(A, B):
+        """Class for testing"""
+
+
+    def test_get_all_subclasses(self):
+        """Test that get_all_subclasses() returns all subclasses of
+        the base class
+        """
+        self.assertEqual(
+            utils.get_all_subclasses(self.Base),
+            set((self.A, self.B, self.C, self.D)))
+
+    def test_export_subclasses(self):
+        """Test that export_subclasses imports the modules of the
+        package and adds subclasses to __all__
+        """
+        # simulate the output of pkgutil.iter_modules()
+        # see https://docs.python.org/3.7/library/pkgutil.html#pkgutil.iter_modules
+        modules = (
+            (mock.Mock(), 'module1', False),
+            (mock.Mock(), 'module2', False)
+        )
+        with mock.patch.dict('sys.modules', {'package': mock.Mock()}):
+            patched_utils = importlib.import_module('geospaas_harvesting.utils')
+            with mock.patch('pkgutil.iter_modules', return_value=iter(modules)), \
+                mock.patch('importlib.import_module'):
+                package__all__ = []
+                patched_utils.export_subclasses(
+                    package__all__, 'package', '/foo/package', self.Base)
+        self.assertCountEqual(package__all__, ['Base', 'A', 'B', 'C', 'D'])
