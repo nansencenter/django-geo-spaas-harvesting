@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 
 import unittest
@@ -16,6 +17,37 @@ class ERDDAPTableCrawlerTestCase(unittest.TestCase):
     """Tests for ERDDAPTableCrawler"""
 
     TEST_DATA_PATH = Path(__file__).parent.parent / 'data' / 'erddap'
+
+    def test_repr(self):
+        """Test string representation"""
+        self.assertEqual(
+            repr(crawlers_erddap.ERDDAPTableCrawler.from_kwargs(
+                url='http://foo.json',
+                id_attrs=['bar'],
+                entry_id_prefix='baz_',
+                longitude_attr='lon',
+                latitude_attr='lat',
+                time_attr='time',
+                position_qc_attr='position_qc',
+                time_qc_attr='time_qc',
+                valid_qc_codes=['1', '2'],
+                search_terms=['qux=quux'],
+                variables=['var1'],
+                location='POINT(1 2)',
+                time_range=[datetime(2025, 1, 1), datetime(2025, 1, 2)],
+                )),
+            "ERDDAPTableCrawler("
+                "url='http://foo.json', "
+                "id_attrs=['bar'], "
+                "entry_id_prefix='baz_', "
+                "longitude_attr='lon', latitude_attr='lat', time_attr='time', "
+                "position_qc_attr='position_qc', time_qc_attr='time_qc', "
+                "valid_qc_codes=['1', '2'], "
+                "search_terms=["
+                    "'qux=quux', "
+                    "'lon>=1.0', 'lon<=1.0', 'lat>=2.0', 'lat<=2.0', "
+                    "'time>=2025-01-01T00:00:00Z', 'time<=2025-01-02T00:00:00Z'], "
+                "variables=['var1'])")
 
     def test_url_check(self):
         """ERDDAPTableCrawler's url should end with .json"""
