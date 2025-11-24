@@ -38,6 +38,23 @@ class DirectoryCrawlerTestCase(unittest.TestCase):
              datetime(2020, 1, 2, tzinfo=timezone.utc)))
         self.assertListEqual(crawler._to_process, ['/bar.nc'])
 
+    def test_repr(self):
+        """Test string representation"""
+        self.assertEqual(
+            repr(crawlers_directory.DirectoryCrawler.from_kwargs(
+                url='https://foo',
+                time_range=(datetime(2025, 1, 1), datetime(2025, 1, 2)),
+                include='\.nc$',
+                username='user',
+                password='pass')),
+            "DirectoryCrawler("
+                "url='https://foo', "
+                "include='\.nc$', "
+                "time_range=(datetime.datetime(2025, 1, 1, 0, 0, tzinfo=datetime.timezone.utc), "
+                            "datetime.datetime(2025, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)), "
+                "username='user', "
+                "password='******')")
+
     def test_equality(self):
         """Test equality of two DirectoryCrawler objects"""
         self.assertEqual(
