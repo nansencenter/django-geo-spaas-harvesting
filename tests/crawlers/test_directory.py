@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from urllib.parse import ParseResult
 
+import numpy as np
 import requests
 
 import geospaas_harvesting.crawlers.base as crawlers_base
@@ -891,3 +892,227 @@ class NansatCrawlerTestCase(unittest.TestCase):
             crawler.get_raw_attributes(''),
             self.mock_nansat.return_value.get_metadata.return_value)
         self.mock_nansat.return_value.reproject_gcps.assert_called_once()
+
+
+class NetCDFCrawlerTestCase(unittest.TestCase):
+    """Test the NetCDFCrawler"""
+
+    def  setUp(self):
+        self.crawler = crawlers_directory.NetCDFCrawler.from_kwargs(
+            url='/foo',
+            longitude_attribute='LONGITUDE',
+            latitude_attribute='LATITUDE')
+    class MockVariable(mock.Mock):
+        """Mock netCDF variable"""
+        def __init__(self, data, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._data = np.array(data)
+            self.shape = self._data.shape
+            self.dimensions = kwargs.get('dimensions', {})
+
+        def __iter__(self):
+            """Make the class iterable"""
+            return iter(self._data)
+
+        def __getitem__(self, i):
+            """Make the class subscriptable"""
+            return self._data[i]
+
+        def __array__(self, *args, **kwargs):
+            """Make the class numpy-array-like"""
+            return self._data
+    class MaskedMockVariable(MockVariable):
+        """Mock netCDF variable with masked values"""
+        def __init__(self, data, *args, **kwargs):
+            super().__init__(data, *args, **kwargs)
+            self._data = np.ma.masked_values(data, 1e10)
+
+    def test_get_raw_attributes(self):
+        """Test reading raw attributes from a netCDF file"""
+        attributes = {
+            'attr1': 'value1',
+            'attr2': 'value2'
+        }
+        with mock.patch('netCDF4.Dataset') as mock_dataset, \
+             mock.patch.object(self.crawler, '_get_parameter_names', return_value=['param']), \
+             mock.patch.object(self.crawler, '_get_geometry_wkt', return_value='wkt'):
+            mock_dataset.return_value.__dict__ = attributes
+
+            self.assertDictEqual(
+                self.crawler.get_raw_attributes('/foo/bar'),
+                {
+                    **attributes,
+                    'raw_dataset_parameters': ['param'],
+                    'location_geometry': 'wkt',
+                })
+
+    def test_repr(self):
+        """Test string representation"""
+        self.assertEqual(
+            repr(crawlers_directory.NetCDFCrawler.from_kwargs(
+                url='https://foo',
+                time_range=(datetime(2025, 1, 1), datetime(2025, 1, 2)),
+                include='\.nc$',
+                username='user',
+                password='pass',
+                longitude_attribute='longitude',
+                latitude_attribute='latitude')),
+            "NetCDFCrawler("
+                "url='https://foo', "
+                "include='\.nc$', "
+                "longitude_attribute='longitude', "
+                "latitude_attribute='latitude', "
+                "time_range=(datetime.datetime(2025, 1, 1, 0, 0, tzinfo=datetime.timezone.utc), "
+                            "datetime.datetime(2025, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)), "
+                "username='user', "
+                "password='******')")
+
+    def test_get_parameter_names(self):
+        """_get_parameter_names() should return the names of the
+        variables of the dataset
+        """
+        mock_variable1 = mock.Mock()
+        mock_variable1.standard_name = 'standard_name_1'
+
+        mock_dataset = mock.Mock()
+        mock_dataset.variables = {
+            'var1': mock_variable1,
+            'var2': 'variable2' # does not have a "standard_name" attribute
+        }
+
+        self.assertListEqual(self.crawler._get_parameter_names(mock_dataset), ['standard_name_1'])
+
+    def test_get_trajectory(self):
+        """Test getting a trajectory from a netCDF dataset"""
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MaskedMockVariable((1, 3, 1e10, 5)),
+            'LATITUDE': self.MaskedMockVariable((2, 4, 1e10, 6))
+        }
+        self.assertEqual(
+            self.crawler._get_geometry_wkt(mock_dataset),
+            'LINESTRING (1 2, 5 6)')
+
+    def test_get_point(self):
+        """Test getting a WKT point when the shape of the latitude and
+        longitude is (1,)"""
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1,)),
+            'LATITUDE': self.MockVariable((2,))
+        }
+        self.assertEqual(
+            self.crawler._get_geometry_wkt(mock_dataset),
+            'POINT (1 2)'
+        )
+
+    def test_get_deduplicated_point(self):
+        """Test getting a WKT point when that point is referenced
+        multiple times in the dataset
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 1, 1)),
+            'LATITUDE': self.MockVariable((2, 2, 2))
+        }
+        self.assertEqual(
+            self.crawler._get_geometry_wkt(mock_dataset),
+            'POINT (1 2)'
+        )
+
+    def test_get_polygon_from_coordinates_lists(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are multi-dimensional and of the same
+        shape
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((
+                (1, 1, 2),
+                (2, 0, 3),
+            )),
+            'LATITUDE': self.MockVariable((
+                (1, 2, 3),
+                (4, 0, 4),
+            ))
+        }
+        self.assertEqual(
+            self.crawler._get_geometry_wkt(mock_dataset),
+            'POLYGON ((0 0, 2 4, 3 4, 1 1, 0 0))'
+        )
+
+    @mock.patch('geospaas_harvesting.crawlers.directory.np.ma.isMaskedArray', return_value=True)
+    def test_get_polygon_from_coordinates_lists_with_masked_array(self, mock_isMaskedArray):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are multi-dimensional masked_array
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MaskedMockVariable((
+                (1, 1e10, 1e10),
+                (2, 0, 3),
+            )),
+            'LATITUDE': self.MaskedMockVariable((
+                (1, 1e10, 1e10),
+                (4, 0, 4),
+            ))
+        }
+        self.assertEqual(
+            self.crawler._get_geometry_wkt(mock_dataset),
+            'POLYGON ((0 0, 2 4, 3 4, 1 1, 0 0))'
+        )
+
+    @mock.patch('geospaas_harvesting.crawlers.directory.np.ma.isMaskedArray', return_value=True)
+    def test_get_polygon_from_coordinates_lists_with_masked_array_1d_case(self, mock_isMaskedArray):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are 1d masked_array as an abstracted
+        version of 2d lon and lat values
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MaskedMockVariable(
+                (1, 1e10, 1e10, 2, 0, 3, 1), dimensions=['LONGITUDE','LATITUDE']),
+            'LATITUDE': self.MaskedMockVariable(
+                (1, 1e10, 1e10, 4, 0, 4, 1), dimensions=['LONGITUDE','LATITUDE']),
+        }
+        self.assertEqual(
+            self.crawler._get_geometry_wkt(mock_dataset),
+            'POLYGON ((0 0, 0 4, 3 4, 3 0, 0 0))'
+        )
+
+    def test_get_polygon_from_1d_lon_lat(self):
+        """Test getting a polygonal coverage from a dataset when the
+        latitude and longitude are one-dimensional and of different
+        shapes
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 2, 3)),
+            'LATITUDE': self.MockVariable((1, 2)),
+            'DATA': self.MockVariable('some_data', dimensions=('LONGITUDE', 'LATITUDE'))
+        }
+        self.assertEqual(
+            self.crawler._get_geometry_wkt(mock_dataset),
+            'POLYGON ((1 1, 1 2, 3 2, 3 1, 1 1))'
+        )
+
+    def test_error_on_unsupported_case(self):
+        """An error should be raised if the dataset has longitude and
+        latitude arrays of different lengths and no variable is
+        dependent on latitude and longitude
+        """
+        mock_dataset = mock.Mock()
+        mock_dataset.dimensions = {}
+        mock_dataset.variables = {
+            'LONGITUDE': self.MockVariable((1, 1, 1, 1)),
+            'LATITUDE': self.MockVariable((2, 2, 2))
+        }
+        with self.assertRaises(ValueError):
+            self.crawler._get_geometry_wkt(mock_dataset)
