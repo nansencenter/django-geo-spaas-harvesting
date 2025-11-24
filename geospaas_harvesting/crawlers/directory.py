@@ -546,7 +546,7 @@ class NansatCrawler(LocalDirectoryCrawler):
         # get metadata from Nansat and get objects from vocabularies
         raw_attributes = nansat_object.get_metadata()
 
-        # Find coverage to set number of points in the geolocation
+        # Find spatial coverage
         if nansat_object.vrt.dataset.GetGCPs():
             nansat_object.reproject_gcps()
         raw_attributes['location_geometry'] = shapely.wkt.loads(
