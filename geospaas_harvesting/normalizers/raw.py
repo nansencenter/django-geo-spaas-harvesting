@@ -4,7 +4,8 @@ from .utils import NC_H5_FILENAME_MATCHER
 
 
 class RawMetadataNormalizer(MetadataNormalizer):
-    """No guess work, just add the raw metadata as a tag
+    """No guess work, just create a Dataset with an entry_id and a URL
+    and optionally add the raw metadata as a tag
     """
 
     name = 'raw'
