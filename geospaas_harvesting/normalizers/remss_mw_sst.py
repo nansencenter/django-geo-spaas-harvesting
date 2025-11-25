@@ -44,15 +44,6 @@ class REMSSMWSSTMetadataNormalizer(MetadataNormalizer):
     def get_time_coverage_end(self, dataset_info):
         return utils.find_time_coverage(self.time_patterns, dataset_info.url)[1]
 
-    def get_platform(self, dataset_info):
-        return utils.get_gcmd_platform('Satellites')
-
-    def get_instrument(self, dataset_info):
-        return utils.get_gcmd_instrument('Earth Remote Sensing Instruments')
-
-    def get_provider(self, dataset_info):
-        return utils.get_gcmd_provider(['Remote Sensing Systems'])
-
     def get_keywords(self, dataset_info):
         return utils.find_keywords((
             {
