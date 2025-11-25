@@ -362,6 +362,22 @@ class CMEMSMetadataNormalizerTestCase(django.test.TestCase):
                         {'kind': 'gcmd_instrument', 'data__icontains': 'Satellite observations'},]),
                 ])
 
+    def test_get_keywords_with_model_platform(self):
+        """Test getting the keywords when the platform is a model"""
+        mock_provider = mock.Mock(data={'Short_Name': 'cmems'})
+        mock_platform = mock.Mock(data={'Category': 'Models'})
+        mock_instrument = mock.Mock(data={'Short_Name': 'Computer'})
+        with mock.patch(
+                'geospaas_harvesting.normalizers.utils.find_keywords') as mock_find_keywords, \
+             mock.patch('geospaas.vocabularies.models.Keyword.objects.filter') as mock_filter:
+            mock_find_keywords.side_effect = ([mock_provider], [mock_platform])
+            mock_filter.return_value.first.return_value = mock_instrument
+            self.assertListEqual(
+                self.normalizer.get_keywords(DatasetInfo(
+                    'https://foo',
+                    {'cmems_dataset_name': 'dataset_1', 'product_info': self.product_info})),
+                [mock_provider, mock_platform, mock_instrument])
+
     def test_get_dataset_parameters(self):
         """Test retrieval of variable names"""
         with mock.patch('geospaas_harvesting.normalizers.utils.create_parameter_list'
