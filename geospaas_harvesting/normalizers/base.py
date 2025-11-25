@@ -144,10 +144,9 @@ class StreamMetadataNormalizer():
         """
         self.dataset_infos = dataset_infos
         self.normalizer = normalizer
-
         self._results = None
         self._failed = None
-
+        self._started = False
         self.main_thread = None
         self.manager_thread = None
 
@@ -159,11 +158,13 @@ class StreamMetadataNormalizer():
                 self.manager_thread.join()
 
     def __iter__(self):
-        self._results = queue.Queue(self.QUEUE_SIZE)
-        self._failed = queue.Queue(self.QUEUE_SIZE)
-        self.main_thread = threading.current_thread()
-        self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
-        self.manager_thread.start()
+        if not self._started:
+            self._results = queue.Queue(self.QUEUE_SIZE)
+            self._failed = queue.Queue(self.QUEUE_SIZE)
+            self.main_thread = threading.current_thread()
+            self.manager_thread = threading.Thread(target=self._start_normalizing, daemon=True)
+            self.manager_thread.start()
+            self._started = True
         return self
 
     def __next__(self):
