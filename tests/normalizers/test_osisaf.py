@@ -42,7 +42,6 @@ class OSISAFMetadataNormalizer(unittest.TestCase):
 
     def test_summary(self):
         """Test getting the summary"""
-
         dataset_info = DatasetInfo('', {'abstract': 'value_abs'})
         self.assertEqual(self.normalizer.get_summary(dataset_info), 'Description: value_abs')
 
