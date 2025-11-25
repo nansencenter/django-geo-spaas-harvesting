@@ -67,11 +67,5 @@ class GPortalGCOMWAMSR2MetadataNormalizer(MetadataNormalizer):
             {'kind': 'iso19115_topic_category', 'data__icontains': 'Oceans'},
         ))
 
-    def get_platform(self, dataset_info):
-        return utils.get_gcmd_platform('GCOM-W1')
-
-    def get_instrument(self, dataset_info):
-        return utils.get_gcmd_instrument('AMSR2')
-
     def get_location_geometry(self, dataset_info):
         return utils.WORLD_WIDE_COVERAGE_WKT
