@@ -116,6 +116,34 @@ class TableDAPMetadataNormalizerTests(unittest.TestCase):
             self.assertEqual(
                 self.normalizer.get_keywords(self.dataset_info),
                 mock_find_keywords.return_value)
+            mock_find_keywords.assert_called_with([
+                {'kind': 'gcmd_platform', 'data__icontains': 'Argo-float'},
+                {'kind': 'gcmd_project', 'data__Short_Name': 'ARGO'}])
+
+    def test_get_keywords_non_argo(self):
+        """Test getting the keywords for data which does not come from
+        Argo floats
+        """
+        with mock.patch(
+                'geospaas_harvesting.normalizers.utils.find_keywords') as mock_find_keywords:
+            self.assertEqual(
+                self.normalizer.get_keywords(DatasetInfo('', {
+                    'product_metadata': {
+                        'table': {
+                            'columnNames': [
+                                "Row Type", "Variable Name", "Attribute Name", "Data Type", "Value"
+                            ],
+                            'rows': [
+                                ["attribute", "NC_GLOBAL", "source", "String", "S1A"],
+                                ["attribute", "NC_GLOBAL", "institution", "String", "NERSC"],
+                            ]
+                        }
+                    }
+                })),
+                mock_find_keywords.return_value)
+            mock_find_keywords.assert_called_with([
+                {'kind': 'gcmd_platform', 'data__icontains': 'S1A'},
+                {'kind': 'gcmd_provider', 'data__icontains': 'NERSC'}])
 
     def test_get_location_geometry(self):
         """get_location_geometry() should return the location
