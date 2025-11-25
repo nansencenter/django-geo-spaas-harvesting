@@ -98,6 +98,27 @@ class RestoAPIMetadataNormalizerTestCase(unittest.TestCase):
         with self.assertRaises(MetadataNormalizationError):
             self.normalizer.get_time_coverage_end(DatasetInfo(''))
 
+    def test_get_platform_lookup(self):
+        """Test getting a lookup for the platform"""
+        self.assertEqual(
+            self.normalizer._get_platform_lookup(DatasetInfo('', {'platform': 'foo'})),
+            {'kind': 'gcmd_platform', 'data__icontains': 'foo'})
+        self.assertEqual(
+            self.normalizer._get_platform_lookup(DatasetInfo('', {'platform': 'S1A'})),
+            {'kind': 'gcmd_platform', 'data__icontains': 'SENTINEL-1A'})
+        self.assertIsNone(self.normalizer._get_platform_lookup(DatasetInfo('')))
+
+    def test_get_instrument_lookup(self):
+        """Test getting a lookup for the instrument"""
+        self.assertEqual(
+            self.normalizer._get_instrument_lookup(DatasetInfo('', {'instrument': 'foo'})),
+            {'kind': 'gcmd_instrument', 'data__icontains': 'foo'})
+        self.assertEqual(
+            self.normalizer._get_instrument_lookup(
+                DatasetInfo('', {'instrument': 'SAR', 'platform': 'S1B'})),
+            {'kind': 'gcmd_instrument', 'data__icontains': 'SENTINEL-1 C-SAR'})
+        self.assertIsNone(self.normalizer._get_instrument_lookup(DatasetInfo('')))
+
     def test_get_keywords(self):
         """Test getting the keywords"""
         with mock.patch(
