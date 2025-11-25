@@ -53,14 +53,6 @@ class RestoAPIMetadataNormalizer(MetadataNormalizer):
     def get_time_coverage_end(self, dataset_info):
         return dateutil.parser.parse(dataset_info.metadata['completionDate']).replace(microsecond=0)
 
-    @utils.raises(KeyError)
-    def get_platform(self, dataset_info):
-        return utils.get_gcmd_platform(dataset_info.metadata['platform'])
-
-    @utils.raises(KeyError)
-    def get_instrument(self, dataset_info):
-        return utils.get_gcmd_instrument(dataset_info.metadata['instrument'])
-
     def _get_platform_lookup(self, dataset_info):
         platform = dataset_info.metadata.get('platform')
         if platform:
