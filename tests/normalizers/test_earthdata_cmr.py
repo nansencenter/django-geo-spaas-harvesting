@@ -214,6 +214,19 @@ class EarthdataCMRMetadataNormalizerTestCase(unittest.TestCase):
                 {'kind': 'gcmd_provider', 'data__icontains': 'OB_DAAC'},
             ])
 
+    def test_get_keywords_no_info(self):
+        """Test getting the keywords when information is missing"""
+        dataset_info = DatasetInfo('', {
+            "meta": {"provider-id": "OB_DAAC"},
+            "umm": {"Platforms": [{"ShortName": "SUOMI-NPP",}],}
+        })
+        with mock.patch('geospaas_harvesting.normalizers.utils.find_keywords'
+                        ) as mock_find_keywords:
+            self.normalizer.get_keywords(dataset_info)
+            mock_find_keywords.assert_called_once_with([
+                {'kind': 'gcmd_platform', 'data__icontains': 'SUOMI-NPP'},
+                {'kind': 'gcmd_provider', 'data__icontains': 'OB_DAAC'},
+            ])
 
     def test_location_geometry_one_bounding_box(self):
         """Test getting the location_geometry from one bounding box"""
