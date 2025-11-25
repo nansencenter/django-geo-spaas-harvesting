@@ -18,9 +18,6 @@ class OSISAFMetadataNormalizer(MetadataNormalizer):
         super().__init__()
         self.filename_matcher = re.compile(r"([^/]+)\.nc(\.dods)?$")
 
-    def check(self, dataset_info):
-        return dataset_info.metadata.get('project_name', '') == 'EUMETSAT OSI SAF'
-
     @utils.raises(KeyError)
     def get_entry_title(self, dataset_info):
         return dataset_info.metadata['title']
