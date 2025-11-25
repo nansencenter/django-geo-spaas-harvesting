@@ -215,7 +215,7 @@ class StreamMetadataNormalizer():
             self.logger.info(
                 'Cancelled future normalizing threads')
         except Exception as error:
-            self.logger.info('Unexpected error happened during normalizing', exc_info=True)
+            self.logger.error('Unexpected error happened during normalizing', exc_info=True)
         finally:
             self.logger.debug("Stopping normalizing threads")
             self._results.put(Stop)
@@ -281,4 +281,4 @@ class StreamMetadataNormalizer():
                     self._pickle_list_elements(failed_ingestions, pickle_path)
                 self._failed.task_done()
         except Exception as e:
-            self.logger.error(exc_info=e)
+            self.logger.error('Error happened in failure management thread', exc_info=e)
