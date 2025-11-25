@@ -1,6 +1,4 @@
-""""""
-from geospaas.catalog.models import Dataset, DatasetURI, Tag
-
+"""Raw normalizers"""
 from .base import MetadataNormalizer
 from .utils import NC_H5_FILENAME_MATCHER
 
