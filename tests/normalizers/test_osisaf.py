@@ -78,6 +78,57 @@ class OSISAFMetadataNormalizer(unittest.TestCase):
         with self.assertRaises(MetadataNormalizationError):
             self.normalizer.get_time_coverage_end(DatasetInfo(''))
 
+    def test_get_platform_lookup(self):
+        """Test getting a lookup for the platform"""
+        self.assertEqual(
+            self.normalizer._get_platform_lookup(DatasetInfo('', {'platform_name': 'foo'})),
+            {'kind': 'gcmd_platform', 'data__icontains': 'foo'})
+        self.assertEqual(
+            self.normalizer._get_platform_lookup(DatasetInfo('')),
+            {
+                'kind': 'gcmd_platform',
+                'data__Category': 'Earth Observation Satellites',
+                'data__Short_Name': '',
+                'data__Long_Name': '',
+                'data__Sub_Category': ''
+            })
+
+    def test__get_instrument_lookup(self):
+        """Test getting a lookup for the instrument"""
+        self.assertEqual(
+            self.normalizer._get_instrument_lookup(DatasetInfo('', {'instrument_type': 'foo'})),
+            {'kind': 'gcmd_instrument', 'data__icontains': 'foo'})
+        self.assertEqual(
+            self.normalizer._get_instrument_lookup(
+                DatasetInfo('', {'product_name': 'osi_saf_ice_conc_l3'})),
+            {
+                'data__Type': 'Spectrometers/Radiometers',
+                'data__Class': 'Passive Remote Sensing',
+                'data__Subtype': 'Imaging Spectrometers/Radiometers',
+                'data__Category': 'Earth Remote Sensing Instruments',
+                'data__Long_Name': '',
+                'data__Short_Name': ''
+            })
+        self.assertEqual(
+            self.normalizer._get_instrument_lookup(
+                DatasetInfo('', {'product_name': 'amsr2ice_conc'})),
+            {'kind': 'gcmd_instrument', 'data__icontains': 'AMSR2'})
+        self.assertEqual(
+            self.normalizer._get_instrument_lookup(
+                DatasetInfo('', {'product_name': 'osi_saf_mr_ice_drift'})),
+            {'kind': 'gcmd_instrument', 'data__icontains': 'AVHRR'})
+        self.assertEqual(
+            self.normalizer._get_instrument_lookup(DatasetInfo('')),
+            {
+                'kind': 'gcmd_instrument',
+                'data__Type': '',
+                'data__Class': '',
+                'data__Subtype': '',
+                'data__Category': 'Earth Remote Sensing Instruments',
+                'data__Long_Name': '',
+                'data__Short_Name': ''
+            })
+
     def test_get_keywords(self):
         """Test getting the keywords"""
         with mock.patch(
