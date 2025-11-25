@@ -38,10 +38,7 @@ class NansatMetadataNormalizer(MetadataNormalizer):
             dataset_info.metadata['time_coverage_end']).replace(tzinfo=timezone.utc)
 
     def get_keywords(self, dataset_info):
-        lookups = [
-            {'kind': 'gcmd_location', 'data__icontains': 'SEA SURFACE'},
-            {'kind': 'iso19115_topic_category', 'data__icontains': 'Oceans'},
-        ]
+        lookups = []
         platform = dataset_info.metadata.get('platform')
         instrument = dataset_info.metadata.get('instrument')
         provider = dataset_info.metadata.get('provider')
@@ -61,7 +58,10 @@ class NansatMetadataNormalizer(MetadataNormalizer):
         return utils.find_keywords(lookups)
 
     def get_location_geometry(self, dataset_info):
-        return dataset_info.metadata.get('location_geometry').wkt
+        try:
+            return dataset_info.metadata.get('location_geometry').wkt
+        except AttributeError:
+            return ''
 
     def get_dataset_parameters(self, dataset_info):
         try:
