@@ -2,11 +2,9 @@
 
 import unittest
 import unittest.mock as mock
-from collections import OrderedDict
 from datetime import datetime, timezone
 
 import geospaas_harvesting.normalizers as normalizers
-import geospaas_harvesting.normalizers.utils as utils
 from geospaas_harvesting.crawlers.base import DatasetInfo
 from geospaas_harvesting.normalizers.errors import MetadataNormalizationError
 

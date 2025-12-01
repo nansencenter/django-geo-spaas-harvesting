@@ -2,8 +2,6 @@
 import logging
 
 import django.db.models as models
-from django.core.exceptions import ValidationError
-from shapely.geometry.polygon import Polygon
 
 import geospaas_harvesting.arguments as arguments
 import geospaas_harvesting.crawlers as crawlers

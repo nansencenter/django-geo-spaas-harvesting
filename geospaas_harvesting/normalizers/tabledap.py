@@ -1,8 +1,5 @@
 """Normalizer for ERDDAP's tabledap data"""
 import dateutil.parser
-from collections import OrderedDict
-
-from shapely.geometry import LineString
 
 import geospaas_harvesting.normalizers.utils as utils
 from .base import MetadataNormalizer

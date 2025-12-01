@@ -35,7 +35,6 @@ from threading import BoundedSemaphore, Lock
 from urllib.parse import urlparse
 
 import django
-import django.db.models
 import oauthlib.oauth2
 import requests
 import requests.auth

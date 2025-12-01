@@ -1,7 +1,6 @@
 """Tests for the ACDD metadata normalizer"""
 import unittest
 import unittest.mock as mock
-from collections import OrderedDict
 from datetime import datetime
 
 from dateutil.tz import tzutc

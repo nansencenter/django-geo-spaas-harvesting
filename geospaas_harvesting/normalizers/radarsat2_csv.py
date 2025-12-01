@@ -3,7 +3,6 @@
 from datetime import timedelta
 
 import dateutil.parser
-import pythesint as pti
 
 import geospaas_harvesting.normalizers.utils as utils
 from .base import MetadataNormalizer

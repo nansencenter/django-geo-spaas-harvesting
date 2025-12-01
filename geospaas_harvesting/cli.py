@@ -12,7 +12,6 @@ from typing import Union
 
 import django
 import django.conf
-import django.core.exceptions
 # Load Django settings to be able to interact with the database
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 if not django.conf.settings.configured:

@@ -6,13 +6,10 @@ import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone as tz
 
-from shapely.geometry.polygon import Polygon
-
 import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.ingesters as ingesters
 import geospaas_harvesting.normalizers.raw
 import geospaas_harvesting.providers as providers
-import geospaas_harvesting.utils as utils
 
 
 class ProviderTestCase(unittest.TestCase):

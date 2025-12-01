@@ -1,13 +1,8 @@
 """Tests for the RawMetadataNormalizer"""
 import unittest
-import unittest.mock as mock
-from datetime import datetime, timezone
-
-import shapely.geometry
 
 import geospaas_harvesting.normalizers as normalizers
 from geospaas_harvesting.crawlers.base import DatasetInfo
-from geospaas_harvesting.normalizers.errors import MetadataNormalizationError
 
 
 class RawMetadataNormalizerTestCase(unittest.TestCase):

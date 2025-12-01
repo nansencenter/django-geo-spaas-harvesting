@@ -4,12 +4,9 @@ import re
 from datetime import timedelta, timezone
 
 import dateutil.parser
-import pythesint as pti
 
 import geospaas_harvesting.normalizers.utils as utils
-
 from .base import MetadataNormalizer
-from .errors import MetadataNormalizationError
 
 
 class NextsimMetadataNormalizer(MetadataNormalizer):

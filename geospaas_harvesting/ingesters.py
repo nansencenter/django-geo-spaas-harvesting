@@ -6,7 +6,6 @@ import logging
 from enum import Enum
 
 import django.db.transaction
-from django.contrib.gis.geos import GEOSGeometry
 import django.db.transaction
 
 from geospaas.catalog.models import Dataset, DatasetURI, Tag

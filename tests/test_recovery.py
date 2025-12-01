@@ -8,7 +8,6 @@ from pathlib import Path
 import django.test
 import requests
 
-import geospaas_harvesting.crawlers as crawlers
 import geospaas_harvesting.crawlers.base as crawlers_base
 import geospaas_harvesting.normalizers as normalizers
 import geospaas_harvesting.recovery as recovery

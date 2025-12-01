@@ -9,8 +9,6 @@ from datetime import datetime
 from pathlib import Path
 
 import geospaas_harvesting.normalizers.utils as utils
-from geospaas.catalog.models import Dataset, DatasetURI
-from geospaas.vocabularies.models import Parameter
 
 
 logger = logging.getLogger(__name__)

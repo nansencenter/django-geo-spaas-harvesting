@@ -1,12 +1,9 @@
 """Configuration management"""
-import importlib
 import logging
-import pkgutil
 from pathlib import Path
 
 import geospaas_harvesting.utils as utils
 import geospaas_harvesting.arguments as arguments
-from .arguments import ArgumentParser, BooleanArgument, DictArgument, ListArgument
 from .providers import Provider
 from .utils import read_yaml_file
 

@@ -1,6 +1,5 @@
 # pylint: disable=protected-access
 """Tests for the config module"""
-import logging
 import unittest
 import unittest.mock as mock
 import django.test

@@ -1,14 +1,9 @@
 """Normalizer for the Copernicus In Situ TAC metadata convention"""
-
-import re
-
 import dateutil.parser
-import pythesint as pti
 
 import geospaas_harvesting.normalizers.utils as utils
 
 from .base import MetadataNormalizer
-from geospaas.catalog.models import Keyword
 
 
 class CMEMSInSituTACMetadataNormalizer(MetadataNormalizer):

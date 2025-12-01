@@ -6,7 +6,6 @@ from dateutil.tz import tzutc
 
 import geospaas_harvesting.normalizers.utils as utils
 from .base import MetadataNormalizer
-from geospaas.catalog.models import Keyword
 
 
 class CEDAESACCIMetadataNormalizer(MetadataNormalizer):
