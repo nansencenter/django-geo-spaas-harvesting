@@ -14,7 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class Provider(models.Model):
-    """Allows saving a combination of crawler, normalizer and ingester
+    """Offers an interface to search data from a type of provider or a
+    specific provider. Uses crawlers, normalizers and ingesters to
+    accomplish this.
+
+    Allows saving a combination of crawler, normalizer and ingester
     configurations and manages instantiating the objects from that
     configuration. Providers can then be used when running searches.
     """
