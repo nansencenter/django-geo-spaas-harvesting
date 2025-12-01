@@ -22,7 +22,6 @@ dependencies = [
     "django",
     "feedparser",
     "graypy",
-    "metanorm",
     "nansat",
     "netCDF4",
     "numpy",

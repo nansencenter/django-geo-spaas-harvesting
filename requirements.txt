@@ -2,12 +2,11 @@
 # For example, this is used to build the Docker image.
 
 # strict requirements
-metanorm @ git+https://github.com/nansencenter/metanorm@4.5.3.dev0
 pythesint==1.7.3.dev0
 
 # loose requirements
 copernicusmarine==2.*
-django-geo-spaas==3.0.0.dev0
+django-geo-spaas==3.0.0.dev1
 django==3.*
 feedparser==6.*
 feedparser==6.0.*
