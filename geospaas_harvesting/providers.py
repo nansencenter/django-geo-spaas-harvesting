@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class Provider(models.Model):
-    """TODO
+    """Allows saving a combination of crawler, normalizer and ingester
+    configurations and manages instantiating the objects from that
+    configuration. Providers can then be used when running searches.
     """
     name = models.CharField(max_length=100, unique=True, null=False, blank=False)
     config = models.JSONField(null=False)
