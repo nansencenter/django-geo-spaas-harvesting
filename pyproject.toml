@@ -31,7 +31,7 @@ dependencies = [
     "PyYAML",
     "requests_oauthlib",
     "requests",
-    "shapely",
+    "shapely>=2",
 ]
 urls = {Repository = "https://github.com/nansencenter/django-geo-spaas-harvesting"}
 dynamic = ["version"]
