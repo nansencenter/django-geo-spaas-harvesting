@@ -35,31 +35,23 @@ class UtilsTestCase(unittest.TestCase):
         """If the `auth` argument is provided, the request should be
         executed inside a TrustDomainSession
         """
-        expected_kwargs = {'stream': False}
-        verify = os.getenv('GEOSPAAS_HARVESTING_CA_BUNDLE')
-        if verify:
-            expected_kwargs['verify'] = verify
         with mock.patch('requests.Session.request', return_value='response') as mock_request:
             self.assertEqual(
                 utils.http_request('GET', 'url', stream=False, auth=('username', 'password')),
                 'response'
             )
-            mock_request.assert_called_once_with('GET', 'url', **expected_kwargs)
+            mock_request.assert_called_once_with('GET', 'url', stream=False)
 
     def test_http_request_without_auth(self):
         """If the `auth` argument is not provided, the request should
         simply be executed using requests.get()
         """
-        expected_kwargs = {'stream': True}
-        verify = os.getenv('GEOSPAAS_HARVESTING_CA_BUNDLE')
-        if verify:
-            expected_kwargs['verify'] = verify
         with mock.patch('requests.request', return_value='response') as mock_request:
             self.assertEqual(
                 utils.http_request('GET', 'url', stream=True),
                 'response'
             )
-            mock_request.assert_called_once_with('GET', 'url', **expected_kwargs)
+            mock_request.assert_called_once_with('GET', 'url', stream=True)
 
     def test_yaml_parsing(self):
         """Test YAML parsing with environment variable retrieval"""
