@@ -14,8 +14,8 @@ class OSISAFMetadataNormalizer(MetadataNormalizer):
 
     name = 'osisaf'
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.filename_matcher = re.compile(r"([^/]+)\.nc(\.dods)?$")
 
     @utils.raises(KeyError)
