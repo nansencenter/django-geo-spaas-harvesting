@@ -84,6 +84,9 @@ class OSISAFMetadataNormalizer(unittest.TestCase):
             self.normalizer._get_platform_lookup(DatasetInfo('', {'platform_name': 'foo'})),
             {'kind': 'gcmd_platform', 'data__icontains': 'foo'})
         self.assertEqual(
+            self.normalizer._get_platform_lookup(DatasetInfo('', {'platform': 'foo'})),
+            {'kind': 'gcmd_platform', 'data__icontains': 'foo'})
+        self.assertEqual(
             self.normalizer._get_platform_lookup(DatasetInfo('')),
             {
                 'kind': 'gcmd_platform',
@@ -97,6 +100,9 @@ class OSISAFMetadataNormalizer(unittest.TestCase):
         """Test getting a lookup for the instrument"""
         self.assertEqual(
             self.normalizer._get_instrument_lookup(DatasetInfo('', {'instrument_type': 'foo'})),
+            {'kind': 'gcmd_instrument', 'data__icontains': 'foo'})
+        self.assertEqual(
+            self.normalizer._get_instrument_lookup(DatasetInfo('', {'instrument': 'foo'})),
             {'kind': 'gcmd_instrument', 'data__icontains': 'foo'})
         self.assertEqual(
             self.normalizer._get_instrument_lookup(
