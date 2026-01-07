@@ -8,6 +8,7 @@ import shapely.geometry
 import shapely.ops
 import shapely.wkt
 from dateutil.tz import tzutc
+from django.db.models import Case, When
 
 from geospaas.vocabularies.models import Keyword, Parameter
 
@@ -298,7 +299,8 @@ def find_keywords(lookups):
     """
     keywords = []
     for lookup in lookups:
-        candidates = Keyword.objects.filter(**lookup)
+        candidates = Keyword.objects.filter(**lookup).order_by(
+            Case(When(kind='legacy', then=1), default=2)) # legacy keywords have the lowest priority
         if candidates.exists() and candidates.first() not in keywords:
             keywords.append(candidates.first())
     return keywords
