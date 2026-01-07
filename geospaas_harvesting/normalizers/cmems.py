@@ -136,15 +136,21 @@ class CMEMSMetadataNormalizer(MetadataNormalizer):
             platform = platforms[0]
             results.append(platform)
 
-        if platform and 'Models' in platform.data['Category']:
-            results.append(Keyword.objects.filter(kind='gcmd_instrument',
-                                                  data__Long_Name='Computer',
-                                                  data__Short_Name='Computer').first())
-        else:
-            instruments = utils.find_keywords([{'kind': 'gcmd_instrument', 'data__icontains': s}
-                                               for s in search_strings])
-            if instruments:
-                results.append(instruments[0])
+        if platform:
+            try:
+                category = platform.data['Category']
+            except KeyError:
+                category = platform.data['category']
+
+            if 'Models' in category:
+                results.append(Keyword.objects.filter(kind='gcmd_instrument',
+                                                      data__Long_Name='Computer',
+                                                      data__Short_Name='Computer').first())
+            else:
+                instruments = utils.find_keywords([{'kind': 'gcmd_instrument', 'data__icontains': s}
+                                                for s in search_strings])
+                if instruments:
+                    results.append(instruments[0])
 
         return results
 
