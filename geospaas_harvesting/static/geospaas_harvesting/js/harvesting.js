@@ -4,7 +4,7 @@ import {APIObject} from "/static/base_viewer/js/geospaas_api.js"
 
 document.addEventListener("DOMContentLoaded", function() {
     let host = `${window.location.protocol}//${window.location.host}`;
-    fetch(`${host}/api/harvesting/providers/`)
+    fetch(`${host}/harvesting/api/providers/`)
         .then(response => response.json())
         .then(page => {
             let selector = document.getElementById("providers_selector");
