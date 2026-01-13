@@ -1,11 +1,11 @@
 from django.urls import path, include
 from rest_framework import routers
 
-import geospaas_harvesting.web_api as web_api
-from geospaas_harvesting.web_ui import HarvestingView
+import geospaas_harvesting.viewsets as viewsets
+from geospaas_harvesting.views import HarvestingView
 
 router = routers.DefaultRouter()
-router.register(r'providers', web_api.ProviderViewSet)
+router.register(r'providers', viewsets.ProviderViewSet)
 
 app_name = 'harvesting'
 urlpatterns = [
