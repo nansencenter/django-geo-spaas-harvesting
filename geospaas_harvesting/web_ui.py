@@ -7,5 +7,3 @@ class HarvestingView(GeoSPaaSView):
     """"""
     template_name = 'geospaas_harvesting/harvesting.html'
     tab_label = 'Harvesting'
-
-urlpatterns = [path('', HarvestingView.as_view(), name='geospaas_harvesting')]
