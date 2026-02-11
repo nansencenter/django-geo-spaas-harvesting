@@ -1,6 +1,4 @@
-import {APIObject} from "/static/base_viewer/js/geospaas_api.js"
-
-
+import {APIObjectElement} from "/static/base_viewer/js/geospaas_api.js"
 
 document.addEventListener("DOMContentLoaded", function() {
     let host = `${window.location.protocol}//${window.location.host}`;
