@@ -26,13 +26,14 @@ dependencies = [
     "netCDF4",
     "numpy",
     "oauthlib",
+    "pystac-client",
     "pythesint>=1.7.0",
     "python-dateutil",
     "PyYAML",
     "requests_oauthlib",
     "requests",
-    "shapely>=2",
     "setuptools<81",
+    "shapely>=2",
 ]
 urls = {Repository = "https://github.com/nansencenter/django-geo-spaas-harvesting"}
 dynamic = ["version"]
