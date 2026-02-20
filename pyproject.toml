@@ -32,6 +32,7 @@ dependencies = [
     "requests_oauthlib",
     "requests",
     "shapely>=2",
+    "setuptools<81",
 ]
 urls = {Repository = "https://github.com/nansencenter/django-geo-spaas-harvesting"}
 dynamic = ["version"]
