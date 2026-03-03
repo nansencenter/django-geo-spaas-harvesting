@@ -39,9 +39,11 @@ class STACMetadataNormalizer(MetadataNormalizer):
         summary_fields[utils.SUMMARY_FIELDS['description']] = description
 
         try:
-            processing_level = dataset_info.metadata['properties'].get('processing:level').replace('L', '')
+            processing_level = (dataset_info.metadata['properties']
+                                                     ['processing:level']
+                                                     .replace('L', ''))
             summary_fields[utils.SUMMARY_FIELDS['processing_level']] = processing_level
-        except AttributeError:
+        except (AttributeError, KeyError):
             pass
 
         return utils.dict_to_string(summary_fields)
@@ -53,38 +55,6 @@ class STACMetadataNormalizer(MetadataNormalizer):
     @utils.raises(KeyError)
     def get_time_coverage_end(self, dataset_info):
         return dateutil.parser.parse(dataset_info.metadata['properties']['end_datetime']).replace(microsecond=0)
-
-    def _get_platform_lookup(self, dataset_info):
-        platform = dataset_info.metadata['properties'].get('platform')
-        if platform:
-            match = re.match('^S1([A-Z])$', platform)
-            if match:
-                platform = f'SENTINEL-1{match.group(1)}'
-            return {'kind': 'gcmd_platform', 'data__icontains': platform}
-        else:
-            return None
-
-    def _get_instrument_lookups(self, dataset_info):
-        instruments = dataset_info.metadata['properties'].get('instruments')
-        if instruments:
-            results = []
-            for instrument in instruments:
-                if instrument.lower() == 'sar':
-                    platform = dataset_info.metadata['properties'].get('platform')
-                    if re.match('^s1[a-z]$', platform.lower()):
-                        instrument = 'SENTINEL-1 C-SAR'
-                results.append({'kind': 'gcmd_instrument', 'data__icontains': instrument})
-            return results
-        else:
-            return None
-
-    def _get_provider_lookup(self, dataset_info):
-        provider = dataset_info.metadata['properties'].get('processing:facility')
-        if provider is None:
-            return lambda d: None
-        return {
-            'kind': 'gcmd_provider',
-            'data__icontains': provider}
 
     def get_keywords(self, dataset_info):
         # TODO: refine
