@@ -39,6 +39,11 @@ providers:
       name: 'netcdf'
       longitude_attribute: 'LONGITUDE'
       latitude_attribute: 'LATITUDE'
+  stac:
+    crawler:
+      name: 'stac'
+    normalizer:
+      name: 'stac'
 
   # specific providers
   ceda:
