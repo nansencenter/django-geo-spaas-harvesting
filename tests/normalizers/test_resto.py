@@ -11,7 +11,7 @@ from geospaas_harvesting.normalizers.errors import MetadataNormalizationError
 
 
 class RestoAPIMetadataNormalizerTestCase(unittest.TestCase):
-    """Tests for the restp API attributes normalizer"""
+    """Tests for the resto API attributes normalizer"""
 
     def setUp(self):
         self.normalizer = normalizers.resto.RestoAPIMetadataNormalizer()
