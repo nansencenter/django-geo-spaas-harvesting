@@ -21,7 +21,8 @@ class STACCrawlerTestCase(unittest.TestCase):
             location='POINT(0 1)',
             username=None,
             password=None,
-            filter=None)
+            filter=None,
+            limit=100)
 
     def tearDown(self):
         self.client_patcher.stop()

@@ -13,6 +13,7 @@ class STACCrawler(Crawler):
         arguments.SequenceArgument('collections', required=False, default=None,
                                    contents_type=arguments.StringArgument),
         arguments.DictArgument('filter', required=False, default=None),
+        arguments.IntegerArgument('limit', default=100),
     ])
 
     def __init__(self, **kwargs):
@@ -20,7 +21,8 @@ class STACCrawler(Crawler):
         self.url = kwargs['url']
         self.collections = kwargs['collections']
         self.filter = kwargs['filter']
-        self._client = Client.open(self.url)
+        self.limit = kwargs['limit']
+        self._client = Client.open(self.url, timeout=300)
 
     def crawl(self):
         items = self._client.search(
@@ -28,6 +30,7 @@ class STACCrawler(Crawler):
             intersects=self.location,
             datetime=self.time_range,
             filter=self.filter,
+            limit=self.limit,
         ).items_as_dicts()
 
         for item in items:
