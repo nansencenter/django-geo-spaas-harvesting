@@ -19,11 +19,17 @@ class MetadataNormalizer():
     """Base class for all metadata normalizers"""
 
     name = None
+    can_force = ['location', 'time_coverage_start', 'time_coverage_end']
 
     def __init__(self, **kwargs):
         self.logger = logging.getLogger(f"geospaas_harvesting.normalizers.{self.name}")
         self.extra_tags = kwargs.get('tags', {})
         self.max_threads = kwargs.get('max_threads', 1)
+        self.force = {}
+        for key in self.can_force:
+            force_value = kwargs.get(key)
+            if force_value is not None:
+                self.force[key] = force_value
 
     def __str__(self):
         return self.name
@@ -37,9 +43,12 @@ class MetadataNormalizer():
         associated keywords, parameters and tags
         """
         dataset_kwargs = {
-            'time_coverage_start': self.get_time_coverage_start(dataset_info),
-            'time_coverage_end': self.get_time_coverage_end(dataset_info),
-            'location': self.get_location_geometry(dataset_info),
+            'time_coverage_start': (self.force.get('time_coverage_start')
+                                    or self.get_time_coverage_start(dataset_info)),
+            'time_coverage_end': (self.force.get('time_coverage_end')
+                                  or self.get_time_coverage_end(dataset_info)),
+            'location': (self.force.get('location')
+                         or self.get_location_geometry(dataset_info)),
             'entry_title': self.get_entry_title(dataset_info),
             'summary': self.get_summary(dataset_info),
         }
