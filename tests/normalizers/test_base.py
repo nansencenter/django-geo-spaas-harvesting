@@ -149,6 +149,28 @@ class MetadataNormalizerTestCase(unittest.TestCase):
             )
         )
 
+        self.assertTupleEqual(
+            TestNormalizer(
+                location='force_location',
+                time_coverage_start='force_time_coverage_start',
+                time_coverage_end='force_time_coverage_end'
+            ).normalize(DatasetInfo('https://foo')),
+            (
+                {
+                    'entry_title': 'entry_title',
+                    'entry_id': 'entry_id',
+                    'summary': 'summary',
+                    'location': 'force_location',
+                    'time_coverage_start': 'force_time_coverage_start',
+                    'time_coverage_end': 'force_time_coverage_end',
+                },
+                'https://foo',
+                [{'kind': 'gcmd_instrument', 'data': {'Short_Name': 'instrument'}}],
+                ['dataset_parameters'],
+                [{'name': 'collection', 'value': 'test'}],
+            )
+        )
+
 
 class StreamMetadataNormalizerTestCase(unittest.TestCase):
     """Tests for StreamMetadataNormalizer
