@@ -2,8 +2,10 @@
 import importlib
 import os
 import pkgutil
+import re
 import sys
 import xml.etree.ElementTree as ET
+from datetime import timedelta
 from urllib.parse import urlparse
 
 import requests
@@ -166,3 +168,16 @@ def merge_configs(config_dict: dict, override: dict):
         else:
             final_config[key] = override[key]
     return final_config
+
+
+def parse_timedelta_str(timedelta_str: str) -> timedelta:
+    """Parse a string in the format `?d?h?m?s`
+    """
+    groups = re.match(
+        r'((?P<days>\d+)d)?((?P<hours>\d+)h)?((?P<minutes>\d+)m)?((?P<seconds>\d+)s)?',
+        timedelta_str).groupdict()
+    return timedelta(
+        days=int(groups.get('days') or 0),
+        hours=int(groups.get('hours') or 0),
+        minutes=int(groups.get('minutes') or 0),
+        seconds=int(groups.get('seconds') or 0))
