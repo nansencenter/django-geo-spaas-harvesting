@@ -1,5 +1,6 @@
 """Tests for the RawMetadataNormalizer"""
 import unittest
+from datetime import datetime, timezone
 
 import geospaas_harvesting.normalizers as normalizers
 from geospaas_harvesting.crawlers.base import DatasetInfo
@@ -29,6 +30,29 @@ class RawMetadataNormalizerTestCase(unittest.TestCase):
     def test_get_time_coverage_start(self):
         """Test getting the start of the time coverage"""
         self.assertIsNone(self.normalizer.get_time_coverage_start(DatasetInfo('')))
+
+    def test_get_time_coverage_with_regex(self):
+        """Test getting the the time coverage with a regex"""
+        n = normalizers.raw.RawMetadataNormalizer(
+            time_regex=r'.*/bar_(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2}).nc',
+            time_offset='1d')
+        self.assertEqual(
+            n.get_time_coverage_start(DatasetInfo(url='https://foo/bar_20250502.nc')),
+            datetime(2025, 5, 2, tzinfo=timezone.utc))
+        self.assertEqual(
+            n.get_time_coverage_end(DatasetInfo(url='https://foo/bar_20250502.nc')),
+            datetime(2025, 5, 3, tzinfo=timezone.utc))
+
+        n = normalizers.raw.RawMetadataNormalizer(
+            time_regex=(r'.*/bar_(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})'
+                        r'T(?P<hour>\d{2})(?P<minute>\d{2})(?P<second>\d{2})Z.nc'),
+            time_offset='1h')
+        self.assertEqual(
+            n.get_time_coverage_start(DatasetInfo(url='https://foo/bar_20250502T095612Z.nc')),
+            datetime(2025, 5, 2, 9, 56, 12, tzinfo=timezone.utc))
+        self.assertEqual(
+            n.get_time_coverage_end(DatasetInfo(url='https://foo/bar_20250502T095612Z.nc')),
+            datetime(2025, 5, 2, 10, 56, 12, tzinfo=timezone.utc))
 
     def test_get_time_coverage_end(self):
         """Test getting the end of the time coverage"""
