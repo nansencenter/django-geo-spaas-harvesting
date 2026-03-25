@@ -24,7 +24,7 @@ dependencies = [
     "graypy",
     "nansat",
     "netCDF4",
-    "numpy",
+    "numpy<2",
     "oauthlib",
     "pystac-client",
     "pythesint>=1.7.0",
