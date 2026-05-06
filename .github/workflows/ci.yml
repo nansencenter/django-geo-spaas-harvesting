@@ -137,7 +137,9 @@ jobs:
              docker run --rm
              -v "$(pwd):/src"
              "${{ vars.DOCKER_ORG }}/geospaas:latest"
-             bash -c "pip install build && python -m build"
+             bash -c "git config --global --add safe.directory /src
+             && pip install build
+             && python -m build"
 
       - name: 'Deploy package to the Github release'
         env:
