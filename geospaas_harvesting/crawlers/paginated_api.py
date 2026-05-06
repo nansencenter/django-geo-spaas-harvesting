@@ -354,7 +354,7 @@ class ODataCrawler(HTTPPaginatedAPICrawler):
 
         collection_filter = [f"Collection/Name eq '{self.collection}'"]
 
-        search_terms_filter = self._build_attributes_filters(search_terms)
+        search_terms_filter = self._build_attributes_filters(search_terms) if search_terms else []
 
         api_date_format = '%Y-%m-%dT%H:%M:%SZ'
         time_filter = []
