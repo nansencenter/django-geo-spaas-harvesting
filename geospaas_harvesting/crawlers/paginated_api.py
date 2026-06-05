@@ -331,6 +331,9 @@ class ODataCrawler(HTTPPaginatedAPICrawler):
     def url(self):
         return f"{self.root_url}/Products"
 
+    def increment_offset(self):
+        self.page_offset += self.page_size
+
     @property
     def collection_attributes(self):
         """Fetches valid attributes depending on the collection"""
