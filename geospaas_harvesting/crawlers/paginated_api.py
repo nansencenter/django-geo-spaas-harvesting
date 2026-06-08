@@ -309,11 +309,12 @@ class RestoCrawler(HTTPPaginatedAPICrawler):
 
 
 class ODataCrawler(HTTPPaginatedAPICrawler):
-    """Crawler for the OData APIs"""
+    """Crawler for the Copernicus OData API"""
     name = 'odata'
     argument_parser = arguments.ArgumentParser([
         *HTTPPaginatedAPICrawler.argument_parser.arguments.values(),
         arguments.StringArgument('collection', required=True),
+        arguments.StringArgument('download_url', required=False),
     ])
     logger = logging.getLogger(__name__ + '.ODataCrawler')
 
@@ -323,6 +324,7 @@ class ODataCrawler(HTTPPaginatedAPICrawler):
 
     def __init__(self, **kwargs):
         self.root_url = kwargs['url'].rstrip('/')
+        self.download_url_base = kwargs.get('download_url')
         self.collection = kwargs['collection']
         self._collection_attributes = None
         super().__init__(**kwargs)
@@ -397,6 +399,13 @@ class ODataCrawler(HTTPPaginatedAPICrawler):
     def _get_entries(self, page):
         return json.loads(page)['value']
 
+    def get_download_url(self, dataset_id):
+        if self.download_url_base:
+            base_url = f"{self.download_url_base.rstrip('/')}/Products"
+        else:
+            base_url = self.url
+        return f"{base_url}({dataset_id})/$value"
+
     def _get_datasets_info(self, entries):
         """Get dataset attributes from the current page and
         yields them.
@@ -404,5 +413,5 @@ class ODataCrawler(HTTPPaginatedAPICrawler):
         for entry in entries:
             metadata = entry
             metadata['geometry'] = json.dumps(entry['GeoFootprint'])
-            url = f"{self.url}({entry['Id']})/$value"
+            url = self.get_download_url(entry['Id'])
             yield DatasetInfo(url, metadata)
