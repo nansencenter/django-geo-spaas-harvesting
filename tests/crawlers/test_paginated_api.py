@@ -633,7 +633,6 @@ class ODataCrawlerTestCase(unittest.TestCase):
                     metadata={
                         'Id': 'id1',
                         'GeoFootprint': [[1, 2]],
-                        'geometry': '[[1, 2]]',
                     }),
                 crawlers_base.DatasetInfo(
                     url='https://download.foo/Products(id2)/$value',
@@ -641,7 +640,6 @@ class ODataCrawlerTestCase(unittest.TestCase):
                         'Id': 'id2',
                         'attr1': 'value1',
                         'GeoFootprint': [[3, 4]],
-                        'geometry': '[[3, 4]]'
                     }),
             ]
         )

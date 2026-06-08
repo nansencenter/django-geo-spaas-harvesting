@@ -412,6 +412,5 @@ class ODataCrawler(HTTPPaginatedAPICrawler):
         Returns True if attributes were found, False otherwise"""
         for entry in entries:
             metadata = entry
-            metadata['geometry'] = json.dumps(entry['GeoFootprint'])
             url = self.get_download_url(entry['Id'])
             yield DatasetInfo(url, metadata)
