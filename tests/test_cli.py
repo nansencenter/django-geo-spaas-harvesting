@@ -1,16 +1,21 @@
 """Tests for the CLI"""
 import argparse
+import contextlib
 import io
 import logging
-import unittest
 import unittest.mock as mock
 import signal
 
+import django.test
+
 import geospaas_harvesting.cli as cli
+from geospaas_harvesting.models import Provider
 
 
-class CLITestCase(unittest.TestCase):
+class CLITestCase(django.test.TestCase):
     """Tests for the CLI"""
+
+    fixtures = ['providers']
 
     def test_init_worker(self):
         """Workers must ignore SIGINT"""
@@ -116,21 +121,101 @@ class CLITestCase(unittest.TestCase):
 
     def test_print_providers(self):
         """Test printing providers help texts"""
-        buffer = io.StringIO()
-        with mock.patch('sys.stdout', buffer), \
-             mock.patch('geospaas_harvesting.cli.ProvidersConfiguration') as mock_config:
-            mock_config.from_file.return_value.providers = {'foo': 'bar'}
-            cli.print_providers(argparse.Namespace(config_path=''))
-        self.assertEqual(buffer.getvalue(), 'Available providers:\nbar\n')
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            cli.print_providers(),
+            self.assertEqual(
+                out.getvalue(),
+                'Available providers:\n'
+                'Provider: ftp (normalizer: raw, crawler: ftp)\n'
+                'Provider: thredds (normalizer: raw, crawler: thredds)\n'
+                'Provider: ceda (normalizer: ceda_esa_cci, crawler: ftp)\n')
+
+    def test_delete_providers(self):
+        """Test deleting providers"""
+        with mock.patch('builtins.print') as mock_print:
+            cli.delete_providers(['ceda', 'thredds'])
+        providers = Provider.objects.all()
+        self.assertEqual(providers.count(), 1)
+        self.assertEqual(providers.first().name, 'ftp')
+
+    def test_update_providers_create_new(self):
+        """Test that new providers are created if they do not exist"""
+        providers_path = '/path/to/providers.yml'
+        new_provider = Provider.from_config('test', {
+            "crawler": {"name": "html_directory"},
+            "ingester": {},
+            "normalizer": {"name": "raw"}
+        })
+        mock_config = mock.Mock()
+        mock_config.providers = [new_provider]
+
+        with mock.patch('geospaas_harvesting.cli.config.ProvidersConfiguration.from_file',
+                        return_value=mock_config), \
+                mock.patch('builtins.print') as mock_print:
+            cli.update_providers(providers_path)
+
+        mock_print.assert_any_call(f"Creating provider {new_provider}")
+        self.assertEqual(Provider.objects.count(), 4)
+        self.assertIn(new_provider, Provider.objects.all())
+
+    def test_update_providers_update_existing(self):
+        """Test that existing providers are updated if they differ"""
+        providers_path = '/path/to/providers.yml'
+        updated_provider = Provider.from_config('ftp', {
+            "crawler": {"name": "ftp"},
+            "ingester": {"update": True},
+            "normalizer": {"name": "raw"}
+        })
+        mock_config = mock.Mock()
+        mock_config.providers = [updated_provider]
+
+        provider_before = Provider.objects.get(name='ftp')
+
+        with mock.patch('geospaas_harvesting.cli.config.ProvidersConfiguration.from_file',
+                        return_value=mock_config), \
+                mock.patch('builtins.print') as mock_print:
+            cli.update_providers(providers_path)
+
+        provider_after = Provider.objects.get(name='ftp')
+        updated_provider.refresh_from_db
+
+        mock_print.assert_any_call(f"Updating provider {provider_before} to {updated_provider}")
+        self.assertEqual(Provider.objects.count(), 3)
+        self.assertEqual(provider_after, updated_provider)
+        self.assertNotEqual(provider_before, provider_after)
+
+    def test_update_providers_no_update_needed(self):
+        """Test that no update occurs if the provider already matches"""
+        providers_path = '/path/to/providers.yml'
+        updated_provider = Provider.from_config('ftp', {
+            "crawler": {"name": "ftp"},
+            "ingester": {},
+            "normalizer": {"name": "raw"}
+        })
+        mock_config = mock.Mock()
+        mock_config.providers = [updated_provider]
+
+        provider_before = Provider.objects.get(name='ftp')
+
+        with mock.patch('geospaas_harvesting.cli.config.ProvidersConfiguration.from_file',
+                        return_value=mock_config), \
+                mock.patch('builtins.print') as mock_print:
+            cli.update_providers(providers_path)
+
+        provider_after = Provider.objects.get(name='ftp')
+
+        mock_print.assert_has_calls((
+            mock.call('Updating providers from /path/to/providers.yml'),))
+        self.assertEqual(provider_before, provider_after)
 
     def test_harvest(self):
         """Check that the necessary functions are called"""
-        with mock.patch('geospaas_harvesting.cli.ProvidersConfiguration'), \
-             mock.patch('geospaas_harvesting.cli.SearchConfiguration'), \
+        with mock.patch('geospaas_harvesting.config.SearchConfiguration'), \
+             mock.patch('geospaas_harvesting.config.GeneralConfiguration'), \
              mock.patch('geospaas_harvesting.cli.refresh_vocabularies') as mock_refresh_vocs, \
              mock.patch('geospaas_harvesting.cli.save_results') as mock_save_results, \
              mock.patch('geospaas_harvesting.cli.retry_ingest') as mock_retry_ingest:
-            cli.harvest(mock.Mock())
+            cli.harvest(mock.Mock(), mock.Mock())
 
             mock_refresh_vocs.assert_called()
             mock_save_results.assert_called()
@@ -158,3 +243,59 @@ class CLITestCase(unittest.TestCase):
              mock.patch('geospaas_harvesting.cli.harvest') as mock_harvest:
             cli.main()
             mock_harvest.assert_called()
+
+    def test_handle_providers_update(self):
+        """Test that providers are updated when --update is passed"""
+        cli_arguments = argparse.Namespace(
+            providers_path='/path/to/providers.yml', delete=None, list=False)
+        general_config = mock.Mock(providers_path='/default/path/to/providers.yml')
+
+        with mock.patch('geospaas_harvesting.cli.update_providers') as mock_update_providers:
+            cli.handle_providers(cli_arguments, general_config)
+
+        mock_update_providers.assert_called_once_with('/path/to/providers.yml')
+
+    def test_handle_providers_update_default(self):
+        """Test that default providers are updated when --update is passed without a path"""
+        cli_arguments = argparse.Namespace(
+            providers_path=cli.CreateDefaultProviders, delete=None, list=False)
+        general_config = mock.Mock(providers_path='/default/path/to/providers.yml')
+
+        with mock.patch('geospaas_harvesting.cli.update_providers') as mock_update_providers:
+            cli.handle_providers(cli_arguments, general_config)
+
+        mock_update_providers.assert_called_once_with('/default/path/to/providers.yml')
+
+    def test_handle_providers_delete(self):
+        """Test that providers are deleted when --delete is passed"""
+        cli_arguments = argparse.Namespace(providers_path=None, delete=['provider1', 'provider2'], list=False)
+        general_config = mock.Mock()
+
+        with mock.patch('geospaas_harvesting.cli.delete_providers') as mock_delete_providers:
+            cli.handle_providers(cli_arguments, general_config)
+
+        mock_delete_providers.assert_called_once_with(['provider1', 'provider2'])
+
+    def test_handle_providers_list(self):
+        """Test that providers are listed when --list is passed"""
+        cli_arguments = argparse.Namespace(providers_path=None, delete=None, list=True)
+        general_config = mock.Mock()
+
+        with mock.patch('geospaas_harvesting.cli.print_providers') as mock_print_providers:
+            cli.handle_providers(cli_arguments, general_config)
+
+        mock_print_providers.assert_called_once()
+
+    def test_handle_providers_no_action(self):
+        """Test that no action is taken when no arguments are passed"""
+        cli_arguments = argparse.Namespace(providers_path=None, delete=None, list=False)
+        general_config = mock.Mock()
+
+        with mock.patch('geospaas_harvesting.cli.update_providers') as mock_update_providers, \
+                mock.patch('geospaas_harvesting.cli.delete_providers') as mock_delete_providers, \
+                mock.patch('geospaas_harvesting.cli.print_providers') as mock_print_providers:
+            cli.handle_providers(cli_arguments, general_config)
+
+        mock_update_providers.assert_not_called()
+        mock_delete_providers.assert_not_called()
+        mock_print_providers.assert_not_called()

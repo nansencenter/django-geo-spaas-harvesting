@@ -13,8 +13,8 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geospaas_harvesting.settings')
 if not django.conf.settings.configured:
     django.setup()  # pragma: no cover
 
-import geospaas_harvesting.crawlers as crawlers  # pylint: disable=wrong-import-position
 import geospaas_harvesting.ingesters as ingesters  # pylint: disable=wrong-import-position
+import geospaas_harvesting.normalizers as normalizers
 
 
 logger = logging.getLogger('geospaas_harvesting.recovery')
@@ -49,6 +49,7 @@ def ingest_file(file_path):
         else:
             logger.info("Nothing to ingest in %s", file_path)
         file_path.unlink()
+    return dataset_infos
 
 
 def retry_ingest():
@@ -57,17 +58,16 @@ def retry_ingest():
     ingestion fails again. In that case, the new files are retried
     after waiting for a while. Maximum 5 tries.
     """
-    base_path = Path(crawlers.CrawlerIterator.FAILED_INGESTIONS_PATH)
-    glob_pattern = f'*{crawlers.CrawlerIterator.RECOVERY_SUFFIX}'
+    base_path = Path(normalizers.StreamMetadataNormalizer.FAILED_INGESTIONS_PATH)
+    glob_pattern = f'*{normalizers.StreamMetadataNormalizer.RECOVERY_SUFFIX}'
     wait_time = 60  # seconds
-    recovery_attempted = False
+    retried_datasets = []
 
     for _ in range(5):  # try maximum 5 times, i.e. wait in total 31 minutes
         recovery_files = base_path.glob(glob_pattern)
         for file_path in recovery_files:
-            recovery_attempted = True
             try:
-                ingest_file(file_path)
+                retried_datasets.append(ingest_file(file_path))
             except Exception:  # pylint: disable=broad-except
                 # do not interrupt recovery process in case of error for one file
                 logger.error("Did not manage to ingest %s", file_path, exc_info=True)
@@ -80,10 +80,12 @@ def retry_ingest():
         else:
             break
 
+    remaining_recovery_files = tuple(base_path.glob(glob_pattern))
     if tuple(base_path.glob(glob_pattern)):
-        logger.error("There are still errors. Stopping.")
-    elif recovery_attempted:
-        logger.info("All failed datasets have been successfully ingested.")
+        logger.error("Unable to ingest the following recovery files: %s", remaining_recovery_files)
+
+    logger.info("Finished retrying to ingest %s failed dataset%s.",
+                len(retried_datasets), '' if len(retried_datasets) != 1 else 's')
 
 
 def main():

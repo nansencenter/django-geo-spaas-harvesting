@@ -5,7 +5,8 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'fake-key')
 
 INSTALLED_APPS = [
     'geospaas.catalog',
-    'geospaas.vocabularies'
+    'geospaas.vocabularies',
+    'geospaas_harvesting',
 ]
 
 DATABASES = {

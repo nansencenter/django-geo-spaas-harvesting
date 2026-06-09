@@ -15,24 +15,25 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: POSIX :: Linux",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 dependencies = [
     "copernicusmarine",
     "django-geo-spaas",
     "django",
     "feedparser",
     "graypy",
-    "metanorm",
     "nansat",
     "netCDF4",
-    "numpy",
+    "numpy<2",
     "oauthlib",
+    "pystac-client",
     "pythesint>=1.7.0",
     "python-dateutil",
     "PyYAML",
     "requests_oauthlib",
     "requests",
-    "shapely",
+    "setuptools<81",
+    "shapely>=2",
 ]
 urls = {Repository = "https://github.com/nansencenter/django-geo-spaas-harvesting"}
 dynamic = ["version"]
