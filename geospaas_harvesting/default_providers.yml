@@ -44,6 +44,11 @@ providers:
       name: 'stac'
     normalizer:
       name: 'stac'
+  odata:
+    crawler:
+      name: 'odata'
+    normalizer:
+      name: 'odata'
 
   # specific providers
   ceda:

@@ -27,12 +27,16 @@ class HTTPPaginatedAPICrawler(Crawler):
     MIN_OFFSET = 0
 
     def __init__(self, **kwargs):
-        self.url = kwargs['url']
+        self.root_url = kwargs['url'].rstrip('/')
         self.initial_offset = kwargs['initial_offset'] or self.MIN_OFFSET
         self.request_parameters = self._build_request_parameters(
             kwargs['search_terms'], kwargs['time_range'], kwargs['location'],
             kwargs['username'], kwargs['password'],
             kwargs['page_size'])
+
+    @property
+    def url(self):
+        return self.root_url
 
     def __eq__(self, other):
         return (
@@ -258,7 +262,7 @@ class RestoCrawler(HTTPPaginatedAPICrawler):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.url = f"{self.url}/resto/api/collections/{kwargs['collection']}/search.json"
+        self.root_url = f"{self.url}/resto/api/collections/{kwargs['collection']}/search.json"
 
     # ------------- crawl ------------
     def _build_request_parameters(self, search_terms=None, time_range=(None, None), location=None,
@@ -301,4 +305,112 @@ class RestoCrawler(HTTPPaginatedAPICrawler):
             metadata = entry['properties']
             metadata['geometry'] = json.dumps(entry['geometry'])
             url = metadata['services']['download']['url']
+            yield DatasetInfo(url, metadata)
+
+
+class ODataCrawler(HTTPPaginatedAPICrawler):
+    """Crawler for the Copernicus OData API"""
+    name = 'odata'
+    argument_parser = arguments.ArgumentParser([
+        *HTTPPaginatedAPICrawler.argument_parser.arguments.values(),
+        arguments.StringArgument('collection', required=True),
+        arguments.StringArgument('download_url', required=False),
+    ])
+    logger = logging.getLogger(__name__ + '.ODataCrawler')
+
+    PAGE_OFFSET_NAME = '$skip'
+    PAGE_SIZE_NAME = '$top'
+    MIN_OFFSET = 0
+
+    def __init__(self, **kwargs):
+        self.root_url = kwargs['url'].rstrip('/')
+        self.download_url_base = kwargs.get('download_url')
+        self.collection = kwargs['collection']
+        self._collection_attributes = None
+        super().__init__(**kwargs)
+
+    @property
+    def url(self):
+        return f"{self.root_url}/Products"
+
+    def increment_offset(self):
+        self.page_offset += self.page_size
+
+    @property
+    def collection_attributes(self):
+        """Fetches valid attributes depending on the collection"""
+        if self._collection_attributes is None:
+            attributes_list = self._http_get(
+                f"{self.root_url}/Attributes({self.collection})"
+            ).json()
+            self._collection_attributes = {
+                attribute['Name']: attribute['ValueType']
+                for attribute in attributes_list
+            }
+        return self._collection_attributes
+
+    # ------------- crawl ------------
+    def _build_request_parameters(self, search_terms=None, time_range=(None, None), location=None,
+                                  username=None, password=None, page_size=100):
+        request_parameters = super()._build_request_parameters(
+            search_terms, time_range, location, username, password, page_size)
+        request_parameters['params']['$orderby'] = 'ContentDate/Start asc'
+        request_parameters['params']['$expand'] = 'Attributes'
+
+        collection_filter = [f"Collection/Name eq '{self.collection}'"]
+
+        search_terms_filter = self._build_attributes_filters(search_terms) if search_terms else []
+
+        api_date_format = '%Y-%m-%dT%H:%M:%SZ'
+        time_filter = []
+        if time_range[0]:
+            time_filter.append(f"ContentDate/End gt {time_range[0].strftime(api_date_format)}")
+        if time_range[1]:
+            time_filter.append(f"ContentDate/Start lt {time_range[1].strftime(api_date_format)}")
+
+        spatial_filter = []
+        if location:
+            spatial_filter.append(f"OData.CSC.Intersects(area=geography'SRID=4326;{location}')")
+
+        request_parameters['params']['$filter'] = ' and '.join(
+            collection_filter + search_terms_filter + time_filter + spatial_filter)
+
+        return request_parameters
+
+    def _build_attributes_filters(self, attributes: dict):
+        """Build a list of filters based on attributes.
+        For now, the only test supported is if the attribute is equal
+        to the provided value
+        """
+        filters = []
+        for name, value in attributes.items():
+            try:
+                attribute_type = self.collection_attributes[name]
+            except KeyError:
+                self.logger.warning("%s is not a valid attribute for collection %s",
+                                    name, self.collection)
+                continue
+            filters.append(
+                f"Attributes/OData.CSC.{attribute_type}Attribute/any("
+                    f"att:att/Name eq '{name}' and "
+                    f"att/OData.CSC.{attribute_type}Attribute/Value eq '{value}')")
+        return filters
+
+    def _get_entries(self, page):
+        return json.loads(page)['value']
+
+    def get_download_url(self, dataset_id):
+        if self.download_url_base:
+            base_url = f"{self.download_url_base.rstrip('/')}/Products"
+        else:
+            base_url = self.url
+        return f"{base_url}({dataset_id})/$value"
+
+    def _get_datasets_info(self, entries):
+        """Get dataset attributes from the current page and
+        yields them.
+        Returns True if attributes were found, False otherwise"""
+        for entry in entries:
+            metadata = entry
+            url = self.get_download_url(entry['Id'])
             yield DatasetInfo(url, metadata)

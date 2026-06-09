@@ -493,3 +493,153 @@ class RestoCrawlerTestCase(unittest.TestCase):
 
         dataset_infos = self.crawler._get_datasets_info(self.crawler._get_entries(page))
         self.assertEqual(next(dataset_infos), expected_result)
+
+
+class ODataCrawlerTestCase(unittest.TestCase):
+    """Tests for the ODataCrawler"""
+
+    def test_init(self):
+        """Test initialisation"""
+        with mock.patch.object(crawlers_paginated_api.ODataCrawler,
+                               '_build_request_parameters') as mock_build_params:
+            crawler = crawlers_paginated_api.ODataCrawler.from_kwargs(
+                url='https://foo/',
+                collection='COLLECTION',
+                time_range=[datetime(2026, 4, 1), datetime(2026, 4, 2)],
+                location='POLYGON((-180 90,180 90,180 60,-180 60,-180 90))',
+                search_terms={'param1': 'value1', 'param2': 2})
+
+        self.assertEqual(crawler.root_url, 'https://foo')
+        self.assertEqual(crawler.collection, 'COLLECTION')
+        self.assertIsNone(crawler._collection_attributes)
+        self.assertEqual(crawler.initial_offset, 0)
+        self.assertEqual(crawler.request_parameters, mock_build_params.return_value)
+
+    def test_url_property(self):
+        """Test URL property"""
+        crawler = crawlers_paginated_api.ODataCrawler.from_kwargs(
+            url='https://foo/',
+            collection='bar')
+        self.assertEqual(crawler.url, 'https://foo/Products')
+
+    def test_collection_attributes_property(self):
+        """Test that the collection_attributes property fetches the """
+        mock_response = mock.Mock()
+        mock_response.json.return_value = [
+            {'Name':'attr1', 'ValueType':'String'},
+            {'Name':'attr2',  'ValueType':'Integer'}]
+        with mock.patch.object(crawlers_paginated_api.ODataCrawler, '_http_get',
+                               return_value=mock_response):
+            crawler = crawlers_paginated_api.ODataCrawler.from_kwargs(
+                url='https://foo/', collection='bar', search_terms={'attr1': 'baz', 'attr2': 'qux'})
+            self.assertDictEqual(crawler.collection_attributes,
+                                 {'attr1': 'String', 'attr2': 'Integer'})
+
+    def test_build_request_parameters(self):
+        """Test builsding requests parameters"""
+        self.maxDiff = None
+        with mock.patch.object(crawlers_paginated_api.ODataCrawler, '_build_attributes_filters',
+                               return_value=['attribute_filter']):
+            crawler = crawlers_paginated_api.ODataCrawler.from_kwargs(
+                url='https://foo/',
+                collection='COLLECTION',
+                time_range=[datetime(2026, 4, 1), datetime(2026, 4, 2)],
+                location='POINT(0 1)',
+                search_terms={'param1': 'value1'},
+                page_size=100,
+            )
+        self.assertDictEqual(
+            crawler.request_parameters,
+            {
+                'params': {
+                    '$skip': 0,
+                    '$top': 100,
+                    '$orderby': 'ContentDate/Start asc',
+                    '$expand': 'Attributes',
+                    '$filter': (
+                        "Collection/Name eq 'COLLECTION' and attribute_filter and "
+                        "ContentDate/End gt 2026-04-01T00:00:00Z and "
+                        "ContentDate/Start lt 2026-04-02T00:00:00Z and "
+                        "OData.CSC.Intersects(area=geography'SRID=4326;POINT (0 1)')")
+                }
+            }
+        )
+
+    def test_increment_offset(self):
+        """Test incrementing the results offset"""
+        crawler = crawlers_paginated_api.ODataCrawler.from_kwargs(
+            url='https://foo/', collection='COLLECTION', page_size=100)
+        self.assertEqual(crawler.page_offset, 0)
+        crawler.increment_offset()
+        self.assertEqual(crawler.page_offset, 100)
+
+    def test_build_attributes_filters(self):
+        """Test building attributes filters"""
+        with mock.patch.object(crawlers_paginated_api.ODataCrawler,'collection_attributes',
+                               new_callable=mock.PropertyMock) as mock_collection_attributes:
+            crawler = crawlers_paginated_api.ODataCrawler.from_kwargs(
+                url='https://foo/', collection='COLLECTION')
+            mock_collection_attributes.return_value = {'key1': 'String', 'key2': 'Integer'}
+
+            with self.assertLogs(crawler.logger, logging.WARNING):
+                self.assertEqual(
+                    crawler._build_attributes_filters({'key1': 'value1', 'key2': '2', 'key3': '3'}),
+                    [
+                        "Attributes/OData.CSC.StringAttribute/any(att:att/Name eq 'key1' and "
+                            "att/OData.CSC.StringAttribute/Value eq 'value1')",
+                        "Attributes/OData.CSC.IntegerAttribute/any(att:att/Name eq 'key2' and "
+                            "att/OData.CSC.IntegerAttribute/Value eq '2')"
+                    ])
+
+    def test_get_entries(self):
+        """Test retrieving dataset entries from the API response"""
+        crawler = crawlers_paginated_api.ODataCrawler.from_kwargs(
+            url='https://foo/', collection='COLLECTION')
+        self.assertListEqual(
+            crawler._get_entries(
+                '{"@odata.context":"$metadata#Products(Attributes())","value":["d1", "d2"]}'),
+            ['d1', 'd2'])
+
+    def test_get_download_url(self):
+        """Test getting the download URL for a dataset given its ID"""
+        crawler_1 = crawlers_paginated_api.ODataCrawler.from_kwargs(
+            url='https://foo/', collection='COLLECTION')
+        self.assertEqual(
+            crawler_1.get_download_url('bar'),
+            "https://foo/Products(bar)/$value")
+        crawler_2 = crawlers_paginated_api.ODataCrawler.from_kwargs(
+            url='https://catalog.foo',
+            download_url='https://download.foo/',
+            collection='COLLECTION', )
+        self.assertEqual(
+            crawler_2.get_download_url('bar'),
+            "https://download.foo/Products(bar)/$value")
+
+    def test_get_datasets_info(self):
+        """Test getting DatasetInfo objects from API entries
+        """
+        crawler = crawlers_paginated_api.ODataCrawler.from_kwargs(
+            url='https://catalog.foo/',
+            download_url='https://download.foo',
+            collection='COLLECTION', )
+        entries = [
+            {'Id': 'id1', 'GeoFootprint': [[1, 2]]},
+            {'Id': 'id2', 'attr1': 'value1', 'GeoFootprint': [[3, 4]]}]
+        self.assertListEqual(
+            list(crawler._get_datasets_info(entries)),
+            [
+                crawlers_base.DatasetInfo(
+                    url='https://download.foo/Products(id1)/$value',
+                    metadata={
+                        'Id': 'id1',
+                        'GeoFootprint': [[1, 2]],
+                    }),
+                crawlers_base.DatasetInfo(
+                    url='https://download.foo/Products(id2)/$value',
+                    metadata={
+                        'Id': 'id2',
+                        'attr1': 'value1',
+                        'GeoFootprint': [[3, 4]],
+                    }),
+            ]
+        )

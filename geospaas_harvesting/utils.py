@@ -1,4 +1,5 @@
 """Utilities module for geospaas_harvesting"""
+import copy
 import importlib
 import os
 import pkgutil
@@ -153,7 +154,7 @@ def merge_configs(config_dict: dict, override: dict):
             'f': 6
         }
     """
-    final_config = config_dict.copy()
+    final_config = copy.deepcopy(config_dict)
     for key in override:
         if key in final_config:
             if type(final_config[key]) == type(override[key]):
