@@ -32,18 +32,22 @@ class ODataMetadataNormalizer(MetadataNormalizer):
 
     @utils.raises(KeyError)
     def get_time_coverage_start(self, dataset_info):
-        return dateutil.parser.parse(dataset_info.metadata['ContentDate']['Start'])
+        return dateutil.parser.parse(
+            dataset_info.metadata['ContentDate']['Start']
+        ).replace(microsecond=0)
 
     @utils.raises(KeyError)
     def get_time_coverage_end(self, dataset_info):
-        return dateutil.parser.parse(dataset_info.metadata['ContentDate']['End'])
+        return dateutil.parser.parse(
+            dataset_info.metadata['ContentDate']['End']
+        ).replace(microsecond=0)
 
     def get_keywords(self, dataset_info):
         lookups = []
         for attribute in dataset_info.metadata['Attributes']:
             if attribute['Name'] == 'platformShortName':
                 lookups.append({'kind': 'gcmd_platform', 'data__icontains': attribute['Value']})
-            elif attribute['Name'] == 'instrumentShortName':
+            if attribute['Name'] == 'instrumentShortName':
                 lookups.append({'kind': 'gcmd_instrument', 'data__icontains': attribute['Value']})
         return utils.find_keywords(lookups)
 
