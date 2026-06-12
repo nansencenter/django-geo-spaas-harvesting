@@ -112,7 +112,7 @@ class Ingester():
                         elif dataset_status == OperationStatus.UPDATED:
                             message = f"Successfully updated dataset '{dataset_entry_id}'"
                         elif dataset_status == OperationStatus.NOOP:
-                            message = f"Dataset already exists: {dataset_entry_id}"
+                            message = f"Dataset already exists: '{dataset_entry_id}'"
                         if created_uris:
                             message += f". Created URIs: {[u.uri for u in created_uris]}"
                         if existing_uris:
