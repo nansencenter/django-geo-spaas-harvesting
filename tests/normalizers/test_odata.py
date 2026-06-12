@@ -112,3 +112,12 @@ class ODataMetadataNormalizerTestCase(unittest.TestCase):
         """An exception must be raised if the attribute is missing"""
         with self.assertRaises(MetadataNormalizationError):
             self.normalizer.get_location_geometry(DatasetInfo(''))
+
+    def test_get_extra_urls(self):
+        """Test getting the S3 URL"""
+        self.assertListEqual(
+            self.normalizer.get_extra_urls(DatasetInfo('https://foo', {'S3Path': 'bar/baz'})),
+            ['s3://bar/baz'])
+        self.assertListEqual(
+            self.normalizer.get_extra_urls(DatasetInfo('https://foo', {})),
+            [])
