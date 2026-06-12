@@ -62,7 +62,8 @@ class MetadataNormalizer():
         keywords = self.get_keywords(dataset_info)
         parameters = self.get_dataset_parameters(dataset_info)
         tags_kwargs = self._get_all_tags(dataset_info)
-        return (dataset_kwargs, dataset_info.url, keywords, parameters, tags_kwargs)
+        extra_urls = self.get_extra_urls(dataset_info)
+        return (dataset_kwargs, [dataset_info.url, *extra_urls], keywords, parameters, tags_kwargs)
 
     def normalize_stream(self, dataset_infos):
         """Normalize an iterable of DatasetInfo objects.
@@ -127,6 +128,12 @@ class MetadataNormalizer():
             return utils.create_parameter_list(dataset_info.metadata['raw_dataset_parameters'])
         except KeyError:
             return []
+
+    def get_extra_urls(self, dataset_info):
+        """Get extra URLs for the dataset (for example alternative
+        download URLs)
+        """
+        return []
 
 
 class Stop():
