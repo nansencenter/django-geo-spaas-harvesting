@@ -155,3 +155,14 @@ class STACMetadataNormalizerTestCase(unittest.TestCase):
         """An exception must be raised if the attribute is missing"""
         with self.assertRaises(MetadataNormalizationError):
             self.normalizer.get_location_geometry(DatasetInfo(''))
+
+    def test_get_extra_urls(self):
+        """Test getting the S3 URL from metadata"""
+        self.assertListEqual(self.normalizer.get_extra_urls(DatasetInfo('', {})), [])
+        self.assertListEqual(self.normalizer.get_extra_urls(DatasetInfo('', {'links': []})), [])
+        self.assertListEqual(
+            self.normalizer.get_extra_urls(DatasetInfo('', {'links': [{'a': 'b'}]})), [])
+        self.assertListEqual(
+            self.normalizer.get_extra_urls(DatasetInfo('', {'links': [{'auth:refs': ['s3'],
+                                                            'href': 's3://bucket/folder/'}]})),
+            ['s3://bucket/folder/'])
