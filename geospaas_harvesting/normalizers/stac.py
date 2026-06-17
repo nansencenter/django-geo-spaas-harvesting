@@ -76,3 +76,10 @@ class STACMetadataNormalizer(MetadataNormalizer):
     def get_location_geometry(self, dataset_info):
         return shapely.to_wkt(
             shapely.from_geojson(json.dumps(dataset_info.metadata['geometry'])))
+
+    def get_extra_urls(self, dataset_info):
+        extra_urls = []
+        for link in dataset_info.metadata.get('links', []):
+            if 's3' in link.get('auth:refs', []):
+                extra_urls.append(link.get('href'))
+        return extra_urls

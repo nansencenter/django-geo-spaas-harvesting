@@ -42,8 +42,8 @@ class Ingester():
         """Writes a dataset to the database based on its attributes and
         URL. The input should be a DatasetInfo object.
         """
-        dataset_kwargs, url, keywords, parameters, tags = to_ingest
-        dataset_status = dataset_uri_status = OperationStatus.NOOP
+        dataset_kwargs, urls, keywords, parameters, tags = to_ingest
+        dataset_status = OperationStatus.NOOP
 
         with django.db.transaction.atomic():
             if self.update:
@@ -63,10 +63,15 @@ class Ingester():
             elif self.update:
                 dataset_status = OperationStatus.UPDATED
 
-            dataset_uri, uri_created = DatasetURI.objects.get_or_create(uri=url, dataset=dataset)
-
-            if uri_created:
-                dataset_uri_status = OperationStatus.CREATED
+            created_uris = []
+            existing_uris = []
+            for url in urls:
+                dataset_uri, uri_created = DatasetURI.objects.get_or_create(uri=url,
+                                                                            dataset=dataset)
+                if uri_created:
+                    created_uris.append(dataset_uri)
+                else:
+                    existing_uris.append(dataset_uri)
 
             # add many-to-many relationships if the dataset was created
             # or update is True
@@ -82,7 +87,7 @@ class Ingester():
                     self.logger.debug("Adding tag %s to dataset %s", tag, dataset)
                     dataset.tags.add(tag)
 
-        return (dataset_uri.uri, dataset.entry_id, dataset_status, dataset_uri_status)
+        return (created_uris, existing_uris, dataset.entry_id, dataset_status)
 
     def ingest(self, elements_to_ingest):
         """Iterates over an iterator of Tuple[Dataset,DatasetURI] and
@@ -100,29 +105,19 @@ class Ingester():
                     futures.append(executor.submit(self._ingest_dataset, to_ingest))
                 for future in concurrent.futures.as_completed(futures):
                     try:
-                        url, dataset_entry_id, dataset_status, dataset_uri_status = future.result()
+                        (created_uris, existing_uris,
+                         dataset_entry_id, dataset_status) = future.result()
                         if dataset_status == OperationStatus.CREATED:
-                            self.logger.info("Successfully created dataset '%s' from url: '%s'",
-                                             dataset_entry_id, url)
-                            if dataset_uri_status == OperationStatus.NOOP:
-                                # This should only happen if a database problem
-                                # occurred in _ingest_dataset(), because the
-                                # presence of the URI in the database is checked
-                                # before attempting to ingest.
-                                self.logger.error(
-                                    "The Dataset URI '%s' was not created for dataset '%s'",
-                                    url, dataset_entry_id)
+                            message = f"Successfully created dataset '{dataset_entry_id}'"
                         elif dataset_status == OperationStatus.UPDATED:
-                            self.logger.info("Sucessfully updated dataset '%s' from url: '%s'",
-                                             dataset_entry_id, url)
+                            message = f"Successfully updated dataset '{dataset_entry_id}'"
                         elif dataset_status == OperationStatus.NOOP:
-                            if dataset_uri_status == OperationStatus.CREATED:
-                                self.logger.info("Dataset URI '%s' added to existing dataset '%s'",
-                                                 url, dataset_entry_id)
-                            elif dataset_uri_status == OperationStatus.NOOP:
-                                self.logger.info("Dataset '%s' with URI '%s' already exists",
-                                                 dataset_entry_id, url)
-
+                            message = f"Dataset already exists: '{dataset_entry_id}'"
+                        if created_uris:
+                            message += f". Created URIs: {[u.uri for u in created_uris]}"
+                        if existing_uris:
+                            message += f". URIs already exist: {[u.uri for u in existing_uris]}"
+                        self.logger.info(message)
                     except Exception as error:  # pylint: disable=broad-except
                         self.logger.error("Error during ingestion: %s", str(error), exc_info=True)
                     finally:
