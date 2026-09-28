@@ -6,12 +6,10 @@ pythesint==1.7.3.dev0
 
 # loose requirements
 copernicusmarine==2.*
-django-geo-spaas==3.0.0.dev1
-django==3.*
+django-geo-spaas==3.0.0.dev7
+django==5.*
 feedparser==6.*
-feedparser==6.0.*
 graypy==2.*
-graypy==2.1.*
 nansat==1.*
 netCDF4==1.*
 numpy==1.*

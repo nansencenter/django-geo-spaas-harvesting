@@ -12,11 +12,10 @@ jobs:
     strategy:
       matrix:
         python_version:
-          - '3.9'
           - '3.10'
           - '3.11'
     env:
-      BASE_IMAGE: "${{ vars.DOCKER_ORG }}/geospaas:2.5.2-python${{ matrix.python_version }}"
+      BASE_IMAGE: "${{ vars.DOCKER_ORG }}/geospaas:latest-python${{ matrix.python_version }}"
       IMAGE_NAME: "${{ vars.DOCKER_ORG }}/geospaas_harvesting"
       GEOSPAAS_DB_HOST: 'db'
       GEOSPAAS_DB_USER: 'test'
