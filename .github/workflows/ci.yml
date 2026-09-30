@@ -15,7 +15,7 @@ jobs:
           - '3.10'
           - '3.11'
     env:
-      BASE_IMAGE: "${{ vars.DOCKER_ORG }}/geospaas:latest-python${{ matrix.python_version }}"
+      BASE_IMAGE: "${{ vars.DOCKER_ORG }}/geospaas:3.0.0.dev9-python${{ matrix.python_version }}"
       IMAGE_NAME: "${{ vars.DOCKER_ORG }}/geospaas_harvesting"
       GEOSPAAS_DB_HOST: 'db'
       GEOSPAAS_DB_USER: 'test'
