@@ -86,6 +86,10 @@ class MetadataNormalizerTestCase(unittest.TestCase):
         """
         self.assertListEqual(self.normalizer.get_dataset_parameters(DatasetInfo('')), [])
 
+    def test_get_extra_urls(self):
+        """Should return an empty list by default"""
+        self.assertListEqual(self.normalizer.get_extra_urls(DatasetInfo('')), [])
+
     def test_normalize(self):
         """Test that the normalize method returns the right attributes
         """
@@ -131,6 +135,9 @@ class MetadataNormalizerTestCase(unittest.TestCase):
             def get_tags(self, dataset_info):
                 return [{'name': 'collection', 'value': 'test'}]
 
+            def get_extra_urls(self, dataset_info):
+                return ['https://dl.foo']
+
         self.assertTupleEqual(
             TestNormalizer().normalize(DatasetInfo('https://foo')),
             (
@@ -142,7 +149,7 @@ class MetadataNormalizerTestCase(unittest.TestCase):
                     'time_coverage_start': 'time_coverage_start',
                     'time_coverage_end': 'time_coverage_end',
                 },
-                'https://foo',
+                ['https://foo', 'https://dl.foo'],
                 [{'kind': 'gcmd_instrument', 'data': {'Short_Name': 'instrument'}}],
                 ['dataset_parameters'],
                 [{'name': 'collection', 'value': 'test'}],
@@ -164,7 +171,7 @@ class MetadataNormalizerTestCase(unittest.TestCase):
                     'time_coverage_start': 'force_time_coverage_start',
                     'time_coverage_end': 'force_time_coverage_end',
                 },
-                'https://foo',
+                ['https://foo', 'https://dl.foo'],
                 [{'kind': 'gcmd_instrument', 'data': {'Short_Name': 'instrument'}}],
                 ['dataset_parameters'],
                 [{'name': 'collection', 'value': 'test'}],

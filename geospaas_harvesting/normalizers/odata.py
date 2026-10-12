@@ -54,3 +54,11 @@ class ODataMetadataNormalizer(MetadataNormalizer):
     @utils.raises(KeyError)
     def get_location_geometry(self, dataset_info):
         return shapely.to_wkt(shapely.geometry.shape(dataset_info.metadata['GeoFootprint']))
+
+    def get_extra_urls(self, dataset_info):
+        urls = []
+        try:
+            urls.append(f"s3://{dataset_info.metadata['S3Path'].lstrip('/')}")
+        except KeyError:
+            pass
+        return urls
