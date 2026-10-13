@@ -3,6 +3,7 @@
 import unittest
 import unittest.mock as mock
 from datetime import datetime, timezone as tz
+from pathlib import Path
 
 import shapely.errors
 import shapely.geometry
@@ -28,12 +29,8 @@ class ArgumentParserTestCase(unittest.TestCase):
 
     def test_parse(self):
         """Test parsing an argument"""
-        argument = arguments.AnyArgument('foo')
-        argument.add_child(arguments.AnyArgument('baz', default='qux'))
-        arg_parser = arguments.ArgumentParser([argument])
-        self.assertDictEqual(
-            arg_parser.parse({'foo': 'bar'}),
-            {'foo': 'bar', 'baz': 'qux'})
+        arg_parser = arguments.ArgumentParser([arguments.AnyArgument('foo')])
+        self.assertDictEqual(arg_parser.parse({'foo': 'bar'}), {'foo': 'bar'})
 
     def test_parse_required_error(self):
         """An error must be raised if a required argument is missing"""
@@ -79,21 +76,6 @@ class ArgumentTestCase(unittest.TestCase):
         self.assertEqual(
             str(arguments.Argument('foo', required=False, default='bar', description='baz')),
             'foo, type=unknown, not required, default=bar, description=baz')
-
-    def test_add_child(self):
-        """Test adding a child to an argument"""
-        parent = arguments.Argument('foo')
-        child = arguments.Argument('bar')
-        parent.add_child(child)
-        self.assertIn(child, parent.children)
-        self.assertEqual(child.parent, parent)
-
-    def test_set_parent(self):
-        """Test setting the parent for an argument"""
-        parent = arguments.Argument('foo')
-        child = arguments.Argument('bar')
-        child._set_parent(parent)
-        self.assertEqual(child.parent, parent)
 
 
 class AnyArgumentTestCase(unittest.TestCase):
@@ -161,14 +143,23 @@ class DictArgumentTestCase(unittest.TestCase):
     def test_parse(self):
         """Test data validation"""
         arg = arguments.DictArgument(name='dict_arg', valid_keys=['foo'])
-
         self.assertEqual(arg.parse({'foo': 'bar'}), {'foo': 'bar'})
-
         with self.assertRaises(ValueError):
             arg.parse('foo')
-
         with self.assertRaises(ValueError):
             arg.parse({'baz': 'qux'})
+
+    def test_parse_values_types(self):
+        """Test data validation with values types"""
+        arg = arguments.DictArgument(
+                name='dict_arg',
+                valid_keys=['foo', 'bar', 'baz'],
+                values_types=[str, arguments.BooleanArgument()])
+        self.assertDictEqual(
+            arg.parse({'foo': True, 'bar': 'quz'}),
+            {'foo': True, 'bar': 'quz'})
+        with self.assertRaises(ValueError):
+            arg.parse({'foo': True, 'bar': 'quz', 'baz': 1})
 
     def test_eq(self):
         """Test equality between dict arguments"""
@@ -222,6 +213,33 @@ class IntegerArgumentTestCase(unittest.TestCase):
             "foo, type=integer, required, minimum value=1, maximum value=5")
 
 
+class SequenceArgumentTestCase(unittest.TestCase):
+    """Tests for the SequenceArgument class"""
+
+    def test_parse(self):
+        """Test simple sequence parsing"""
+        arg = arguments.SequenceArgument()
+        self.assertEqual(arg.parse((1, 2, 3)), (1, 2, 3))
+        self.assertEqual(arg.parse([1, 2, 3]), [1, 2, 3])
+        with self.assertRaises(ValueError):
+            arg.parse(1)
+
+    def test_parse_length_validation(self):
+        """Test sequence parsing with length validation"""
+        arg = arguments.SequenceArgument(length=3)
+        self.assertEqual(arg.parse((1, 2, 3)), (1, 2, 3))
+        self.assertEqual(arg.parse([1, 2, 3]), [1, 2, 3])
+        with self.assertRaises(ValueError):
+            arg.parse([1])
+
+    def test_parse_content_validation(self):
+        """Test sequence parsing with contents validation"""
+        arg = arguments.SequenceArgument(contents_type=arguments.IntegerArgument)
+        self.assertEqual(arg.parse((1, 2, 3)), (1, 2, 3))
+        with self.assertRaises(ValueError):
+            arg.parse([1, 2, '3'])
+
+
 class ListArgumentTestCase(unittest.TestCase):
     """Tests for the ListArgument class"""
 
@@ -236,23 +254,11 @@ class ListArgumentTestCase(unittest.TestCase):
 class PathArgumentTestCase(unittest.TestCase):
     """Tests for the PathArgument class"""
 
-    def test_is_path(self):
-        """Test checking that a string represents a path"""
-        arg = arguments.PathArgument(name='foo')
-        self.assertTrue(arg.is_path('/bar'))
-        self.assertTrue(arg.is_path('/bar/'))
-        self.assertTrue(arg.is_path('/bar/baz'))
-        self.assertTrue(arg.is_path('/bar/baz/'))
-        self.assertTrue(arg.is_path('./bar'))
-        self.assertTrue(arg.is_path('../bar'))
-        self.assertFalse(arg.is_path('bar'))
-        self.assertFalse(arg.is_path('bar/baz'))
-
     def test_validate(self):
         """Test path validation"""
         arg = arguments.PathArgument(name='foo', valid_options=['/foo'])
-        self.assertEqual(arg.parse('/foo'), '/foo')
-        self.assertEqual(arg.parse('/foo/bar'), '/foo/bar')
+        self.assertEqual(arg.parse('/foo'), Path('/foo'))
+        self.assertEqual(arg.parse('/foo/bar'), Path('/foo/bar'))
         with self.assertRaises(ValueError):
             arg.parse('/baz')
         with self.assertRaises(ValueError):
@@ -319,3 +325,15 @@ class WKTArgumentTestCase(unittest.TestCase):
                                       required=True,
                                       geometry_types=[shapely.geometry.Point])),
             "foo, type=WKT string, required, accepted geometries=['Point']")
+
+
+class WKTOrStringArgumentTestCase(unittest.TestCase):
+    """Tests for the WKTOrStringArgument class"""
+
+    def test_parse(self):
+        """Should return a shapely object if valid WKT, else pass along
+        the string
+        """
+        arg = arguments.WKTOrStringArgument()
+        self.assertEqual(arg.parse("Point(1 1)"), shapely.Point(1, 1))
+        self.assertEqual(arg.parse("bbox(1,2,3,4)"), "bbox(1,2,3,4)")
