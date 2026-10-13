@@ -78,19 +78,17 @@ class Provider(models.Model):
     def normalizer_name(self):
         return self.config['normalizer']['name']
 
-    @property
-    def crawler_class(self):
+    def get_crawler_class(self, crawler_name):
         try:
-            return crawlers.index[self.crawler_name]
+            return crawlers.index[crawler_name]
         except KeyError:
-            raise ValueError(f"Unknown crawler {self.crawler_name}")
+            raise ValueError(f"Unknown crawler {crawler_name}")
 
-    @property
-    def normalizer_class(self):
+    def get_normalizer_class(self, normalizer_name):
         try:
-            return normalizers.index[self.normalizer_name]
+            return normalizers.index[normalizer_name]
         except KeyError:
-            raise ValueError(f"Unknown normalizer {self.normalizer_name}")
+            raise ValueError(f"Unknown normalizer {normalizer_name}")
 
     @staticmethod
     def get_config_section(config_dict, key):
@@ -98,19 +96,21 @@ class Provider(models.Model):
         Overrides values with `override_parameters` if provided
         """
         config_ = config_dict.get(key, {}).copy()
-        config_.pop('name', None)
-        return config_
+        name = config_.pop('name', None)
+        return (name, config_)
 
     def search(self, **search_parameters):
         """Returns a Search object which can be used to explore the
         search results returned by the crawler
         """
         final_config = utils.merge_configs(self.config, search_parameters)
+        crawler_name, crawler_config = self.get_config_section(final_config, 'crawler')
+        normalizer_name, normalizer_config = self.get_config_section(final_config, 'normalizer')
+        _, ingester_config = self.get_config_section(final_config, 'ingester')
         return SearchResults(
-            crawler=self.crawler_class.from_config(
-                self.get_config_section(final_config, 'crawler')),
-            normalizer=self.normalizer_class(**self.get_config_section(final_config, 'normalizer')),
-            ingester=ingesters.Ingester(**self.get_config_section(final_config, 'ingester')))
+            crawler=self.get_crawler_class(crawler_name).from_config(crawler_config),
+            normalizer=self.get_normalizer_class(normalizer_name)(**normalizer_config),
+            ingester=ingesters.Ingester(**ingester_config))
 
 
 class SearchResults():

@@ -72,23 +72,35 @@ class ProviderTestCase(unittest.TestCase):
             str(self.provider),
             "Provider: test (normalizer: raw, crawler: test)")
 
-    def test_crawler_class(self):
+    def test_get_crawler_class(self):
         """Test getting a crawler class from the provider's config"""
         mock_crawler = mock.Mock()
         with mock.patch('geospaas_harvesting.crawlers.index', {'test': mock_crawler}):
-            self.assertEqual(self.provider.crawler_class, mock_crawler)
+            self.assertEqual(self.provider.get_crawler_class('test'), mock_crawler)
             with self.assertRaises(ValueError):
-                providers.Provider(name='test', config={'crawler': {'name': 't'}}).crawler_class
+                self.provider.get_crawler_class('foo')
 
-    def test_normalizer_class(self):
+    def test_get_normalizer_class(self):
         """Test getting a normalizer class from the provider's config
         """
         mock_normalizer = mock.Mock()
         with mock.patch('geospaas_harvesting.normalizers.index', {'raw': mock_normalizer}):
-            self.assertEqual(self.provider.normalizer_class, mock_normalizer)
+            self.assertEqual(
+                self.provider.get_normalizer_class('raw'), mock_normalizer)
             with self.assertRaises(ValueError):
-                providers.Provider(
-                    name='test', config={'normalizer': {'name': 'n'}}).normalizer_class
+                self.provider.get_normalizer_class('foo')
+
+    def test_get_config_section(self):
+        """Test getting a section of configuration"""
+        self.assertTupleEqual(
+            self.provider.get_config_section(self.provider.config, 'crawler'),
+            ('test', {'username': 'user', 'password': 'pass'}))
+        self.assertTupleEqual(
+            self.provider.get_config_section(self.provider.config, 'normalizer'),
+            ('raw', {}))
+        self.assertTupleEqual(
+            self.provider.get_config_section(self.provider.config, 'ingester'),
+            (None, {}))
 
 
 class SearchResultsTestCase(unittest.TestCase):
