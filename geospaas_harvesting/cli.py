@@ -113,8 +113,9 @@ def update_providers(providers_path: Union[Path, str]):
                 provider.save()
 
 
-def handle_providers(cli_arguments, general_config):
+def handle_providers(cli_arguments):
     """List/update/delete providers"""
+    general_config = config.GeneralConfiguration.from_file(cli_arguments.config_path)
     if cli_arguments.providers_path:
         if cli_arguments.providers_path is CreateDefaultProviders:
             providers_path = general_config.providers_path
@@ -127,11 +128,12 @@ def handle_providers(cli_arguments, general_config):
         print_providers()
 
 
-def harvest(cli_arguments, general_config):
+def harvest(cli_arguments):
     """Reads the configuration files and harvests the searched data.
     If errors occur during the ingestion process (like the provider
     website being temporarily unavailable), it is retried at the end.
     """
+    general_config = config.GeneralConfiguration.from_file(cli_arguments.config_path)
     search_config = config.SearchConfiguration.from_file(cli_arguments.search_path)
     searches_results = search_config.create_provider_searches()
 
@@ -145,6 +147,7 @@ def harvest(cli_arguments, general_config):
 def make_arg_parser():
     """Creates a parser for the CLI arguments"""
     arg_parser = argparse.ArgumentParser(
+        prog='harvesting',
         description='CLI for searching and harvesting data for the GeoSPaaS catalog')
     arg_parser.add_argument('-c', '--config',
                             dest='config_path',
@@ -183,8 +186,7 @@ def main():
     """
     arg_parser = make_arg_parser()
     cli_arguments = arg_parser.parse_args()
-    general_config = config.GeneralConfiguration.from_file(cli_arguments.config_path)
-    cli_arguments.func(cli_arguments, general_config)
+    cli_arguments.func(cli_arguments)
 
 
 if __name__ == '__main__':  # pragma: no cover
