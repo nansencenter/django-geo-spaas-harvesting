@@ -5,7 +5,7 @@ docker run -d --rm \
 --name "$GEOSPAAS_DB_HOST" \
 -e "POSTGRES_USER=$GEOSPAAS_DB_USER" \
 -e "POSTGRES_PASSWORD=$GEOSPAAS_DB_PASSWORD" \
-'postgis/postgis:12-3.0'
+'postgis/postgis:18-3.6'
 
 i=0
 while ! docker exec db pg_isready && (( i < 10 ));do

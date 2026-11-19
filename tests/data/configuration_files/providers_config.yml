@@ -1,9 +1,0 @@
----
-update_vocabularies: False
-update_pythesint: False
-pythesint_versions:
-  gcmd_instrument: '9.1.5'
-providers:
-  creodias:
-    type: 'resto'
-    url: 'https://datahub.creodias.eu'

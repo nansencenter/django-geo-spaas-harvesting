@@ -1,92 +1,31 @@
 """This module defines classes used to parse and validate arguments.
 """
+import copy
 import re
-from datetime import timezone
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Sequence
 
 import dateutil.parser
 import shapely.wkt
+from shapely.errors import GEOSException
 
 
 class NoDefault:
     """Special class used when no default value is specified"""
 
 
-class ArgumentParser():
-    """Class capable of validating if a dictionary of parameters
-    matches a list of argument definitions
-    """
-    def __init__(self, arguments, strict=True):
-        """Set the list of valid arguments.
-        If `strict` is True, only the defined arguments must be present
-        in the parameters being validated. Otherwise, extra parameters
-        are allowed
-        """
-        self.arguments = {}
-        self.add_arguments(arguments)
-        self.strict = strict
-
-    def __str__(self):
-        result = ['available arguments:']
-        result.extend([str(arg) for arg in self.arguments.values()])
-        return '\n\t'.join(result)
-
-    def add_arguments(self, arguments):
-        """Adds or updates Arguments in the valid arguments"""
-        for arg in arguments:
-            if not isinstance(arg, Argument):
-                raise ValueError(f"{arg} should be an Argument object")
-            self.arguments[arg.name] = arg
-
-    def parse(self, parameters):
-        """Makes sure the right arguments are passed and parses them.
-        `parameters` should be a dictionary of parameters to be
-        validated.
-        """
-        parsed_parameters = {}
-        recursion_stack = list(self.arguments.values())
-        max_stack_size = 10000
-
-        # Loop through the argument definitions and check that the
-        # parameters match the definitions.
-        # If an argument has children, they will be checked too
-        while recursion_stack and len(recursion_stack) <= max_stack_size:
-            # if the name of the argument is found in the parameters,
-            # the value is parsed and adde to the final results.
-            argument = recursion_stack.pop()
-            if argument.name in parameters:
-                parsed_parameters[argument.name] = argument.parse(
-                    parameters.pop(argument.name))
-                # add the child arguments to the stack so that they are
-                # processed
-                for child in argument.children:
-                    recursion_stack.append(child)
-            elif argument.required:
-                raise ValueError(f"Argument {argument.name} not provided")
-            else:
-                if argument.default is not NoDefault:
-                    parsed_parameters[argument.name] = argument.default
-
-        if self.strict and parameters:
-            raise ValueError(f"Unknown argument(s) {parameters}")
-
-        return parsed_parameters
-
-
 class Argument():
     """Base class for arguments. Each argument has at least a name and
     a 'required' attribute.
-    In case there are arguments depending on another one, they can be
-    listed as children. In that case, their 'parent' attribute is set
     """
     type = 'unknown'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.name = name
         self.required = kwargs.get('required', False)
         self.default = kwargs.get('default', NoDefault)
         self.description = kwargs.get('description', '')
-        self.parent = None
-        self.children = []
 
     def __eq__(self, other):
         return (
@@ -105,20 +44,75 @@ class Argument():
             f"description={self.description}" if self.description else '',
         )))
 
-    def _set_parent(self, parent):
-        """Define the parent of the current argument"""
-        self.parent = parent
-
-    def add_child(self, child):
-        """Add a child argument"""
-        child._set_parent(self)
-        self.children.append(child)
-
     def parse(self, value):
         """Return a properly formatted value for the argument.
         If the input is not correct, should raise an exception
         """
         raise NotImplementedError()
+
+
+class ArgumentParser(Argument):
+    """Class capable of validating if a dictionary of parameters
+    matches a list of argument definitions
+    """
+
+    def __init__(self, arguments, name='root', strict=True, **kwargs):
+        """Set the list of valid arguments.
+        If `strict` is True, only the defined arguments must be present
+        in the parameters being validated. Otherwise, extra parameters
+        are allowed
+        """
+        self.arguments = {}
+        self.add_arguments(arguments)
+        self.strict = strict
+        super().__init__(name, **kwargs)
+
+    def __str__(self):
+        result = ['available arguments:']
+        result.extend([str(arg) for arg in self.arguments.values()])
+        return '\n\t'.join(result)
+
+    def add_arguments(self, arguments):
+        """Adds or updates Arguments in the valid arguments"""
+        for arg in arguments:
+            if not (isinstance(arg, Argument) or isinstance(arg, ArgumentParser)):
+                raise ValueError(f"{arg} should be an Argument or ArgumentParser object")
+            self.arguments[arg.name] = arg
+
+    def parse(self, parameters, allow_missing=False):
+        """Makes sure the right arguments are passed and parses them.
+        `parameters` should be a dictionary of parameters to be
+        validated.
+        """
+        parsed_parameters = {}
+        recursion_stack = list(self.arguments.values())
+        max_stack_size = 10000
+
+        # Loop through the argument definitions and check that the
+        # parameters match the definitions.
+        while recursion_stack and len(recursion_stack) <= max_stack_size:
+            # if the name of the argument is found in the parameters,
+            # the value is parsed and adde to the final results.
+            argument = recursion_stack.pop()
+            if argument.name in parameters:
+                parsed_parameters[argument.name] = argument.parse(
+                    parameters.pop(argument.name))
+            elif not allow_missing and argument.required:
+                raise ValueError(f"Argument {argument.name} not provided")
+            else:
+                if argument.default is not NoDefault:
+                    if isinstance(argument.default, type):
+                        default = argument.default()
+                    else:
+                        # copy prevents all instances from sharing the
+                        # same default object when the default is mutable
+                        default = copy.deepcopy(argument.default)
+                    parsed_parameters[argument.name] = default
+
+        if self.strict and parameters:
+            raise ValueError(f"Unknown argument(s) {parameters}")
+
+        return parsed_parameters
 
 
 class AnyArgument(Argument):
@@ -146,7 +140,7 @@ class ChoiceArgument(Argument):
     """
     type = 'multiple choices'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.valid_options = kwargs.pop('valid_options', [])
         super().__init__(name, **kwargs)
         if self.default is not NoDefault:
@@ -177,7 +171,11 @@ class DatetimeArgument(Argument):
     def parse(self, value):
         if value is None:
             return None
-        _datetime = dateutil.parser.parse(value)
+        elif isinstance(value, datetime):
+            _datetime = value
+        else:
+            _datetime = dateutil.parser.parse(value)
+
         if _datetime.tzinfo is None:
             _datetime = _datetime.replace(tzinfo=timezone.utc)
         return _datetime
@@ -187,8 +185,9 @@ class DictArgument(Argument):
     """Dictionary argument"""
     type = 'dictionary'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.valid_keys = set(kwargs.pop('valid_keys', []))
+        self.values_types = kwargs.pop('values_types', [])
         super().__init__(name, **kwargs)
 
     def __eq__(self, other):
@@ -201,9 +200,30 @@ class DictArgument(Argument):
     def parse(self, value):
         if not isinstance(value, dict):
             raise ValueError(f"{self.name} should be a dictionary")
-        keys = set(value.keys())
-        if self.valid_keys and not keys.issubset(self.valid_keys):
-            raise ValueError(f"Invalid keys {keys.difference(self.valid_keys)}")
+
+        for dict_key, dict_value in value.items():
+            if self.valid_keys and dict_key not in self.valid_keys:
+                raise ValueError(f"Invalid key '{dict_key}'")
+            valid = False
+            if self.values_types:
+                # self.values_types can contain Python types or
+                # Argument instances
+                for valid_type in self.values_types:
+                    if isinstance(valid_type, Argument):
+                        try:
+                            valid_type.parse(dict_value)
+                        except ValueError:
+                            continue
+                        else:
+                            valid = True
+                            break
+                    elif isinstance(dict_value, valid_type):
+                        valid = True
+                        break
+                if not valid:
+                    raise ValueError(
+                        f"The value for '{dict_key}' should be of one of the following types: " +
+                        str(self.values_types))
         return value
 
 
@@ -213,7 +233,7 @@ class IntegerArgument(Argument):
     """
     type = 'integer'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         min_value = kwargs.pop('min_value', None)
         max_value = kwargs.pop('max_value', None)
         self.min_value = int(min_value) if min_value is not None else min_value
@@ -242,14 +262,31 @@ class IntegerArgument(Argument):
         return value
 
 
-class ListArgument(Argument):
+class SequenceArgument(Argument):
+    """The argument can be any sequence"""
+    type = 'sequence'
+
+    def __init__(self, name='', **kwargs):
+        super().__init__(name, **kwargs)
+        self.contents_type = kwargs.get('contents_type', AnyArgument) # should be an argument class
+        self.length = kwargs.get('length', None)
+
+    def parse(self, value):
+        if not isinstance(value, Sequence):
+            raise ValueError(f"{self.name} should be a sequence")
+        if self.length is not None and len(value) != self.length:
+            raise ValueError(f"{self.name} should have {self.length} elements")
+        return type(value)(self.contents_type(f'{self.name} element').parse(elt) for elt in value)
+
+
+class ListArgument(SequenceArgument):
     """Check that the value is a list"""
     type = 'list'
 
     def parse(self, value):
         if not isinstance(value, list):
             raise ValueError(f"{self.name} should be a list")
-        return value
+        return super().parse(value)
 
 
 class PathArgument(ChoiceArgument):
@@ -258,35 +295,30 @@ class PathArgument(ChoiceArgument):
     Subdirectories of the valid options are still valid.
     """
     type = 'path'
-    SEP = '/'
-    path_re = re.compile(rf'^\.{{,2}}({SEP}[^{SEP}]*)*{SEP}?$')
 
-    def is_path(self, path):
-        """Returns True if the value is a valid path"""
-        return self.path_re.match(path)
-
-    def validate(self, value):
-        # check path format
-        if not self.is_path(value):
-            raise ValueError(f"{value} is not a valid path")
-
+    def validate(self, value: Path):
         # check valid options
         if self.valid_options:
             found = False
             for valid_path in self.valid_options:
-                if value.startswith(valid_path):
+                if value.is_relative_to(valid_path):
                     found = True
                     break
             if not found:
                 raise ValueError(
-                    f"{value} is not an accepted path :{self.valid_options}")
+                    f"{value} is not an accepted path. Accepted paths are: {self.valid_options}")
+
+    def parse(self, value):
+        path_value = Path(value)
+        self.validate(path_value)
+        return path_value
 
 
 class StringArgument(Argument):
     """String argument with optional regex validation"""
     type = 'string'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.regex = kwargs.pop('regex', None)
         super().__init__(name, **kwargs)
 
@@ -301,7 +333,7 @@ class StringArgument(Argument):
         if not isinstance(value, str):
             raise ValueError(f"{self.name} should be a string")
         if self.regex is not None and not re.match(self.regex, value):
-            raise ValueError(f"{value} does not match the validation pattern {self.regex}")
+            raise ValueError(f"Value does not match the validation pattern {self.regex}")
         return value
 
 
@@ -309,7 +341,7 @@ class WKTArgument(Argument):
     """Creates a shapely geometry object from a WKT string"""
     type = 'WKT string'
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name='', **kwargs):
         self.geometry_types = kwargs.pop('geometry_types', [])
         super().__init__(name, **kwargs)
 
@@ -324,7 +356,20 @@ class WKTArgument(Argument):
     def parse(self, value):
         geometry = shapely.wkt.loads(value)
         geometry_type = type(geometry)
-        if self.geometry_types is None or geometry_type in self.geometry_types:
+        if not self.geometry_types or geometry_type in self.geometry_types:
             return geometry
         else:
             raise ValueError(f"{geometry_type} is not supported for argument {self.name}")
+
+
+class WKTOrStringArgument(WKTArgument):
+    """Creates a shapely geometry if possible. Otherwise, if the
+    argument is a string, pass it through
+    """
+    type = 'WKT or arbitrary string'
+
+    def parse(self, value):
+        try:
+            return super().parse(value)
+        except GEOSException as error:
+            return str(value)
